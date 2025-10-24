@@ -710,10 +710,8 @@ const PORT = process.env.PORT || 3000;
 
 async function startServer() {
   try {
-    const MONGO_URI =
-      process.env.MONGO_URI ||
-      process.env.MONGO ||
-      'mongodb://127.0.0.1:27017/Aalacomputer';
+    const MONGO_URI ='mongodb+srv://uni804043_db_user:P5AYVn4VkHqlQbjz@cluster0.0cy1usa.mongodb.net/'
+
 
     if (MONGO_URI) {
       mongoose.set('bufferCommands', false);
