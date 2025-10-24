@@ -1,0 +1,56 @@
+redirectsOrigin = "config"
+plugins = []
+functionsDirectory = "C:\\Users\\MicroZaib\\OneDrive\\Pictures\\aalacomputer-main\\api"
+functionsDirectoryOrigin = "config-v1"
+headers = []
+
+[functions]
+
+[functions."*"]
+
+[build]
+publish = "C:\\Users\\MicroZaib\\OneDrive\\Pictures\\aalacomputer-main\\dist"
+publishOrigin = "config"
+commandOrigin = "config"
+base = "C:\\Users\\MicroZaib\\OneDrive\\Pictures\\aalacomputer-main"
+command = "npm run build"
+functions = "C:\\Users\\MicroZaib\\OneDrive\\Pictures\\aalacomputer-main\\api"
+
+[build.environment]
+NODE_VERSION = "18"
+
+[build.processing]
+
+[build.processing.css]
+
+[build.processing.html]
+
+[build.processing.images]
+
+[build.processing.js]
+
+[build.services]
+
+[[redirects]]
+from = "/api/*"
+to = "/.netlify/functions/server/:splat"
+status = 200.0
+force = false
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200.0
+force = false
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
