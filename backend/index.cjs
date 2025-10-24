@@ -30,7 +30,13 @@ const cookieParser = require('cookie-parser');
 const app=express()
 // Trust proxy so req.protocol/hostname respect X-Forwarded-* when behind load balancers/proxies
 app.set('trust proxy', true);
+const __dirname = path.resolve();
+app.use(express.static(path.join(__dirname, 'dist')));
 
+// Fallback for SPA routing
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
 // Flexible CORS: echo origin dynamically and allow credentials so cookies/auth headers work.
 // This avoids hardcoding origins and supports HTTP and HTTPS across hosting platforms.
 app.use(cors({
