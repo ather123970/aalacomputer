@@ -140,6 +140,19 @@ router.post('/login', async (req, res) => {
 // Me
 router.get('/me', authMiddleware, async (req, res) => {
   try {
+    // Handle file-based admin user
+    if (req.user?.id === 'file-admin') {
+      return res.json({ 
+        user: { 
+          id: 'file-admin', 
+          name: 'Admin', 
+          email: req.user.email, 
+          phone: null 
+        } 
+      });
+    }
+    
+    // Handle regular MongoDB users
     const user = await User.findById(req.user?.id).lean();
     if (!user) return res.status(404).json({ message: 'User not found' });
     res.json({ user: { id: user._id, name: user.name, email: user.email, phone: user.phone } });
