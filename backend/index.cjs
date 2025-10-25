@@ -13,8 +13,9 @@ app.use(helmet());
 app.use(cors());
 app.use(compression());
 
-// Serve static files from backend/dist
-const distPath = path.join(__dirname, 'dist');
+// Serve static files from project root dist directory
+const distPath = path.join(__dirname, '..', 'dist');
+console.log('[server] Looking for frontend files in:', distPath);
 // Serve static assets with caching; index.html is always served via the fallback route
 app.use(express.static(distPath, { maxAge: '1d' }));
 

@@ -5,13 +5,12 @@
   "type": "module",
   "main": "backend/index.cjs",
   "scripts": {
-  "dev": "vite",
-  "build": "node tools/ensure-dist.cjs",
+    "dev": "vite",
+    "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
     "backend:start": "node backend/index.cjs",
     "backend:dev": "nodemon --watch backend --ext js,cjs --exec node backend/index.cjs",
-    
     "start": "node backend/index.cjs"
   },
   "dependencies": {
