@@ -113,4 +113,20 @@ router.get('/orders/:id', async (req, res) => {
   }
 })
 
+// Delete item from cart
+router.delete('/cart/:id', async (req, res) => {
+  try {
+    const id = decodeURIComponent(req.params.id || '')
+    let cart = await readJSON('cart', [])
+    const idx = cart.findIndex(c => String(c.id) === String(id))
+    if (idx === -1) return res.status(404).json({ ok: false, message: 'Item not found' })
+    cart.splice(idx, 1)
+    await writeJSON('cart', cart)
+    return res.json({ ok: true, cart })
+  } catch (e) {
+    console.error('Failed to delete cart item', e)
+    return res.status(500).json({ ok: false, message: 'Failed to delete item' })
+  }
+})
+
 export default router

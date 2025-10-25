@@ -436,57 +436,11 @@ app.post('/api/ask', (req, res) => {
   return res.status(404).json({ error: 'AI assistant removed from this server' });
 });
 
-// Cart POST - maintain simple in-memory cart behavior (dev)
-app.post('/api/v1/cart', (req, res) => {
-  const payload = req.body;
-  if (!payload) return res.status(400).json({ error: 'no data' });
+// Cart POST route moved to orders.js
 
-  const normalizeItem = (item) => ({
-    id: item.id ?? item._id ?? item.name ?? Math.random().toString(36),
-    name: item.name ?? item.Name ?? 'Unnamed',
-    price: Number(item.price ?? item.p ?? 0) || 0,
-    img: item.img ?? item.image ?? '',
-    spec: item.spec ?? item.specs ?? item.desc ?? item.description ?? '',
-    qty: Number(item.qty ?? 1)
-  });
+// Cart GET route moved to orders.js
 
-  const upsert = (item) => {
-    const existing = CART.find(c => c.id === item.id);
-    if (existing) {
-      existing.qty = item.qty;
-      existing.price = item.price;
-      existing.name = item.name;
-      existing.img = item.img;
-      existing.spec = item.spec;
-    } else {
-      CART.push(item);
-    }
-  };
-
-  if (Array.isArray(payload)) {
-    payload.map(normalizeItem).forEach(upsert);
-  } else {
-    upsert(normalizeItem(payload));
-  }
-
-  return res.json({ ok: true, cart: CART, cartCount: CART.length });
-});
-
-app.get('/api/v1/cart', (req, res) => res.json(CART));
-
-// Delete item from in-memory cart
-app.delete('/api/v1/cart/:id', (req, res) => {
-  try {
-    const id = decodeURIComponent(req.params.id || '')
-    const idx = CART.findIndex(c => String(c.id) === String(id))
-    if (idx === -1) return res.status(404).json({ ok: false, message: 'Item not found' })
-    CART.splice(idx, 1)
-    return res.json({ ok: true, cart: CART })
-  } catch (e) {
-    console.error('Cart DELETE error', e && (e.stack || e.message || e))
-    return res.status(500).json({ ok: false, message: 'Server error' })
-  }
-});
+// Cart DELETE route moved to orders.js
 
 // /api/chat endpoint removed
 
