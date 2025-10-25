@@ -1,0 +1,46 @@
+name: CI - Build & Smoke Test
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build (frontend -> backend/dist)
+        run: npm run build
+
+      - name: Start server (background)
+        run: |
+          nohup node backend/index.cjs > server.log 2>&1 &
+          # wait for server to boot
+          sleep 3
+
+      - name: Smoke test GET /
+        run: |
+          curl -fS http://localhost:3000/ -o /tmp/root.html
+          head -n 1 /tmp/root.html
+
+      - name: Smoke test GET /api/ping
+        run: |
+          curl -fS http://localhost:3000/api/ping | jq .
+
+      - name: Archive server logs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-log
+          path: server.log

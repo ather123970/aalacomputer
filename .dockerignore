@@ -1,0 +1,9 @@
+node_modules
+npm-debug.log
+.git
+.github
+/.vscode
+/*.log
+Dockerfile
+tools
+**/.DS_Store
