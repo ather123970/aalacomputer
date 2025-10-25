@@ -18,7 +18,7 @@ export default defineConfig({
   },
   server: {
     host: true,
-  allowedHosts: ['.loca.lt', 'localhost', '127.0.0.1', 'aalacomputerkarachi.vercel.app', 'aalacomputer.com'],
+    allowedHosts: ['.loca.lt', 'localhost', '127.0.0.1', 'aalacomputerkarachi.vercel.app', 'aalacomputer.com'],
     cors: false,
     // Proxy /api to the local API shim during development so frontend requests
     // to /api/v1/* are forwarded to the dev API server. The dev shim provided
