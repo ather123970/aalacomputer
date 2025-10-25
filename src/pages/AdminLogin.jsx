@@ -52,7 +52,8 @@ const AdminLogin = () => {
 
       if (data.ok && data.token) {
         localStorage.setItem('aalacomp_admin_token', data.token);
-        navigate('/admin');
+        // Automatically redirect to admin dashboard
+        window.location.href = '/admin';
       } else {
         setError(data.error || 'Login failed');
       }

@@ -126,9 +126,6 @@ const ProductDetail = () => {
                   <h1 className="text-3xl sm:text-4xl font-bold mb-2">
                     {product.Name}
                   </h1>
-                  {localStorage.getItem('aalacomp_admin_token') && (
-                    <button onClick={async ()=>{ window.location.href = '/admin'; }} className="px-2 py-1 bg-blue-600 text-white rounded text-sm">Edit</button>
-                  )}
                 </div>
                 <p className="text-2xl font-semibold text-blue-400 mb-4">
                   PKR {parsePrice(product.price).toLocaleString()}
