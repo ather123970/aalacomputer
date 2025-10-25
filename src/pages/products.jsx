@@ -367,10 +367,10 @@ const AnimatedProductCard = ({ p, buynow, loadingId, navigate, delay, isAdmin, s
     >
       <div className="relative h-48 w-full rounded-xl overflow-hidden flex items-center justify-center bg-gray-800 mb-4">
         <img
-          src={p.img || "https://via.placeholder.com/200"}
+          src={p.img || "/images/placeholder.svg"}
           alt={p.Name}
           className="object-contain w-full h-full hover:scale-110 transition-transform duration-300"
-          onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/200")}
+          onError={(e) => (e.currentTarget.src = "/images/placeholder.svg")}
         />
         {isAdmin && (
           <button onClick={(e)=>{ e.stopPropagation(); /* open edit */ if (typeof setEditing === 'function') setEditing({ ...p, id: p.id, Name: p.Name || p.name }); else window.dispatchEvent(new CustomEvent('aalacomp:openEdit', { detail: p })); }} className="absolute top-2 right-2 bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded">Edit</button>

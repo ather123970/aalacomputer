@@ -190,12 +190,11 @@ export default function Product() {
               className="h-[220px] sm:h-[260px] w-full rounded-xl overflow-hidden flex items-center justify-center bg-card cursor-pointer"
             >
               <img
-                src={p.img || "https://via.placeholder.com/420x260?text=No+Image"}
+                src={p.img || "/images/placeholder.svg"}
                 alt={p.Name}
                 className="object-contain w-full h-full"
                 onError={(e) => {
-                  e.currentTarget.src =
-                    "https://via.placeholder.com/420x260?text=No+Image";
+                  e.currentTarget.src = "/images/placeholder.svg";
                 }}
               />
             </div>

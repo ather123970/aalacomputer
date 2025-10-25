@@ -113,7 +113,7 @@ const ProductDetail = () => {
             {/* Image Section */}
             <div className="flex items-center justify-center bg-card rounded-xl p-6 sm:p-8">
               <img
-                src={product.img || "https://via.placeholder.com/400"}
+                src={product.img || "/images/placeholder.svg"}
                 alt={product.Name}
                 className="max-h-80 sm:max-h-[400px] w-full object-contain rounded-lg transition-transform duration-500 hover:scale-105"
               />

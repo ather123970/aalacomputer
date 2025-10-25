@@ -29,7 +29,7 @@ export default function Deal() {
                   src={deal.img}
                   alt={deal.name}
                   className="w-full h-full object-cover"
-                  onError={(e) => e.currentTarget.src="https://via.placeholder.com/400x300"}
+                  onError={(e) => e.currentTarget.src="/images/placeholder.svg"}
                 />
               </div>
               <div className="p-6">

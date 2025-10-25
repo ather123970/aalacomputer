@@ -31,11 +31,48 @@ const app=express()
 // Trust proxy so req.protocol/hostname respect X-Forwarded-* when behind load balancers/proxies
 app.set('trust proxy', true);
 
-// Flexible CORS: echo origin dynamically and allow credentials so cookies/auth headers work.
-// This avoids hardcoding origins and supports HTTP and HTTPS across hosting platforms.
+// Enhanced CORS: allow multiple origins dynamically
 app.use(cors({
-  origin: true,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    if (FRONTEND_ORIGINS.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Allow localhost with any port for development
+    if (origin.match(/^https?:\/\/localhost(:\d+)?$/)) {
+      return callback(null, true);
+    }
+    
+    // Allow 127.0.0.1 with any port for development
+    if (origin.match(/^https?:\/\/127\.0\.0\.1(:\d+)?$/)) {
+      return callback(null, true);
+    }
+    
+    // Allow any Render deployment
+    if (origin.match(/^https:\/\/.*\.onrender\.com$/)) {
+      return callback(null, true);
+    }
+    
+    // Allow any Vercel deployment
+    if (origin.match(/^https:\/\/.*\.vercel\.app$/)) {
+      return callback(null, true);
+    }
+    
+    // Allow custom domains
+    if (origin.match(/^https:\/\/.*\.com$/)) {
+      return callback(null, true);
+    }
+    
+    console.log('[cors] blocked origin:', origin);
+    return callback(new Error('Not allowed by CORS'), false);
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 // Note: preflight OPTIONS are handled by the cors middleware and a lightweight
 // OPTIONS responder in the logging middleware below.
@@ -566,14 +603,24 @@ app.post('/api/admin/login', async (req, res) => {
 
 function requireAdmin(req) {
   const auth = req.headers.authorization || '';
-  if (!auth) return false;
+  if (!auth) {
+    console.log('[admin] no authorization header');
+    return false;
+  }
+  
   const parts = String(auth || '').split(' ');
   const token = parts.length === 2 ? parts[1] : parts[0];
-  if (!token) return false;
+  if (!token) {
+    console.log('[admin] no token found in authorization header');
+    return false;
+  }
+  
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    console.log('[admin] token verified for:', decoded.sub);
     return decoded; // truthy admin payload
   } catch (e) {
+    console.log('[admin] token verification failed:', e.message);
     return false;
   }
 }
