@@ -5,8 +5,8 @@
   "type": "module",
   "main": "backend/index.cjs",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+  "dev": "vite",
+  "build": "node tools/ensure-dist.cjs",
     "preview": "vite preview",
     "lint": "eslint .",
     "backend:start": "node backend/index.cjs",
