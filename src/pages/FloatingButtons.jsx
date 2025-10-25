@@ -23,7 +23,7 @@ export default function FloatingButtonsPage() {
     // Try fetching config from /api/v1/config if available (no error if missing)
     (async () => {
       try {
-        const res = await fetch('/api/v1/config');
+        const res = await fetch(`${import.meta.env.DEV ? 'http://localhost:10000' : window.location.origin}/api/v1/config`);
         if (!res.ok) return;
         const j = await res.json();
         if (j && j.whatsapp) setWhHref(getWhatsAppHref(j.whatsapp));

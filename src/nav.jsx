@@ -57,13 +57,21 @@ export default function Navbar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
+  // Helper function to get API base URL
+  const getApiBaseUrl = () => {
+    if (import.meta.env.DEV) {
+      return import.meta.env.VITE_BACKEND_URL || 'http://localhost:10000';
+    }
+    return window.location.origin;
+  };
+
   // keep your original auth + cart logic intact
   useEffect(() => {
     let alive = true;
     // prefer Authorization header with local accessToken when available (easier in dev)
     const token = (() => { try { return localStorage.getItem('accessToken'); } catch (e) { return null; } })();
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    fetch('/api/v1/auth/me', { credentials: 'include', headers })
+    fetch(`${getApiBaseUrl()}/api/v1/auth/me`, { credentials: 'include', headers })
       .then(async (res) => {
         if (!alive) return null;
         if (!res.ok) return null;
@@ -91,7 +99,7 @@ export default function Navbar() {
 
     (async () => {
       try {
-        const r = await fetch('/api/v1/cart');
+        const r = await fetch(`${getApiBaseUrl()}/api/v1/cart`);
         if (r.ok) {
           const j = await r.json();
           setCartCount(Array.isArray(j) ? j.length : 0);
@@ -109,7 +117,7 @@ export default function Navbar() {
   const handleLogout = () => {
     const token = (() => { try { return localStorage.getItem('accessToken'); } catch (e) { return null; } })();
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include', headers }).finally(() => {
+    fetch(`${getApiBaseUrl()}/api/v1/auth/logout`, { method: 'POST', credentials: 'include', headers }).finally(() => {
       localStorage.removeItem('user');
       localStorage.removeItem('accessToken');
       setUser(null);

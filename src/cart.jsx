@@ -154,7 +154,7 @@ export default function Cart() {
     // Create order on server
     let createdOrder = null
     try {
-      const res = await fetch('/api/v1/orders', {
+      const res = await fetch(`${import.meta.env.DEV ? 'http://localhost:10000' : window.location.origin}/api/v1/orders`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

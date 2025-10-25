@@ -88,7 +88,7 @@ const Checkout = () => {
     // Load WhatsApp number from config API
     ;(async () => {
       try {
-        const r = await fetch('/api/v1/config', { credentials: 'include' })
+        const r = await fetch(`${import.meta.env.DEV ? 'http://localhost:10000' : window.location.origin}/api/v1/config`, { credentials: 'include' })
         if (r.ok) {
           const j = await r.json()
           if (j.whatsapp) window.__WH_NUMBER = j.whatsapp
@@ -152,7 +152,7 @@ const Checkout = () => {
         }
 
         // Persist order to backend orders collection
-        const res = await fetch('/api/v1/orders', {
+        const res = await fetch(`${import.meta.env.DEV ? 'http://localhost:10000' : window.location.origin}/api/v1/orders`, {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
