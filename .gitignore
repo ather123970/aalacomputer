@@ -1,8 +1,10 @@
+.gitignore
 node_modules/
 .env
 .env.*
 dist/
-backend/dist/
+# keep built backend/dist in repo for production deployments (remove this line to ignore)
+# backend/dist/
 .DS_Store
 /.idea
 /.vscode
