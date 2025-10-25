@@ -11,5 +11,9 @@
 // For production (Vercel) prefer relative '/api' so client calls hit serverless functions.
 // Prefer explicit VITE_API_BASE_URL (new recommended name). Fall back to other
 // names for compatibility, otherwise use '/api' in dev and window.location.origin+'/api' in production.
+// Prefer explicit Vite-provided API base. Otherwise default to a relative
+// '/api' so the frontend will call the same origin the site is served from
+// (this is what you want when backend serves the static files). If you
+// need to target a different backend in production, set VITE_API_BASE_URL.
 const explicit = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL;
-export const API_BASE = explicit || (import.meta.env.MODE === 'production' ? 'https://aalacomputer-api.onrender.com/api' : '/api');
+export const API_BASE = explicit || '/api';

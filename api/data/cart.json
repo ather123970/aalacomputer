@@ -1,0 +1,47 @@
+[
+  {
+    "id": "1",
+    "name": "StreetRunner",
+    "price": 70000,
+    "img": "/rbtech_sonic_c05_white-removebg-preview.png",
+    "specs": [
+      "CPU: AMD Ryzen 3 3200G (4 Cores, Vega 8 iGPU)",
+      "GPU: Integrated Vega 8",
+      "RAM: 8GB DDR4 3200MHz",
+      "Storage: 240GB SSD",
+      "Case: Simple ATX Compact Case",
+      "PSU: 450W 80+ Bronze"
+    ],
+    "type": "Pre-Build",
+    "qty": 1
+  },
+  {
+    "id": "4",
+    "name": "Mouse",
+    "price": 3500,
+    "img": "/mouse.png",
+    "specs": [
+      "Ergonomic",
+      "RGB",
+      "Wired"
+    ],
+    "type": "Pre-Build",
+    "qty": 1
+  },
+  {
+    "id": "2",
+    "name": "Workhorse",
+    "price": 230000,
+    "img": "/pcglow.jpg",
+    "specs": [
+      "CPU: Ryzen 7 7700X",
+      "GPU: RTX 3070 8GB",
+      "RAM: 32GB DDR5 5200MHz",
+      "Storage: 1TB NVMe SSD",
+      "PSU: 750W 80+ Gold",
+      "Case: Corsair 4000D Airflow"
+    ],
+    "type": "Pre-Build",
+    "qty": 1
+  }
+]

@@ -302,6 +302,7 @@ const DEFAULT_ORIGINS = [
   'https://aalacomputerkarachi.vercel.app',
   'https://aalacomputer.com',
   'https://aalacomputerkarachi2124.netlify.app/',
+  'https://aalacomputer-123.onrender.com',
 ];
 // Allow either FRONTEND_ORIGINS (comma-separated) or a single FRONTEND_ORIGIN for convenience
 const FRONTEND_ORIGINS = (process.env.FRONTEND_ORIGINS
@@ -711,21 +712,89 @@ app.get('/api/admin/stats', (req, res) => {
 // Endpoint to increment AI-open counter (called by frontend when AI opens product via window.aalaaiOpen)
 // AI open tracking endpoint removed.
 
-// Serve static files from the dist directory and provide client-side routing
-// fallback. This is mounted after all API routes so it doesn't interfere with
-// API handling.
+// Serve static files from the frontend build directory and provide
+// client-side routing fallback. This is mounted after all API routes so
+// it doesn't interfere with API handling.
 const PORT = process.env.PORT || 3000;
 
-const DIST_DIR = path.join(__dirname, '..', 'dist');
-app.use(express.static(DIST_DIR));
-app.get('*', (req, res, next) => {
-  // Let API routes pass through
-  if (req.path.startsWith('/api')) return next();
-  const indexPath = path.join(DIST_DIR, 'index.html');
-  if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
-  // If index.html is missing, return a clear 404 so logs are actionable
-  res.status(404).send('Not found');
-});
+// Support multiple possible frontend build locations and allow an env
+// override. Common outputs: dist (vite), build, public. The env
+// FRONTEND_DIST can be used to explicitly set the folder.
+function findDistDir() {
+  const candidates = [];
+  if (process.env.FRONTEND_DIST) candidates.push(path.resolve(process.env.FRONTEND_DIST));
+  // default candidates (relative to project root)
+  candidates.push(path.join(__dirname, '..', 'dist'));
+  candidates.push(path.join(__dirname, '..', 'build'));
+  candidates.push(path.join(__dirname, '..', 'public'));
+  // also check project root (when backend is run from repo root)
+  candidates.push(path.resolve('dist'));
+  candidates.push(path.resolve('build'));
+  candidates.push(path.resolve('public'));
+
+  for (const c of candidates) {
+    try {
+      if (c && fs.existsSync(c) && fs.statSync(c).isDirectory()) return c;
+    } catch (e) {
+      // ignore
+    }
+  }
+  return null;
+}
+
+const FOUND_DIST = findDistDir();
+if (FOUND_DIST) {
+  console.log('[server] serving frontend from', FOUND_DIST);
+  // Detect an un-built Vite index.html that still points to /src/main.jsx
+  // which indicates the frontend hasn't been built for production. In
+  // that case we show a helpful message instead of serving a broken
+  // app that will only render the static AI button.
+  let devIndexDetected = false;
+  try {
+    const idxContent = fs.readFileSync(path.join(FOUND_DIST, 'index.html'), 'utf8');
+    if (/type\s*=\s*"module"\s+src\s*=\s*"\/src\//i.test(idxContent) || /src\/main\.jsx/i.test(idxContent)) {
+      devIndexDetected = true;
+      console.warn('[server] Found index.html that references /src — frontend likely not built. Run `npm run build`.');
+    }
+  } catch (e) {
+    // ignore read errors
+  }
+  // Provide a favicon route to avoid 404 noise. If a real favicon exists
+  // in the build, serve it; otherwise return 204 (no content) so browsers
+  // stop reporting a missing favicon.
+  app.get('/favicon.ico', (req, res) => {
+    const fav = path.join(FOUND_DIST, 'favicon.ico');
+    if (fs.existsSync(fav)) return res.sendFile(fav);
+    res.status(204).end();
+  });
+
+  // disable express static index auto-serve so SPA fallback works explicitly
+  app.use(express.static(FOUND_DIST, { index: false, maxAge: '1d' }));
+  app.get(/.*/, (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    const indexPath = path.join(FOUND_DIST, 'index.html');
+    if (!fs.existsSync(indexPath)) {
+      return res.status(404).send('Frontend build not found (index.html missing in ' + FOUND_DIST + '). Run `npm run build` from the project root.');
+    }
+    if (devIndexDetected) {
+      // Informative plain-text response to help the developer fix the build
+      return res.status(200).send('Detected un-built frontend in ' + FOUND_DIST + ".\n\nThis index.html points at '/src' (dev entry). Run `npm run build` in the project root to produce a production build, then restart the server.\n\nIf you intentionally want to serve the dev files, run the frontend dev server with `npm run dev` instead.");
+    }
+    return res.sendFile(indexPath);
+  });
+} else {
+  console.warn('[server] No frontend build directory found. Expected one of: dist, build, public (or set FRONTEND_DIST env).');
+  // Provide a minimal informative route at root so `Cannot GET /` is replaced
+  // with a helpful message rather than a generic Express response.
+  app.get('/', (req, res) => {
+    res.status(200).send('Frontend build not found. Run `npm run build` in the project root to generate the static files, or start the frontend dev server with `npm run dev`.');
+  });
+  // Keep a fallback for any non-API paths
+  app.get(/.*/, (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.status(404).send('Frontend build not found. See server logs for details.');
+  });
+}
 
 async function startServer() {
   try {
@@ -733,9 +802,17 @@ async function startServer() {
     // in production — Render and other hosts should provide MONGO_URI. If no
     // MONGO_URI is provided we'll skip attempting to connect to avoid noisy
     // ECONNREFUSED errors when there's no DB available.
+    // DB connect is opt-in. To avoid noisy auth errors during local
+    // development or when running `npm run preview`, only attempt a
+    // MongoDB connection when MONGO_URI is present AND ENABLE_DB=1 or
+    // NODE_ENV=production. This lets you run the server locally without
+    // providing DB credentials.
     const MONGO_URI = process.env.MONGO_URI || process.env.MONGO || null;
+  // Only attempt DB connect when explicitly enabled via ENABLE_DB=1.
+  // This avoids accidental DB attempts when running locally or using `npm run preview`.
+  const ENABLE_DB = (String(process.env.ENABLE_DB || '').trim() === '1');
 
-    if (MONGO_URI) {
+    if (MONGO_URI && ENABLE_DB) {
       try {
         mongoose.set('bufferCommands', false);
         await mongoose.connect(MONGO_URI, {
@@ -747,7 +824,7 @@ async function startServer() {
         console.error('[db] MongoDB connection failed:', e && (e.stack || e.message));
       }
     } else {
-      console.log('[db] No MONGO_URI configured; skipping DB connect');
+      console.log('[db] Skipping MongoDB connect (MONGO_URI present? ' + Boolean(MONGO_URI) + ', ENABLE_DB? ' + ENABLE_DB + ')');
     }
 
     await ensureAdminUser();

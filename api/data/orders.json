@@ -1,0 +1,21 @@
+[
+  {
+    "id": "local_1761386022928",
+    "createdAt": "2025-10-25T09:53:42.928Z",
+    "items": [
+      {
+        "id": "1",
+        "name": "StreetRunner",
+        "price": 70000,
+        "qty": 1
+      },
+      {
+        "id": "4",
+        "name": "Mouse",
+        "price": 3500,
+        "qty": 1
+      }
+    ],
+    "total": 73500
+  }
+]
