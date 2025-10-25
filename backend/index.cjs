@@ -730,9 +730,9 @@ app.get('/api/admin/stats', (req, res) => {
 
 // Catch-all handler: send back React's index.html file for client-side routing
 // Use a middleware approach that's more reliable
-app.get('*', (req, res, next) => {
+app.use((req, res, next) => {
   // Only handle non-API routes and non-static file requests
-  if (!req.path.startsWith('/api/') && !req.path.startsWith('/assets/')) {
+  if (!req.path.startsWith('/api') && !req.path.startsWith('/assets')) {
     const indexPath = path.join(__dirname, '..', 'dist', 'index.html');
     if (fs.existsSync(indexPath)) {
       return res.sendFile(indexPath);
