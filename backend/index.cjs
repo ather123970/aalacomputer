@@ -302,7 +302,7 @@ const DEFAULT_ORIGINS = [
   'https://aalacomputerkarachi.vercel.app',
   'https://aalacomputer.com',
   'https://aalacomputerkarachi2124.netlify.app/',
-  'https://aalacomputer-123.onrender.com',
+  'https://aalacomputer-1234.onrender.com',
 ];
 // Allow either FRONTEND_ORIGINS (comma-separated) or a single FRONTEND_ORIGIN for convenience
 const FRONTEND_ORIGINS = (process.env.FRONTEND_ORIGINS
