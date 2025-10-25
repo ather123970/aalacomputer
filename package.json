@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node backend/index.cjs",
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm install && vite build",
     "preview": "vite preview",
     "lint": "eslint .",
     "backend:dev": "nodemon --watch backend --ext js,cjs --exec node backend/index.cjs"

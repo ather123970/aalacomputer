@@ -721,20 +721,27 @@ const PORT = process.env.PORT || 3000;
 // override. Common outputs: dist (vite), build, public. The env
 // FRONTEND_DIST can be used to explicitly set the folder.
 function findDistDir() {
-  const candidates = [];
-  if (process.env.FRONTEND_DIST) candidates.push(path.resolve(process.env.FRONTEND_DIST));
-  // default candidates (relative to project root)
-  candidates.push(path.join(__dirname, '..', 'dist'));
-  candidates.push(path.join(__dirname, '..', 'build'));
-  candidates.push(path.join(__dirname, '..', 'public'));
-  // also check project root (when backend is run from repo root)
-  candidates.push(path.resolve('dist'));
-  candidates.push(path.resolve('build'));
-  candidates.push(path.resolve('public'));
+  // On Render, we know the dist directory will be at the project root
+  const distPath = path.join(__dirname, '..', 'dist');
+  if (process.env.NODE_ENV === 'production') {
+    console.log('[server] Production environment - using dist path:', distPath);
+    return distPath;
+  }
+
+  // For development, check multiple possible locations
+  const candidates = [
+    process.env.FRONTEND_DIST && path.resolve(process.env.FRONTEND_DIST),
+    distPath,
+    path.join(__dirname, '..', 'build'),
+    path.join(__dirname, '..', 'public'),
+    path.resolve('dist'),
+    path.resolve('build'),
+    path.resolve('public')
+  ].filter(Boolean);
 
   for (const c of candidates) {
     try {
-      if (c && fs.existsSync(c) && fs.statSync(c).isDirectory()) return c;
+      if (fs.existsSync(c) && fs.statSync(c).isDirectory()) return c;
     } catch (e) {
       // ignore
     }
