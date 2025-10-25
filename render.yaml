@@ -1,0 +1,36 @@
+services:services:
+
+  - type: web  - type: web
+
+    name: aalacomputer-web    name: aalacomputer-web
+
+    env: node    env: node
+
+    plan: free    plan: free
+
+    buildCommand: |    buildCommand: npm install && npm run build
+
+      npm install    startCommand: node backend/index.cjs
+
+      npm run build    envVars:
+
+      ls -la dist/      - key: NODE_ENV
+
+    startCommand: node backend/index.cjs        value: production
+
+    envVars:      - key: PORT
+
+      - key: NODE_ENV        value: 10000
+
+        value: production    staticPublishPath: ./dist
+
+      - key: PORT    autoDeploy: true
+
+        value: 10000    healthCheckPath: /api/ping
+      - key: ENABLE_DB
+        value: 1
+      - key: FRONTEND_DIST
+        value: /opt/render/project/src/dist
+    staticPublishPath: ./dist
+    autoDeploy: true
+    healthCheckPath: /api/ping
