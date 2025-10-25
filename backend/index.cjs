@@ -322,7 +322,20 @@ app.use(express.json({ limit: '1mb' }));
 // Serve static files from the dist directory (built frontend)
 const distPath = path.join(__dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {
-  app.use(express.static(distPath));
+  // Serve static files with proper headers
+  app.use(express.static(distPath, {
+    maxAge: '1d', // Cache static assets for 1 day
+    etag: true,
+    lastModified: true,
+    setHeaders: (res, path) => {
+      // Set proper MIME types for JS and CSS files
+      if (path.endsWith('.js')) {
+        res.setHeader('Content-Type', 'application/javascript');
+      } else if (path.endsWith('.css')) {
+        res.setHeader('Content-Type', 'text/css');
+      }
+    }
+  }));
   console.log('[server] serving static files from:', distPath);
 } else {
   console.warn('[server] dist directory not found at:', distPath);
@@ -717,9 +730,9 @@ app.get('/api/admin/stats', (req, res) => {
 
 // Catch-all handler: send back React's index.html file for client-side routing
 // Use a middleware approach that's more reliable
-app.use((req, res, next) => {
-  // Only handle non-API routes
-  if (!req.path.startsWith('/api/')) {
+app.get('*', (req, res, next) => {
+  // Only handle non-API routes and non-static file requests
+  if (!req.path.startsWith('/api/') && !req.path.startsWith('/assets/')) {
     const indexPath = path.join(__dirname, '..', 'dist', 'index.html');
     if (fs.existsSync(indexPath)) {
       return res.sendFile(indexPath);

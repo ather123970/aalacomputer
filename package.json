@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "vite preview --port $PORT --host",
+    "start": "node backend/index.cjs",
     "server": "nodemon backend/index.cjs"
   },
   "dependencies": {
