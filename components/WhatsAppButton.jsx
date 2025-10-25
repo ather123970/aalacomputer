@@ -9,6 +9,9 @@ export default function WhatsAppButton({ href = 'https://wa.me/923125066195', ar
       rel="noopener noreferrer"
       aria-label={ariaLabel}
       style={{
+        position: 'fixed',       // Fixed position on screen
+        right: 20,               // distance from right
+        bottom: 50,              // moved up 50px from bottom
         width: 52,
         height: 52,
         borderRadius: 9999,
@@ -18,7 +21,8 @@ export default function WhatsAppButton({ href = 'https://wa.me/923125066195', ar
         justifyContent: 'center',
         boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
         textDecoration: 'none',
-        color: '#fff'
+        color: '#fff',
+        zIndex: 1000             // ensure it stays above other elements
       }}
     >
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

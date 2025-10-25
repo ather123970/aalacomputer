@@ -18,7 +18,21 @@ const About = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log('Form submitted:', formData);
+
+    const { name, email, number, message } = formData;
+
+    // Construct WhatsApp message
+    const whatsappMessage = `Hello, I have a message from your website:\n\nName: ${name}\nEmail: ${email}\nPhone: ${number}\nMessage: ${message}`;
+
+    // URL encode the message
+    const encodedMessage = encodeURIComponent(whatsappMessage);
+
+    // WhatsApp link
+    const whatsappNumber = '923125066195'; // without '+'
+    const whatsappURL = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
+
+    // Open WhatsApp in new tab
+    window.open(whatsappURL, '_blank');
   };
 
   // Animation controls
@@ -135,11 +149,6 @@ const About = () => {
           {/* Brand / About */}
           <div className="md:w-1/3 space-y-4">
             <h1 className="text-2xl font-bold text-blue-500 flex items-center gap-2">
-              <img
-                src="https://seeklogo.com/images/A/Ala-logo-9A7F5A0E9F-seeklogo.com.png"
-                alt="Aala Computers Logo"
-                className="w-8 h-8"
-              />
               Aala Computers
             </h1>
             <p className="text-gray-400 text-sm">
