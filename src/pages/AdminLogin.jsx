@@ -14,8 +14,17 @@ const AdminLogin = () => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  // Auto-fill credentials for development
+  // Auto-fill credentials for development and log domain info
   useEffect(() => {
+    // Log current domain information for debugging
+    console.log('Admin Login - Current Domain Info:', {
+      hostname: window.location.hostname,
+      protocol: window.location.protocol,
+      port: window.location.port,
+      origin: window.location.origin,
+      apiUrl: getApiUrl('/api/admin/login')
+    });
+    
     const prefill = import.meta.env.VITE_ENABLE_ADMIN_PREFILL;
     if (prefill && (!formData.username && !formData.password)) {
       setFormData({
