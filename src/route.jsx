@@ -14,6 +14,7 @@ import Checkout from './pages/Checkout'
 import DealDetail from './pages/Dealdetail'
 import AdminLogin from './pages/AdminLogin'
 import AdminDashboard from './pages/AdminDashboard'
+import AdminLayout from './components/AdminLayout'
 const Layout = () => (
   <div>
     <nav className="p-4 border-b">
@@ -49,7 +50,18 @@ export const router = createBrowserRouter([
       ,{ path: 'admin/login', element: <AdminLogin /> }
     ],
   },
-  { path: '/admin', element: <AdminDashboard /> },
+  { 
+    path: '/admin', 
+    element: <AdminLayout><AdminDashboard /></AdminLayout> 
+  },
+  { 
+    path: '/admin/products', 
+    element: <AdminLayout><AdminDashboard /></AdminLayout> 
+  },
+  { 
+    path: '/admin/products/new', 
+    element: <AdminLayout><AdminDashboard /></AdminLayout> 
+  },
 ])
 
 export const RouterRoot = () => <RouterProvider router={router} />

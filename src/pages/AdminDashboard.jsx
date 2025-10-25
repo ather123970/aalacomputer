@@ -1,222 +1,538 @@
-import React, { useEffect, useState } from 'react';
-import { API_BASE } from '../config'
+import React, { useState, useEffect } from 'react';
+import { 
+  Package, 
+  TrendingUp, 
+  Users, 
+  ShoppingCart, 
+  DollarSign,
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  Search,
+  Filter
+} from 'lucide-react';
 
-function getToken() {
-  return localStorage.getItem('aalacomp_admin_token');
-}
-
-function getBackendBase() {
-  return API_BASE.replace(/\/$/, '')
-}
-
-export default function AdminDashboard() {
+const AdminDashboard = () => {
+  const [stats, setStats] = useState({
+    totalProducts: 0,
+    totalOrders: 0,
+    totalSales: 0,
+    topSelling: []
+  });
   const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [rawMode, setRawMode] = useState(false);
-  const [rawText, setRawText] = useState('');
-  const [editErr, setEditErr] = useState(null);
-  const [creating, setCreating] = useState(false);
-  const [newProd, setNewProd] = useState({ name: '', price: '', img: '', description: '' });
-  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [categories, setCategories] = useState([]);
 
-  useEffect(()=>{ load(); loadStats(); }, []);
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  async function load() {
+  const getToken = () => localStorage.getItem('aalacomp_admin_token');
+  const getBackendBase = () => {
+    const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:10000';
+    return API_BASE.replace(/\/$/, '');
+  };
+
+  const loadData = async () => {
     setLoading(true);
     try {
-  const base = getBackendBase();
-  const res = await fetch(`${base}/admin/products`, { headers: { Authorization: `Bearer ${getToken()}` } });
-      const j = await res.json();
-      if (res.ok) setProducts(j.products || []);
-      else console.error('admin products error', j);
-    } catch (e) { console.error(e); }
-    setLoading(false);
-  }
+      await Promise.all([
+        loadStats(),
+        loadProducts(),
+        loadCategories()
+      ]);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  async function loadStats() {
+  const loadStats = async () => {
     try {
-  const base = getBackendBase();
-  const res = await fetch(`${base}/admin/stats`, { headers: { Authorization: `Bearer ${getToken()}` } });
-      const j = await res.json();
-      if (res.ok) setStats(j);
-    } catch (e) { console.error(e); }
-  }
-
-  function startEdit(p) { setEditing({ ...p }); }
-
-  async function saveEdit() {
-    try {
-      let payload = editing;
-      if (rawMode) {
-        try {
-          payload = JSON.parse(rawText);
-        } catch (pe) {
-          setEditErr('Invalid JSON: ' + (pe.message || pe));
-          return;
-        }
+      const response = await fetch(`${getBackendBase()}/api/admin/stats`, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+      const data = await response.json();
+      if (data.ok) {
+        setStats(data);
       }
-  const base = getBackendBase();
-  const res = await fetch(`${base}/admin/products/${editing.id}`, { method: 'PUT', headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      const j = await res.json();
-      if (res.ok) {
-        setEditing(null);
-        setRawMode(false);
-        setRawText('');
-        setEditErr(null);
-        load();
-        loadStats();
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
+  };
+
+  const loadProducts = async () => {
+    try {
+      const response = await fetch(`${getBackendBase()}/api/admin/products`, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+      const data = await response.json();
+      if (data.ok) {
+        setProducts(data.products || []);
+      }
+    } catch (error) {
+      console.error('Error loading products:', error);
+    }
+  };
+
+  const loadCategories = async () => {
+    // Extract unique categories from products
+    const uniqueCategories = [...new Set(products.map(p => p.category).filter(Boolean))];
+    setCategories(uniqueCategories);
+  };
+
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         product.id?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = !selectedCategory || product.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const handleDeleteProduct = async (productId) => {
+    if (!confirm('Are you sure you want to delete this product?')) return;
+    
+    try {
+      const response = await fetch(`${getBackendBase()}/api/admin/products/${productId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+      
+      if (response.ok) {
+        await loadData();
       } else {
-        setEditErr(j && j.error ? j.error : 'Save failed');
-        console.error('save failed', j);
+        alert('Failed to delete product');
       }
-    } catch (e) { setEditErr(String(e)); console.error(e); }
-  }
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      alert('Error deleting product');
+    }
+  };
 
-  if (!getToken()) return (
-    <div className="p-4">Unauthorized. Please login at <a href="/admin/login" className="text-blue-500">/admin/login</a></div>
+  const StatCard = ({ title, value, icon: Icon, color = 'blue' }) => (
+    <div className="bg-white rounded-lg shadow-sm border p-6">
+      <div className="flex items-center">
+        <div className={`p-3 rounded-lg bg-${color}-100`}>
+          <Icon className={`w-6 h-6 text-${color}-600`} />
+        </div>
+        <div className="ml-4">
+          <p className="text-sm font-medium text-gray-600">{title}</p>
+          <p className="text-2xl font-semibold text-gray-900">{value}</p>
+        </div>
+      </div>
+    </div>
   );
 
-  return (
-    <div className="p-4">
-      <h2 className="text-xl font-semibold mb-3">Admin Dashboard</h2>
-      {stats && (
-        <div className="mb-4">
-          <div>Total products: {stats.totalProducts}</div>
-          <div>Total orders: {stats.totalOrders}</div>
-          <div>Total sales: {stats.totalSales}</div>
-          <div>Top selling: {stats.topSelling && stats.topSelling.length ? stats.topSelling.map(t=>`${t.id}(${t.sold})`).join(', ') : 'n/a'}</div>
-        </div>
-      )}
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
-      <div className="mb-3 flex items-center gap-2">
-        <button onClick={load} className="px-2 py-1 bg-gray-800 text-white rounded">Refresh</button>
-        <button onClick={()=>setCreating(true)} className="px-2 py-1 bg-green-600 text-white rounded">Create product</button>
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-600">Manage your store and products</p>
+        </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Add Product</span>
+        </button>
       </div>
 
-      {loading ? <div>Loading...</div> : (
-        <div className="space-y-2">
-          {products.map(p => (
-            <div key={p.id} className="p-2 border rounded bg-gray-900 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gray-800 flex items-center justify-center">
-                  {p.img ? <img src={p.img} alt={p.name} className="w-full h-full object-cover" /> : <div className="text-xs text-gray-400">No</div>}
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard
+          title="Total Products"
+          value={stats.totalProducts}
+          icon={Package}
+          color="blue"
+        />
+        <StatCard
+          title="Total Orders"
+          value={stats.totalOrders}
+          icon={ShoppingCart}
+          color="green"
+        />
+        <StatCard
+          title="Total Sales"
+          value={`PKR ${stats.totalSales}`}
+          icon={DollarSign}
+          color="purple"
+        />
+        <StatCard
+          title="Top Selling"
+          value={stats.topSelling.length}
+          icon={TrendingUp}
+          color="orange"
+        />
+      </div>
+
+      {/* Top Selling Products */}
+      {stats.topSelling.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Selling Products</h3>
+          <div className="space-y-3">
+            {stats.topSelling.slice(0, 5).map((item, index) => (
+              <div key={item.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                <div className="flex items-center space-x-3">
+                  <span className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium">
+                    {index + 1}
+                  </span>
+                  <span className="text-gray-900">{item.id}</span>
                 </div>
-                <div>
-                  <div className="font-medium">{p.name}</div>
-                  <div className="text-sm text-gray-300">ID: {p.id}</div>
-                </div>
+                <span className="text-gray-600">{item.sold} sold</span>
               </div>
-              <div>
-                <button onClick={()=>startEdit(p)} className="px-2 py-1 bg-blue-600 text-white rounded mr-2">Edit</button>
-                <button onClick={async ()=>{
-                  if (!confirm(`Delete product ${p.id}? This cannot be undone.`)) return;
-                  try {
-                    const base = getBackendBase();
-                    const res = await fetch(`${base}/admin/products/${p.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${getToken()}` } });
-                    const j = await res.json();
-                    if (res.ok) load(); else alert(j && j.error ? j.error : 'Delete failed');
-                  } catch (e) { alert('Delete failed: ' + (e && e.message)); }
-                }} className="px-2 py-1 bg-red-600 text-white rounded">Delete</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {editing && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/60">
-          <div className="bg-gray-900 p-4 rounded w-full max-w-2xl">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="">Edit product {editing.id}</h3>
-              <div className="flex gap-2">
-                <button onClick={()=>{ setRawMode((r)=>!r); if (!rawMode) setRawText(JSON.stringify(editing, null, 2)); }} className="px-2 py-1 bg-gray-800 text-white rounded">{rawMode ? 'Form' : 'Raw JSON'}</button>
-                <button onClick={()=>{ setEditing(null); setRawMode(false); setRawText(''); setEditErr(null); }} className="px-2 py-1 bg-gray-700 text-white rounded">Close</button>
-              </div>
-            </div>
-
-            {editErr && <div className="text-sm text-red-400 mb-2">{editErr}</div>}
-
-            {!rawMode ? (
-              <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs text-gray-300">Name</label>
-                    <input value={editing.name || ''} onChange={(e)=>setEditing({...editing, name: e.target.value})} className="w-full p-2 border rounded" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-300">Price</label>
-                    <input value={editing.price || ''} onChange={(e)=>setEditing({...editing, price: e.target.value})} className="w-full p-2 border rounded" />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs text-gray-300">Image URL</label>
-                  <input value={editing.img || ''} onChange={(e)=>setEditing({...editing, img: e.target.value})} className="w-full p-2 border rounded" />
-                </div>
-
-                <div>
-                  <label className="text-xs text-gray-300">Description</label>
-                  <textarea value={editing.description || ''} onChange={(e)=>setEditing({...editing, description: e.target.value})} className="w-full p-2 border rounded" />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs text-gray-300">Tags (comma)</label>
-                    <input value={(editing.tags || []).join ? (editing.tags || []).join(',') : (editing.tags || '')} onChange={(e)=>{ const v=e.target.value; setEditing({...editing, tags: v.split(',').map(s=>s.trim()).filter(Boolean)}); }} className="w-full p-2 border rounded" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-300">Specs (comma)</label>
-                    <input value={(editing.specs || []).join ? (editing.specs || []).join(',') : (editing.specs || '')} onChange={(e)=>{ const v=e.target.value; setEditing({...editing, specs: v.split(',').map(s=>s.trim()).filter(Boolean)}); }} className="w-full p-2 border rounded" />
-                  </div>
-                </div>
-
-                <div className="flex gap-2 mt-2">
-                  <button onClick={saveEdit} className="px-3 py-2 bg-green-600 text-white rounded">Save</button>
-                  <button onClick={()=>{ setEditing(null); setRawMode(false); setRawText(''); setEditErr(null); }} className="px-3 py-2 bg-gray-600 text-white rounded">Cancel</button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <label className="text-xs text-gray-300">Raw JSON</label>
-                <textarea value={rawText} onChange={(e)=>setRawText(e.target.value)} rows={12} className="w-full p-2 border rounded font-mono text-sm" />
-                <div className="flex gap-2 mt-2">
-                  <button onClick={saveEdit} className="px-3 py-2 bg-green-600 text-white rounded">Save JSON</button>
-                  <button onClick={()=>{ setRawMode(false); setRawText(''); setEditErr(null); }} className="px-3 py-2 bg-gray-600 text-white rounded">Back to Form</button>
-                </div>
-              </div>
-            )}
+            ))}
           </div>
         </div>
       )}
 
-      {creating && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/60">
-          <div className="bg-gray-900 p-4 rounded w-full max-w-lg">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="">Create new product</h3>
-              <button onClick={()=>{ setCreating(false); setNewProd({ name: '', price: '', img: '', description: '' }); }} className="px-2 py-1 bg-gray-700 text-white rounded">Close</button>
-            </div>
-            <div className="space-y-2">
-              <input placeholder="Name" value={newProd.name} onChange={(e)=>setNewProd({...newProd, name: e.target.value})} className="w-full p-2 border rounded" />
-              <input placeholder="Price" value={newProd.price} onChange={(e)=>setNewProd({...newProd, price: e.target.value})} className="w-full p-2 border rounded" />
-              <input placeholder="Image URL" value={newProd.img} onChange={(e)=>setNewProd({...newProd, img: e.target.value})} className="w-full p-2 border rounded" />
-              <textarea placeholder="Description" value={newProd.description} onChange={(e)=>setNewProd({...newProd, description: e.target.value})} className="w-full p-2 border rounded" />
-              <div className="flex gap-2">
-                <button onClick={async ()=>{
-                  try {
-                    const base = getBackendBase();
-                    const res = await fetch(`${base}/admin/products`, { method: 'POST', headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(newProd) });
-                    const j = await res.json();
-                    if (res.ok) { setCreating(false); setNewProd({ name: '', price: '', img: '', description: '' }); load(); } else alert(j && j.error ? j.error : 'Create failed');
-                  } catch(e){ alert('Create failed: ' + (e && e.message)); }
-                }} className="px-3 py-2 bg-green-600 text-white rounded">Create</button>
-                <button onClick={()=>{ setCreating(false); setNewProd({ name: '', price: '', img: '', description: '' }); }} className="px-3 py-2 bg-gray-600 text-white rounded">Cancel</button>
+      {/* Products Section */}
+      <div className="bg-white rounded-lg shadow-sm border">
+        <div className="p-6 border-b">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+            <h3 className="text-lg font-semibold text-gray-900">Products</h3>
+            
+            {/* Search and Filter */}
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div className="relative">
+                <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white"
+                >
+                  <option value="">All Categories</option>
+                  {categories.map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
         </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Product
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Category
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Price
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredProducts.map((product) => (
+                <tr key={product.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
+                        {product.img ? (
+                          <img src={product.img} alt={product.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <Package className="w-6 h-6 text-gray-400" />
+                        )}
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">
+                          {product.name || product.Name || 'Unnamed Product'}
+                        </div>
+                        <div className="text-sm text-gray-500">ID: {product.id}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                      {product.category || 'Uncategorized'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    PKR {product.price || 'N/A'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => setEditingProduct(product)}
+                        className="text-blue-600 hover:text-blue-900"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProduct(product.id)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          
+          {filteredProducts.length === 0 && (
+            <div className="text-center py-12">
+              <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No products found</h3>
+              <p className="text-gray-500">
+                {searchTerm || selectedCategory 
+                  ? 'Try adjusting your search or filter criteria'
+                  : 'Get started by adding your first product'
+                }
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Create/Edit Product Modal */}
+      {(showCreateModal || editingProduct) && (
+        <ProductModal
+          product={editingProduct}
+          onClose={() => {
+            setShowCreateModal(false);
+            setEditingProduct(null);
+          }}
+          onSave={loadData}
+        />
       )}
     </div>
   );
-}
+};
+
+// Product Modal Component
+const ProductModal = ({ product, onClose, onSave }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    price: '',
+    category: '',
+    img: '',
+    description: '',
+    specs: '',
+    tags: '',
+    ...product
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const getToken = () => localStorage.getItem('aalacomp_admin_token');
+  const getBackendBase = () => {
+    const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:10000';
+    return API_BASE.replace(/\/$/, '');
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const payload = {
+        ...formData,
+        price: parseFloat(formData.price) || 0,
+        specs: formData.specs ? formData.specs.split(',').map(s => s.trim()).filter(Boolean) : [],
+        tags: formData.tags ? formData.tags.split(',').map(s => s.trim()).filter(Boolean) : []
+      };
+
+      const url = product 
+        ? `${getBackendBase()}/api/admin/products/${product.id}`
+        : `${getBackendBase()}/api/admin/products`;
+      
+      const method = product ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getToken()}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      if (data.ok) {
+        onSave();
+        onClose();
+      } else {
+        setError(data.error || 'Failed to save product');
+      }
+    } catch (err) {
+      setError('Network error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b">
+          <h3 className="text-lg font-semibold text-gray-900">
+            {product ? 'Edit Product' : 'Create New Product'}
+          </h3>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+              {error}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Product Name *
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Price (PKR) *
+              </label>
+              <input
+                type="number"
+                required
+                min="0"
+                step="0.01"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Category *
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                placeholder="e.g., Gaming PC, Laptop, Accessories"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Image URL
+              </label>
+              <input
+                type="url"
+                value={formData.img}
+                onChange={(e) => setFormData({ ...formData, img: e.target.value })}
+                placeholder="https://example.com/image.jpg"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Description
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Specifications (comma-separated)
+              </label>
+              <input
+                type="text"
+                value={formData.specs}
+                onChange={(e) => setFormData({ ...formData, specs: e.target.value })}
+                placeholder="e.g., Intel i7, 16GB RAM, RTX 3080"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tags (comma-separated)
+              </label>
+              <input
+                type="text"
+                value={formData.tags}
+                onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                placeholder="e.g., gaming, budget, premium"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+            >
+              {loading ? 'Saving...' : (product ? 'Update Product' : 'Create Product')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default AdminDashboard;

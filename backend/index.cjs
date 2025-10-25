@@ -458,7 +458,7 @@ try {
 
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'dev_jwt_secret_change_this';
+const JWT_SECRET = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET || 'dev_jwt_secret_change_this';
 
 // helper: read/write admin file fallback
 function readAdminFile() {
@@ -470,7 +470,7 @@ function writeAdminFile(obj) {
 }
 
 async function ensureAdminUser() {
-  const email = process.env.ADMIN_EMAIL || 'aalacomputeradmin@gmail.com';
+  const email = process.env.ADMIN_EMAIL || 'aalacomputerstore@gmail.com';
   const password = process.env.ADMIN_PASSWORD || 'karachi123';
   try {
     if (AdminModel && mongoose.connection.readyState === 1) {
@@ -515,16 +515,17 @@ function writeDataFile(filename, data) {
   }
 }
 
-// Admin login: POST /api/admin/login { username, password }
+// Admin login: POST /api/admin/login { username, password } or { email, password }
 app.post('/api/admin/login', async (req, res) => {
   try {
-    const { username, password } = req.body || {};
-    if (!username || !password) return res.status(400).json({ ok: false, error: 'username and password required' });
+    const { username, email, password } = req.body || {};
+    const loginEmail = email || username;
+    if (!loginEmail || !password) return res.status(400).json({ ok: false, error: 'email/username and password required' });
 
     // Try DB first
     try {
       if (AdminModel && mongoose.connection.readyState === 1) {
-        const admin = await AdminModel.findOne({ email: String(username).toLowerCase() }).lean();
+        const admin = await AdminModel.findOne({ email: String(loginEmail).toLowerCase() }).lean();
         if (!admin) return res.status(401).json({ ok: false, error: 'invalid credentials' });
         const ok = await bcrypt.compare(String(password), String(admin.passwordHash || ''));
         if (!ok) return res.status(401).json({ ok: false, error: 'invalid credentials' });
@@ -538,7 +539,7 @@ app.post('/api/admin/login', async (req, res) => {
     // Fallback to admin.json file
     const adm = readAdminFile();
     if (!adm || !adm.email) return res.status(500).json({ ok: false, error: 'admin not configured' });
-    if (String(adm.email).toLowerCase() !== String(username).toLowerCase()) return res.status(401).json({ ok: false, error: 'invalid credentials' });
+    if (String(adm.email).toLowerCase() !== String(loginEmail).toLowerCase()) return res.status(401).json({ ok: false, error: 'invalid credentials' });
     const ok = await bcrypt.compare(String(password), String(adm.passwordHash || ''));
     if (!ok) return res.status(401).json({ ok: false, error: 'invalid credentials' });
     const token = jwt.sign({ sub: adm.email, role: adm.role || 'admin' }, JWT_SECRET, { expiresIn: '7d' });
@@ -687,13 +688,13 @@ app.get('/api/admin/stats', (req, res) => {
           }
           topSelling = Object.keys(salesCount).map(k => ({ id: k, sold: salesCount[k] })).sort((a,b) => b.sold - a.sold).slice(0,10);
         } else {
-          const orders = readDataFile('orders') || [];
+          const orders = readDataFile('orders.json') || [];
           totalOrders = orders.length;
           const salesCount = {};
           for (const o of orders) {
             const items = o.items || [];
             for (const it of items) {
-              const pid = it.id || it.productId || it.id;
+              const pid = it.id || it.productId || it._id;
               if (!pid) continue;
               salesCount[pid] = (salesCount[pid] || 0) + (it.qty || 1);
               totalSales += (it.qty || 1);
@@ -702,13 +703,13 @@ app.get('/api/admin/stats', (req, res) => {
           topSelling = Object.keys(salesCount).map(k => ({ id: k, sold: salesCount[k] })).sort((a,b) => b.sold - a.sold).slice(0,10);
         }
       } catch (e) {
-        const orders = readDataFile('orders') || [];
+        const orders = readDataFile('orders.json') || [];
         totalOrders = orders.length;
         const salesCount = {};
         for (const o of orders) {
           const items = o.items || [];
           for (const it of items) {
-            const pid = it.id || it.productId || it.id;
+            const pid = it.id || it.productId || it._id;
             if (!pid) continue;
             salesCount[pid] = (salesCount[pid] || 0) + (it.qty || 1);
             totalSales += (it.qty || 1);
