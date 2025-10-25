@@ -5,7 +5,7 @@ import Nav from "../nav";
 import { ArrowLeft, ShoppingCart } from "lucide-react";
 
 import { API_BASE } from '../config'
-const API_URL = API_BASE.replace(/\/+$/, '') + '/v1/cart';
+const API_URL = API_BASE.replace(/\/+$/, '') + '/api/v1/cart';
 
 function parsePrice(price) {
   if (typeof price === "number") return price;

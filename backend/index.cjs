@@ -31,48 +31,12 @@ const app=express()
 // Trust proxy so req.protocol/hostname respect X-Forwarded-* when behind load balancers/proxies
 app.set('trust proxy', true);
 
-// Enhanced CORS: allow multiple origins dynamically
+// Flexible CORS: allow any origin for maximum compatibility
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, etc.)
-    if (!origin) return callback(null, true);
-    
-    // Check if origin is in allowed list
-    if (FRONTEND_ORIGINS.includes(origin)) {
-      return callback(null, true);
-    }
-    
-    // Allow localhost with any port for development
-    if (origin.match(/^https?:\/\/localhost(:\d+)?$/)) {
-      return callback(null, true);
-    }
-    
-    // Allow 127.0.0.1 with any port for development
-    if (origin.match(/^https?:\/\/127\.0\.0\.1(:\d+)?$/)) {
-      return callback(null, true);
-    }
-    
-    // Allow any Render deployment
-    if (origin.match(/^https:\/\/.*\.onrender\.com$/)) {
-      return callback(null, true);
-    }
-    
-    // Allow any Vercel deployment
-    if (origin.match(/^https:\/\/.*\.vercel\.app$/)) {
-      return callback(null, true);
-    }
-    
-    // Allow custom domains
-    if (origin.match(/^https:\/\/.*\.com$/)) {
-      return callback(null, true);
-    }
-    
-    console.log('[cors] blocked origin:', origin);
-    return callback(new Error('Not allowed by CORS'), false);
-  },
+  origin: true, // Allow any origin
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Session-ID'],
 }));
 // Note: preflight OPTIONS are handled by the cors middleware and a lightweight
 // OPTIONS responder in the logging middleware below.

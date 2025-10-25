@@ -4,7 +4,7 @@ import Navbar from './nav'
 
 import { API_BASE } from './config'
 const BASE = API_BASE
-const API_CART = `${BASE.replace(/\/+$/, '')}/v1/cart`
+const API_CART = `${BASE.replace(/\/+$/, '')}/api/v1/cart`
 
 const idKey = item => (item.id || item._id || item.sku || item.name || '').toString()
 
@@ -100,7 +100,7 @@ export default function Cart() {
     const { [id]: _, ...rest } = quantities
     setQuantities(rest)
     try {
-      await fetch(`${API_CART}/${encodeURIComponent(id)}`, {
+      await fetch(`${API_CART}?id=${encodeURIComponent(id)}`, {
         method: 'DELETE',
         credentials: 'include'
       })
@@ -174,7 +174,7 @@ export default function Cart() {
     try {
       await Promise.all(
         data.map(it =>
-          fetch(`${API_CART}/${encodeURIComponent(it.id)}`, {
+          fetch(`${API_CART}?id=${encodeURIComponent(it.id)}`, {
             method: 'DELETE',
             credentials: 'include'
           })

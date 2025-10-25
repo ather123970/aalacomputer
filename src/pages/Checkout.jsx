@@ -61,7 +61,7 @@ const Checkout = () => {
       ;(async () => {
         try {
           console.debug('[checkout] fetching order by id', targetId)
-          const r = await fetch(`/api/v1/orders/${encodeURIComponent(targetId)}`, { credentials: 'include' })
+          const r = await fetch(`${import.meta.env.DEV ? 'http://localhost:10000' : window.location.origin}/api/v1/orders/${encodeURIComponent(targetId)}`, { credentials: 'include' })
           console.debug('[checkout] orders/:id status', r.status)
           if (r.ok) {
             const j = await r.json()

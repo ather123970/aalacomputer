@@ -58,7 +58,7 @@ export default function AuthPage() {
         : { email: form.email.trim(), password: form.password };
 
     try {
-      const url = `${BACKEND_URL}/v1/auth/${mode === "register" ? "register" : "login"}`
+      const url = `${BACKEND_URL}/api/v1/auth/${mode === "register" ? "register" : "login"}`
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
