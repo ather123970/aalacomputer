@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:full": "npx vite build",
+    "build:full": "vite build",
+    "build:prod": "node build-production.js",
     "start": "npm run build:full && node backend/index.cjs",
     "lint": "eslint .",
     "preview": "vite preview",
