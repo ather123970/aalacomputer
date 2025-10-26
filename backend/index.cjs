@@ -806,7 +806,6 @@ app.get('/api/admin/products', async (req, res) => {
             serverSelectionTimeoutMS: 30000,
             connectTimeoutMS: 30000,
             socketTimeoutMS: 45000,
-            keepAlive: true,
             keepAliveInitialDelay: 300000
           });
           console.log('[admin/products] MongoDB connection established');

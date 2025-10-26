@@ -3,13 +3,13 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyDo5_zOM9DiCRAAFeI6RC9ubniu8XcMEzc',
-  authDomain: 'aalacomputer-a50b2.firebaseapp.com',
-  projectId: 'aalacomputer-a50b2',
-  storageBucket: 'aalacomputer-a50b2.firebasestorage.app',
-  messagingSenderId: '784568324253',
-  appId: '1:784568324253:web:f8943331098bea48a30474',
-  measurementId: 'G-D7Q7W5SV3Y',
+  apiKey: "AIzaSyD1rar0iBmLO7ipINM8p0_z2Hc-k-q1NOY",
+  authDomain: "mywebaap-8b758.firebaseapp.com",
+  projectId: "mywebaap-8b758",
+  storageBucket: "mywebaap-8b758.firebasestorage.app",
+  messagingSenderId: "1031950836780",
+  appId: "1:1031950836780:web:94b4563401e7d7f9bfdd89",
+  measurementId: "G-0ER9EK6J3K"
 };
 
 export const app = initializeApp(firebaseConfig);
