@@ -772,21 +772,56 @@ app.get('/api/products', (req, res) => {
 });
 
 // List all products (PROTECTED - for admin dashboard)
-app.get('/api/admin/products', (req, res) => {
-  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+app.get('/api/admin/products', async (req, res) => {
   try {
-    const mongoose = require('mongoose');
-    const ProductModel = getProductModel();
-    if (ProductModel && mongoose.connection.readyState === 1) {
-      ProductModel.find({}).lean().sort({ createdAt: -1 }).then((docs) => res.json({ ok: true, products: docs })).catch(err => { 
-        console.error('[admin/products] admin products list failed', err && (err.stack || err.message)); 
-        res.status(500).json({ ok: false, error: 'db error' }); 
-      });
-      return;
+    // Check authentication first
+    if (!requireAdmin(req)) {
+      return res.status(401).json({ ok: false, error: 'unauthorized' });
     }
-  } catch (e) { console.error('[admin/products] error', e && (e.stack || e.message)); }
-  const prods = readDataFile('products.json') || [];
-  res.json({ ok: true, products: prods });
+
+    // Try database first
+    try {
+      const mongoose = require('mongoose');
+      
+      // Check MongoDB connection
+      if (!mongoose.connection.readyState) {
+        console.log('[admin/products] MongoDB not connected, attempting connection...');
+        const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/Aalacomputer';
+        await mongoose.connect(MONGO_URI, {
+          useNewUrlParser: true,
+          useUnifiedTopology: true,
+          serverSelectionTimeoutMS: 5000,
+          connectTimeoutMS: 5000
+        });
+      }
+
+      const ProductModel = getProductModel();
+      if (ProductModel && mongoose.connection.readyState === 1) {
+        const docs = await ProductModel.find({}).lean().sort({ createdAt: -1 });
+        console.log(`[admin/products] Successfully retrieved ${docs.length} products from database`);
+        return res.json({ ok: true, products: docs });
+      } else {
+        console.log('[admin/products] ProductModel not available or DB not connected, falling back to file storage');
+      }
+    } catch (dbError) {
+      console.error('[admin/products] Database error:', dbError.message);
+      console.error(dbError.stack);
+      // Don't return here - fall back to file storage
+    }
+
+    // Fallback to file storage
+    console.log('[admin/products] Using file storage fallback');
+    const prods = readDataFile('products.json') || [];
+    return res.json({ ok: true, products: prods });
+  } catch (e) {
+    console.error('[admin/products] Fatal error:', e.message);
+    console.error(e.stack);
+    return res.status(500).json({ 
+      ok: false, 
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? e.message : undefined
+    });
+  }
 });
 
 // Get single product by ID (protected)
