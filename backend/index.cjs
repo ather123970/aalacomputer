@@ -774,25 +774,47 @@ app.get('/api/products', (req, res) => {
 // List all products (PROTECTED - for admin dashboard)
 app.get('/api/admin/products', async (req, res) => {
   try {
+    console.log('[admin/products] Request received');
+    
     // Check authentication first
     if (!requireAdmin(req)) {
+      console.log('[admin/products] Unauthorized request');
       return res.status(401).json({ ok: false, error: 'unauthorized' });
     }
 
     // Try database first
     try {
+      console.log('[admin/products] Checking database connection');
       const mongoose = require('mongoose');
       
       // Check MongoDB connection
       if (!mongoose.connection.readyState) {
         console.log('[admin/products] MongoDB not connected, attempting connection...');
-        const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/Aalacomputer';
-        await mongoose.connect(MONGO_URI, {
-          useNewUrlParser: true,
-          useUnifiedTopology: true,
-          serverSelectionTimeoutMS: 5000,
-          connectTimeoutMS: 5000
-        });
+        const MONGO_URI = process.env.MONGO_URI;
+        
+        if (!MONGO_URI) {
+          console.log('[admin/products] MONGO_URI not configured, falling back to file storage');
+          const prods = readDataFile('products.json') || [];
+          return res.json({ ok: true, products: prods });
+        }
+
+        try {
+          console.log('[admin/products] Connecting to MongoDB...');
+          await mongoose.connect(MONGO_URI, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+            serverSelectionTimeoutMS: 30000,
+            connectTimeoutMS: 30000,
+            socketTimeoutMS: 45000,
+            keepAlive: true,
+            keepAliveInitialDelay: 300000
+          });
+          console.log('[admin/products] MongoDB connection established');
+        } catch (connError) {
+          console.error('[admin/products] MongoDB connection failed:', connError);
+          const prods = readDataFile('products.json') || [];
+          return res.json({ ok: true, products: prods });
+        }
       }
 
       const ProductModel = getProductModel();
@@ -999,31 +1021,54 @@ async function startServer() {
     const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/Aalacomputer';
     
     if (MONGO_URI) {
-      console.log('[db] Connecting to MongoDB...', MONGO_URI.replace(/mongodb\+srv:\/\/([^:]+):([^@]+)@/, 'mongodb+srv://[hidden]:[hidden]@'));
+      // Log connection attempt (safely hiding credentials)
+      const safeUri = MONGO_URI.replace(/mongodb(\+srv)?:\/\/[^@]+@/, 'mongodb$1://****:****@');
+      console.log('[db] Connecting to MongoDB...', safeUri);
       
-      // Configure mongoose with retry logic
+      // Configure mongoose
       mongoose.set('bufferCommands', false);
       mongoose.set('strictQuery', false);
+      
+      // Enhanced connection monitoring
+      mongoose.connection.on('connected', () => {
+        console.log('[db] Mongoose connection established');
+      });
+      
+      mongoose.connection.on('error', (err) => {
+        console.error('[db] Mongoose connection error:', err.message);
+      });
+      
+      mongoose.connection.on('disconnected', () => {
+        console.log('[db] Mongoose connection disconnected');
+      });
       
       const connectWithRetry = async (retries = 5) => {
         try {
           await mongoose.connect(MONGO_URI, {
             useNewUrlParser: true,
             useUnifiedTopology: true,
-            connectTimeoutMS: 10000,
-            serverSelectionTimeoutMS: 10000,
+            connectTimeoutMS: 30000, // Increased timeout
+            serverSelectionTimeoutMS: 30000, // Increased timeout
+            socketTimeoutMS: 45000, // Added socket timeout
             heartbeatFrequencyMS: 1000,
             retryWrites: true,
-            w: 'majority'
+            w: 'majority',
+            maxPoolSize: 10,
+            keepAlive: true,
+            keepAliveInitialDelay: 300000
           });
           
-          console.log('[db] MongoDB connected successfully');
+          // Verify connection by attempting a simple operation
+          await mongoose.connection.db.admin().ping();
+          console.log('[db] MongoDB connection verified with ping');
           return true;
         } catch (e) {
           console.error(`[db] MongoDB connection attempt failed (${retries} retries left):`, e.message);
+          console.error('[db] Full error:', e);
           if (retries > 0) {
-            console.log('[db] Retrying connection in 5 seconds...');
-            await new Promise(resolve => setTimeout(resolve, 5000));
+            const delay = (6 - retries) * 5000; // Progressive delay
+            console.log(`[db] Retrying connection in ${delay/1000} seconds...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
             return connectWithRetry(retries - 1);
           }
           throw e;
