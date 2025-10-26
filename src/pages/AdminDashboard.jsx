@@ -541,11 +541,11 @@ const ProductModal = ({ product, onClose, onSave }) => {
     img: '',
     imageUrl: '',
     description: '',
-    specs: '',
+    specs: product ? (Array.isArray(product.specs) ? product.specs.join(', ') : product.specs || '') : '',
     tags: '',
     stock: 0,
     sold: 0,
-    ...product
+    ...(product || {}),
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -593,8 +593,16 @@ const ProductModal = ({ product, onClose, onSave }) => {
         name: formData.name || formData.title,
         imageUrl: formData.imageUrl || formData.img,
         img: formData.img || formData.imageUrl,
-        specs: formData.specs ? formData.specs.split(',').map(s => s.trim()).filter(Boolean) : [],
-        tags: formData.tags ? formData.tags.split(',').map(s => s.trim()).filter(Boolean) : []
+        specs: typeof formData.specs === 'string' 
+          ? formData.specs.split(',').map(s => s.trim()).filter(Boolean)
+          : Array.isArray(formData.specs) 
+            ? formData.specs
+            : [],
+        tags: typeof formData.tags === 'string'
+          ? formData.tags.split(',').map(s => s.trim()).filter(Boolean)
+          : Array.isArray(formData.tags)
+            ? formData.tags
+            : []
       };
 
       const endpoint = product 
