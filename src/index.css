@@ -1,0 +1,263 @@
+@import "tailwindcss";
+
+/* Theme variables - default is dark */
+:root {
+  --bg: #000000;
+  --panel: #0b0b0b;
+  --muted: #9ca3af; /* gray-400 */
+  --text: #ffffff;
+  --accent: #3b82f6; /* blue-500 */
+  --accent-600: #2563eb; /* blue-600 */
+  --card: #111827; /* gray-900 */
+  --border: rgba(148,163,184,0.06);
+}
+
+/* Light theme overrides */
+.theme-light {
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --muted: #374151; /* gray-700 text muted */
+  --text: #0b1220; /* near-black text */
+  --accent: #0b5cff; /* blue for light theme */
+  --accent-600: #0b4be0;
+  --card: #f8fafc; /* light card */
+  --border: rgba(15,23,42,0.06);
+}
+
+/* Broad overrides for Tailwind utility classes so light theme converts whole app */
+.theme-light body, .theme-light #root, .theme-light .min-h-screen, .theme-light .p-6, .theme-light .p-4, .theme-light .p-3 {
+  background-color: var(--bg) !important;
+  color: var(--text) !important;
+}
+
+/* Match explicit utility classes */
+.theme-light .bg-black,
+.theme-light .bg-black\/30,
+.theme-light .bg-black\/40,
+.theme-light [class*="bg-black"] {
+  background-color: var(--panel) !important;
+}
+
+.theme-light .text-white,
+.theme-light .text-gray-100,
+.theme-light .text-gray-200,
+.theme-light .text-gray-300,
+.theme-light [class*="text-white"] {
+  color: var(--text) !important;
+}
+
+.theme-light .bg-gray-900,
+.theme-light .bg-gray-800,
+.theme-light .bg-gray-700,
+.theme-light .bg-gray-600,
+.theme-light [class*="bg-gray-9"],
+.theme-light [class*="bg-gray-8"],
+.theme-light [class*="bg-gray-7"],
+.theme-light [class*="bg-gray-6"] {
+  background-color: var(--card) !important;
+  color: var(--text) !important;
+}
+
+.theme-light .border-gray-800,
+.theme-light .border-gray-700,
+.theme-light .border-gray-600,
+.theme-light [class*="border-gray-"] {
+  border-color: var(--border) !important;
+}
+
+/* Buttons: blue accents in light mode */
+.theme-light .bg-blue-600,
+.theme-light .bg-blue-700,
+.theme-light [class*="bg-blue-6"],
+.theme-light .btn-accent {
+  background: linear-gradient(90deg, var(--accent), var(--accent-600)) !important;
+  color: #ffffff !important;
+}
+
+/* Hover/active variants to match accent */
+.theme-light .hover\:bg-blue-700:hover,
+.theme-light .hover\:bg-blue-600:hover {
+  background: linear-gradient(90deg, var(--accent-600), var(--accent)) !important;
+}
+
+/* Make small utility backgrounds and cards adopt light scheme */
+.theme-light .bg-white\/10,
+.theme-light .bg-white\/5,
+.theme-light .bg-gray-900\/95,
+.theme-light .bg-gray-900\/50,
+.theme-light .bg-gray-900\/40 {
+  background-color: rgba(255,255,255,0.85) !important;
+  color: var(--text) !important;
+}
+
+/* Inputs and textareas */
+.theme-light input,
+.theme-light textarea,
+.theme-light select,
+.theme-light .outline-none {
+  background: var(--card) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+
+/* Tailwind gradient helpers — override gradient color stop variables used by Tailwind */
+.theme-light .from-blue-700 { --tw-gradient-from: var(--accent) !important; }
+.theme-light .via-purple-600 { --tw-gradient-stops: var(--tw-gradient-from), var(--accent-600) !important; }
+.theme-light .to-indigo-500 { --tw-gradient-to: var(--accent-600) !important; }
+
+/* Ensure cards and panels show subtle light border/shadow */
+.theme-light .shadow-lg, .theme-light .shadow, .theme-light .shadow-2xl {
+  box-shadow: 0 6px 18px rgba(11,92,255,0.06) !important;
+}
+
+/* Fallback: any element not covered should at least have readable text on white bg */
+.theme-light * {
+  color: var(--text) !important;
+  background-color: transparent !important;
+}
+
+/* Ensure the document body shows light background by default when theme-light is present */
+.theme-light body, .theme-light #root {
+  background-color: var(--bg) !important;
+}
+
+/* Where we explicitly want panels/cards white, override again */
+.theme-light .card, .theme-light .bg-panel { background: var(--panel) !important; }
+
+/* Basic element resets using variables so entire app can switch */
+html, body, #root {
+  /* use auto height so mobile browsers can compute dynamic viewport correctly */
+  height: auto;
+  min-height: 100%;
+}
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  /* Ensure vertical scrolling is enabled on mobile devices */
+  overflow-y: auto;
+}
+
+/* Prevent accidental horizontal scroll on small devices caused by absolute elements */
+html, body {
+  overflow-x: hidden;
+}
+
+/* Make all images responsive by default */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Defensive: ensure elements that are visually hidden don't capture touches (fix mobile unclickable issues) */
+.opacity-0, .hidden, [aria-hidden="true"] {
+  pointer-events: none !important;
+}
+
+/* Make sure interactive controls are tappable on mobile (visual tap highlight) */
+button, a, input, textarea, select {
+  -webkit-tap-highlight-color: rgba(0,0,0,0.06);
+}
+
+li{
+  list-style: none;
+  color: var(--text);
+  font-size: large;
+}
+
+input, textarea, select {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+input:hover{
+  border-color: var(--accent-600);
+}
+
+/* Utility classes for components to rely on */
+.bg-panel { background: var(--panel); }
+.text-muted { color: var(--muted); }
+.text-primary { color: var(--text); }
+.btn-accent { background: linear-gradient(90deg, var(--accent), var(--accent-600)); color: var(--text); }
+.bg-card { background: var(--card); }
+
+/* Cart button overrides: blue background with white icons */
+.btn-accent { background: linear-gradient(90deg, var(--accent), var(--accent-600)); color: #fff; }
+.btn-accent svg { color: #fff; }
+
+/* Floating admin controls safe style: prevent borders or radiused outlines causing overflow */
+.fixed.bottom-6.right-6 { box-shadow: 0 8px 20px rgba(10,20,40,0.06); }
+
+/* Utility to hide on extra-small screens (Tailwind's sm breakpoint begins at 640px) */
+@media (max-width: 420px) {
+  .hide-xs { display: none !important; }
+}
+
+/* Profile / user icon button styling */
+.profile-btn { background: transparent; color: var(--text); }
+.profile-btn svg { color: var(--text); }
+
+/* TrustCard icons tweak in light theme: green tick, blue truck, yellow tag (or gradiented) */
+.icon-accept { color: #10b981; }
+.icon-truck { color: #0b5cff; }
+.icon-tag { color: #f59e0b; }
+
+/* In .theme-light prefer blue gradient accents for trust cards */
+.theme-light .icon-accept { color: #059669; }
+.theme-light .icon-truck { color: var(--accent); }
+.theme-light .icon-tag { color: #b45309; }
+
+/* Price firing animation used when placing an order */
+.price-fire{
+  animation: pricePop 1s ease-in-out;
+}
+@keyframes pricePop{
+  0% { transform: scale(1); color: var(--text); text-shadow: none; }
+  30% { transform: scale(1.18); color: #ffdd57; text-shadow: 0 8px 24px rgba(255,221,87,0.18); }
+  60% { transform: scale(0.98); }
+  100% { transform: scale(1); color: var(--text); text-shadow: none; }
+}
+
+/* Chatbase AI Assistant fixed widget */
+#chatbase-assistant {
+  position: fixed;
+  right: 0;
+  bottom: 22px;
+  /* keep this below the header (header z-index: 100002) so header remains clickable */
+  z-index: 100000;
+  width: 360px;
+  height: 600px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+#chatbase-assistant iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+@media (max-width: 480px) {
+  /* On very small screens keep it unobtrusive — smaller widget */
+  #chatbase-assistant { width: 300px; height: 520px; right: 8px; bottom: 18px; }
+}
+
+/* Force the main header/navigation to be top-most and accept pointer events
+   This protects against accidental overlays from floating widgets or modals
+   that might intercept clicks on desktop. The header in `src/nav.jsx` has
+   role="navigation" so we target that element specifically. */
+header[role="navigation"] {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  z-index: 200002 !important; /* must be higher than floating widgets */
+  pointer-events: auto !important;
+}
+
+/* Be explicit: ensure direct children inside header are interactive */
+header[role="navigation"] * {
+  pointer-events: auto !important;
+}

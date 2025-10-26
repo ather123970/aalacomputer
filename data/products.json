@@ -1,0 +1,34 @@
+[
+  {
+    "id": "p_1761472399386",
+    "title": "keyboard mechanical",
+    "name": "keyboard mechanical",
+    "price": 5000,
+    "category": "keyboard",
+    "img": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTHGbtJk1cQu3caGtwyTKAGg671mYzxqHGPnQ&s",
+    "imageUrl": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTHGbtJk1cQu3caGtwyTKAGg671mYzxqHGPnQ&s",
+    "description": "best",
+    "specs": [],
+    "tags": [],
+    "stock": 0,
+    "sold": 0
+  },
+  {
+    "id": "p_1761466569507",
+    "title": "asd",
+    "name": "asd",
+    "price": 1232,
+    "category": "asd",
+    "img": "https://googlepic.com",
+    "imageUrl": "https://googlepic.com",
+    "description": "asd",
+    "specs": [
+      "asd"
+    ],
+    "tags": [
+      "asd"
+    ],
+    "stock": 32,
+    "sold": 0
+  }
+]

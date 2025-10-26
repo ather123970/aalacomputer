@@ -1,0 +1,41 @@
+[
+  {
+    "id": "order_1",
+    "customerEmail": "customer1@example.com",
+    "items": [
+      {
+        "id": "p_1",
+        "productId": "p_1",
+        "name": "Gaming PC",
+        "price": 150000,
+        "qty": 1
+      },
+      {
+        "id": "p_2", 
+        "productId": "p_2",
+        "name": "Gaming Mouse",
+        "price": 5000,
+        "qty": 2
+      }
+    ],
+    "total": 160000,
+    "status": "completed",
+    "createdAt": "2024-01-15T10:00:00Z"
+  },
+  {
+    "id": "order_2",
+    "customerEmail": "customer2@example.com", 
+    "items": [
+      {
+        "id": "p_1",
+        "productId": "p_1",
+        "name": "Gaming PC",
+        "price": 150000,
+        "qty": 1
+      }
+    ],
+    "total": 150000,
+    "status": "completed",
+    "createdAt": "2024-01-16T14:30:00Z"
+  }
+]
