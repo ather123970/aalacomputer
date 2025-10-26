@@ -806,7 +806,6 @@ app.get('/api/admin/products', async (req, res) => {
             serverSelectionTimeoutMS: 30000,
             connectTimeoutMS: 30000,
             socketTimeoutMS: 45000,
-            keepAliveInitialDelay: 300000
           });
           console.log('[admin/products] MongoDB connection established');
         } catch (connError) {
@@ -1053,8 +1052,6 @@ async function startServer() {
             retryWrites: true,
             w: 'majority',
             maxPoolSize: 10,
-            keepAlive: true,
-            keepAliveInitialDelay: 300000
           });
           
           // Verify connection by attempting a simple operation
