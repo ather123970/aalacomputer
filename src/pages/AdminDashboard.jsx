@@ -161,6 +161,11 @@ const AdminDashboard = () => {
       // Show success message
       setError('Product deleted successfully');
       setTimeout(() => setError(''), 3000); // Clear message after 3 seconds
+      // Notify other parts of the app that products were updated
+      try {
+        localStorage.setItem('products_last_updated', String(Date.now()));
+      } catch (e) { /* ignore */ }
+      try { window.dispatchEvent(new Event('products-updated')); } catch (e) { /* ignore */ }
     } catch (error) {
       console.error('Error deleting product:', error);
       setError(`Failed to delete product: ${error.message}`);
@@ -598,10 +603,21 @@ const ProductModal = ({ product, onClose, onSave }) => {
       
       const method = product ? 'PUT' : 'POST';
 
-      await apiCall(endpoint, {
+      const result = await apiCall(endpoint, {
         method,
         body: JSON.stringify(payload)
       });
+
+      // Ensure backend acknowledged the change
+      if (!result || (typeof result === 'object' && !result.ok && !result.product && !Array.isArray(result))) {
+        throw new Error((result && result.error) ? result.error : 'Failed to save product');
+      }
+
+      // Notify backend-driven UI to reload lists (only after success)
+      try {
+        localStorage.setItem('products_last_updated', String(Date.now()));
+      } catch (e) { /* ignore */ }
+      try { window.dispatchEvent(new Event('products-updated')); } catch (e) { /* ignore */ }
 
       onSave();
       onClose();

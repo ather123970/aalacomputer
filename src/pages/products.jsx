@@ -26,6 +26,23 @@ const Products = () => {
   // Fetch products from backend on component mount
   useEffect(() => {
     loadProducts();
+
+    // Listen for product updates from admin (same-tab) and storage events (cross-tab)
+    const onProductsUpdated = () => {
+      loadProducts();
+    };
+
+    const onStorage = (e) => {
+      if (e && e.key === 'products_last_updated') onProductsUpdated();
+    };
+
+    window.addEventListener('products-updated', onProductsUpdated);
+    window.addEventListener('storage', onStorage);
+
+    return () => {
+      window.removeEventListener('products-updated', onProductsUpdated);
+      window.removeEventListener('storage', onStorage);
+    };
   }, []);
 
   // Filter products when category or price changes
@@ -41,9 +58,11 @@ const Products = () => {
   const loadProducts = async () => {
     setIsLoading(true);
     try {
-      // Try to fetch from backend first
-      const response = await fetch('http://localhost:10000/api/products');
-      const data = await response.json();
+  // Fetch from backend using configured API base so env/deployments work consistently
+  const base = API_BASE ? API_BASE.replace(/\/+$/, '') : '';
+  const url = `${base}/api/products`;
+  const response = await fetch(url);
+  const data = await response.json();
       
       if (Array.isArray(data) && data.length > 0) {
         const formattedProducts = data.map(p => ({
