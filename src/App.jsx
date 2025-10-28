@@ -1,20 +1,25 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { motion as FM } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 import { useNavigate } from "react-router-dom";
 import { API_BASE } from "./config";
+import { normalizeProduct, searchProducts, getSearchSuggestions } from "./utils/searchUtils";
 
 const App = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [prebuilds, setPrebuilds] = useState([]);
+  const [normalizedProducts, setNormalizedProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [suggestions, setSuggestions] = useState([]);
 
   const { ref: sectionRef, inView } = useInView({
     triggerOnce: false,
     threshold: 0.2,
   });
 
+  // Fetch and normalize products
   useEffect(() => {
     const fetchAllProducts = async () => {
       setLoading(true);
@@ -26,17 +31,26 @@ const App = () => {
           const formatted = Array.isArray(data) ? data.map(p => ({
             id: p._id || p.id,
             name: p.title || p.name || 'Unnamed Product',
+            title: p.title || p.name || 'Unnamed Product',
             price: typeof p.price === 'number' ? p.price : Number(p.price) || 0,
             img: p.imageUrl || p.img || '/placeholder.svg',
+            imageUrl: p.imageUrl || p.img || '/placeholder.svg',
             category: p.category || 'Product',
             brand: p.brand || '',
-            description: p.description || (Array.isArray(p.specs) ? p.specs.join(' ') : '')
+            description: p.description || (Array.isArray(p.specs) ? p.specs.join(' ') : ''),
+            specs: p.specs || []
           })) : [];
+          
+          // Normalize all products for search
+          const normalized = formatted.map(p => normalizeProduct(p));
+          
           setPrebuilds(formatted);
+          setNormalizedProducts(normalized);
         }
       } catch (error) {
         console.error('Failed to fetch products:', error);
         setPrebuilds([]);
+        setNormalizedProducts([]);
       } finally {
         setLoading(false);
       }
@@ -45,16 +59,41 @@ const App = () => {
     fetchAllProducts();
   }, []);
 
-  const filteredResults = searchTerm.trim()
-    ? prebuilds.filter((item) => {
-        const query = searchTerm.toLowerCase();
-        const nameMatch = item.name.toLowerCase().includes(query);
-        const categoryMatch = item.category.toLowerCase().includes(query);
-        const brandMatch = item.brand?.toLowerCase().includes(query);
-        const descMatch = item.description?.toLowerCase().includes(query);
-        return nameMatch || categoryMatch || brandMatch || descMatch;
-      })
-    : [];
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Update suggestions as user types
+  useEffect(() => {
+    if (searchTerm.trim().length >= 1) {
+      const newSuggestions = getSearchSuggestions(searchTerm);
+      setSuggestions(newSuggestions);
+    } else {
+      setSuggestions([]);
+    }
+  }, [searchTerm]);
+
+  // Perform smart search using normalized products
+  const filteredResults = useMemo(() => {
+    if (!debouncedSearchTerm.trim() || debouncedSearchTerm.trim().length < 1) {
+      return [];
+    }
+    return searchProducts(normalizedProducts, debouncedSearchTerm, {
+      minScore: 5,
+      maxResults: 20
+    });
+  }, [debouncedSearchTerm, normalizedProducts]);
+
+  // Handle suggestion click
+  const handleSuggestionClick = useCallback((suggestion) => {
+    setSearchTerm(suggestion.value);
+    setSuggestions([]);
+  }, []);
 
   return (
     <>
@@ -112,7 +151,7 @@ const App = () => {
             <div className="relative w-full md:w-[80%] lg:w-[70%]">
               <input
                 type="text"
-                placeholder={loading ? "Loading products..." : "Search Products..."}
+                placeholder={loading ? "Loading products..." : "Search by brand, category, or product name..."}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 disabled={loading}
@@ -123,38 +162,70 @@ const App = () => {
                   <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
               )}
+              
+              {/* Search Suggestions */}
+              {suggestions.length > 0 && searchTerm.trim() && (
+                <div className="absolute top-full mt-1 w-full bg-white rounded-lg shadow-lg border border-blue-200 z-30 overflow-hidden">
+                  <div className="p-2 bg-blue-50 border-b border-blue-200">
+                    <p className="text-xs text-blue-600 font-semibold">Suggestions:</p>
+                  </div>
+                  {suggestions.map((suggestion, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleSuggestionClick(suggestion)}
+                      className="w-full text-left px-4 py-2 hover:bg-blue-50 transition-colors flex items-center gap-2"
+                    >
+                      <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full capitalize">
+                        {suggestion.type}
+                      </span>
+                      <span className="text-sm text-blue-900 font-medium">{suggestion.display}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {searchTerm.trim() && filteredResults.length === 0 && !loading && (
+            {debouncedSearchTerm.trim() && filteredResults.length === 0 && !loading && (
               <div className="w-full md:w-[80%] lg:w-[70%] bg-white/95 backdrop-blur-sm rounded-lg shadow-xl p-6 border border-blue-200 text-center">
-                <p className="text-blue-600">No products found matching "{searchTerm}"</p>
+                <p className="text-blue-600 font-semibold mb-2">No products found matching "{debouncedSearchTerm}"</p>
+                <p className="text-blue-500 text-sm">Try searching for: GPU, MSI, Corsair, Keyboard, etc.</p>
               </div>
             )}
 
             {filteredResults.length > 0 && (
               <div className="w-full md:w-[80%] lg:w-[70%] bg-white/95 backdrop-blur-sm rounded-lg shadow-xl p-4 max-h-[60vh] overflow-y-auto space-y-3 border border-blue-200">
+                <div className="pb-2 border-b border-blue-200">
+                  <p className="text-xs text-blue-600 font-semibold">
+                    Found {filteredResults.length} result{filteredResults.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
                 {filteredResults.map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-center space-x-4 border-b border-blue-100 pb-3 last:border-b-0 hover:bg-blue-50 transition-colors rounded-md p-2 cursor-pointer"
+                    className="flex items-center space-x-4 border-b border-blue-100 pb-3 last:border-b-0 hover:bg-blue-50 transition-colors rounded-md p-2 cursor-pointer group"
                     onClick={() => navigate(`/products/${item.id}`)}
                   >
                     <img
-                      src={item.img}
-                      alt={item.name}
-                      className="w-16 h-16 object-contain rounded-md shadow-sm bg-white p-1"
+                      src={item.img || item.imageUrl}
+                      alt={item.displayName || item.name}
+                      className="w-16 h-16 object-contain rounded-md shadow-sm bg-white p-1 group-hover:scale-105 transition-transform"
                     />
                     <div className="flex-1">
-                      <h3 className="font-semibold text-blue-900 text-sm sm:text-base">
-                        {item.name}
+                      <h3 className="font-semibold text-blue-900 text-sm sm:text-base group-hover:text-blue-700">
+                        {item.displayName || item.name}
                       </h3>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <p className="text-blue-600 font-medium text-sm">
                           Rs {item.price.toLocaleString()}
                         </p>
-                        <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
-                          {item.category}
+                        <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full capitalize">
+                          {item.categoryNormalized || item.category}
                         </span>
+                        {item.brandNormalized && (
+                          <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full capitalize">
+                            {item.brandNormalized}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
