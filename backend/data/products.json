@@ -1,0 +1,10 @@
+[
+  { "id": 1, "Name": "StreetRunner", "price": 70000, "img": "/rbtech_sonic_c05_white-removebg-preview.png", "Spec": ["CPU: AMD Ryzen 3 3200G", "GPU: Vega 8", "RAM: 8GB", "Storage: 240GB SSD", "Case: Simple ATX", "PSU: 450W"], "category": "PC", "type": "Pre-Build" },
+  { "id": 2, "Name": "Workhorse", "price": 230000, "img": "/images/pcglow.jpg", "Spec": ["CPU: Ryzen 7 7700X", "GPU: RTX 3070 8GB", "RAM: 32GB DDR5", "Storage: 1TB NVMe SSD", "PSU: 750W", "Case: Corsair 4000D"], "category": "PC", "type": "Pre-Build" },
+  { "id": 3, "Name": "RGB Keyboard", "price": 3500, "img": "/images/keyboard.png", "Spec": ["Mechanical", "RGB", "USB-C"], "category": "Keyboard" },
+  { "id": 4, "Name": "Mouse", "price": 3500, "img": "/images/mouse.png", "Spec": ["Ergonomic", "RGB", "Wired"], "category": "Mouse" },
+  { "id": 5, "Name": "RTX 4070", "price": 150000, "img": "/images/gpu.png", "Spec": ["RTX 4070", "12GB GDDR6"], "category": "GPU" },
+  { "id": 6, "Name": "PowerRAM 32GB", "price": 18000, "img": "/rgbram.png", "Spec": ["DDR5", "5200MHz"], "category": "RAM" },
+  { "id": 7, "Name": "UltraSSD 1TB", "price": 12000, "img": "/images/ssd.png", "Spec": ["NVMe", "Gen4", "1TB"], "category": "SSD" },
+  { "id": 8, "Name": "ThunderStorm", "price": 32000, "img": "/images/luxeries.png", "Spec": ["ATX", "Tempered Glass"], "category": "Case" }
+]

@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>aalacomputer</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+
+    <!-- AalaAi toggle button and Chatbase AI Assistant panel -->
+    <style>
+      /* AalaAi toggle button */
+      .aalaai-toggle {
+        position: fixed;
+        right: 20px;
+        /* moved closer to bottom as requested (30px) */
+        bottom: 120px;
+        z-index: 9999;
+        background: linear-gradient(135deg,#0ea5a4,#6366f1);
+        color: #fff;
+        border: none;
+        padding: 12px 18px;
+        border-radius: 9999px; /* fully rounded */
+        box-shadow: 0 6px 18px rgba(99,102,241,0.25);
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: transform .12s ease, opacity .12s ease;
+      }
+      .aalaai-toggle:active{ transform: scale(.98); }
+
+      /* Chat panel */
+      .aalaai-panel {
+        position: fixed;
+        right: 20px;
+        /* keep panel above the toggle button */
+        bottom: 72px;
+        width: 360px;
+        height: 520px;
+        max-width: calc(100vw - 40px);
+        max-height: calc(100vh - 120px);
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(2,6,23,0.2);
+        overflow: hidden;
+        transform-origin: bottom right;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(8px) scale(.98);
+        transition: opacity .18s ease, transform .18s ease, visibility .18s;
+        z-index: 9998;
+        display: flex;
+        flex-direction: column;
+      }
+      .aalaai-panel.open{ opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
+
+      .aalaai-panel header{
+        display:flex; align-items:center; justify-content:space-between;
+        padding:10px 12px; border-bottom:1px solid #eee;
+        background:linear-gradient(90deg,#f8fafc, #fff);
+      }
+      .aalaai-panel header h4{ margin:0; font-size:14px; color:#0f172a }
+      .aalaai-close-btn{ background:none; border:0; font-size:16px; cursor:pointer; color:#475569 }
+
+      .aalaai-frame{ flex:1; border:0; width:100%; height:100%; }
+
+      /* small responsive tweak */
+      @media (max-width:420px){
+        .aalaai-panel{ right:10px; left:10px; width:auto; bottom:72px; }
+        .aalaai-toggle{ right:12px; bottom:12px; }
+      }
+    </style>
+
+    <!-- Toggle button (AalaAi) -->
+    <button id="aalaaiToggle" class="aalaai-toggle" aria-expanded="false" aria-controls="aalaaiPanel">
+      AalaAi
+    </button>
+
+    <!-- Panel that contains the Chatbase iframe -->
+    <div id="aalaaiPanel" class="aalaai-panel" role="dialog" aria-modal="true" aria-hidden="true">
+      <header>
+        <h4>AalaAi Assistant</h4>
+        <div>
+          <button id="aalaaiMinimize" class="aalaai-close-btn" title="Minimize">_</button>
+          <button id="aalaaiClose" class="aalaai-close-btn" title="Close">✕</button>
+        </div>
+      </header>
+      <iframe
+        id="aalaaiIframe"
+        class="aalaai-frame"
+        title="AalaAi Chat"
+        src="https://www.chatbase.co/chatbot-iframe/UXATkQc9Z76pguTCqPuC8"
+        loading="lazy"
+        aria-label="AI assistant chat"
+      ></iframe>
+    </div>
+
+    <script>
+      (function(){
+        const toggle = document.getElementById('aalaaiToggle');
+        const panel = document.getElementById('aalaaiPanel');
+        const closeBtn = document.getElementById('aalaaiClose');
+        const minimizeBtn = document.getElementById('aalaaiMinimize');
+
+        function openPanel(){
+          panel.classList.add('open');
+          panel.setAttribute('aria-hidden','false');
+          toggle.setAttribute('aria-expanded','true');
+          // save state
+          try{ localStorage.setItem('aalaai_open','1'); }catch(e){}
+        }
+        function closePanel(){
+          panel.classList.remove('open');
+          panel.setAttribute('aria-hidden','true');
+          toggle.setAttribute('aria-expanded','false');
+          try{ localStorage.removeItem('aalaai_open'); }catch(e){}
+        }
+
+        toggle.addEventListener('click', ()=>{
+          if(panel.classList.contains('open')) closePanel(); else openPanel();
+        });
+        closeBtn.addEventListener('click', closePanel);
+        minimizeBtn.addEventListener('click', closePanel);
+
+        // close on outside click (but not when clicking inside panel or toggle)
+        document.addEventListener('click', (e)=>{
+          const inside = panel.contains(e.target) || toggle.contains(e.target);
+          if(!inside && panel.classList.contains('open')) closePanel();
+        });
+
+        // keyboard accessibility: Esc to close
+        document.addEventListener('keydown', (e)=>{
+          if(e.key === 'Escape' && panel.classList.contains('open')){
+            closePanel();
+            toggle.focus();
+          }
+        });
+
+        // restore state
+        try{
+          if(localStorage.getItem('aalaai_open') === '1') openPanel();
+        }catch(e){}
+      })();
+    </script>
+  </body>
+</html>
