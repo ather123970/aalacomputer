@@ -28,7 +28,9 @@ const App = () => {
             name: p.title || p.name || 'Unnamed Product',
             price: typeof p.price === 'number' ? p.price : Number(p.price) || 0,
             img: p.imageUrl || p.img || '/placeholder.svg',
-            category: p.category || 'Product'
+            category: p.category || 'Product',
+            brand: p.brand || '',
+            description: p.description || (Array.isArray(p.specs) ? p.specs.join(' ') : '')
           })) : [];
           setPrebuilds(formatted);
         }
@@ -44,9 +46,14 @@ const App = () => {
   }, []);
 
   const filteredResults = searchTerm.trim()
-    ? prebuilds.filter((item) =>
-        item.name.toLowerCase().includes(searchTerm.toLowerCase())
-      )
+    ? prebuilds.filter((item) => {
+        const query = searchTerm.toLowerCase();
+        const nameMatch = item.name.toLowerCase().includes(query);
+        const categoryMatch = item.category.toLowerCase().includes(query);
+        const brandMatch = item.brand?.toLowerCase().includes(query);
+        const descMatch = item.description?.toLowerCase().includes(query);
+        return nameMatch || categoryMatch || brandMatch || descMatch;
+      })
     : [];
 
   return (
@@ -63,9 +70,9 @@ const App = () => {
           transition={{ duration: 0.8, ease: "easeInOut" }}
           id="view-prebuilds-btn"
           onClick={() => navigate("/products")}
-          className="absolute top-6 right-6 bg-blue-700 hover:bg-blue-800 text-white text-sm sm:text-base md:text-lg rounded-md py-2 px-4 md:py-3 md:px-6 transition-all shadow-md hover:shadow-lg z-20"
+          className="absolute top-0 right-4 md:top-4 md:right-6 bg-blue-700 hover:bg-blue-800 text-white text-base sm:text-lg md:text-xl font-semibold rounded-xl py-3 px-6 md:py-4 md:px-8 transition-all shadow-lg hover:shadow-xl hover:scale-105 z-20"
         >
-          View PreBuilds
+          View Products
         </FM.button>
         {/* LEFT SIDE — TEXT CONTENT */}
         <FM.div
