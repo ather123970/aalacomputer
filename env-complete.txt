@@ -1,0 +1,13 @@
+# Environment Variables for Aala Computer
+# Copy this content to your .env file
+
+MONGO_URI=mongodb+srv://uni804043_db_user:<db_password>@cluster0.0cy1usa.mongodb.net/Aalacomputer
+JWT_SECRET=2124377as
+ADMIN_JWT_SECRET=2124377as
+ADMIN_EMAIL=aalacomputerstore@gmail.com
+ADMIN_PASSWORD=karachi123
+FRONTEND_ORIGINS=*
+ALLOW_ANY_ORIGIN=true
+WHATSAPP_NUMBER=+923125066195
+PORT=10000
+NODE_ENV=development
