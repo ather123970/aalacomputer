@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, useAnimation } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 import Nav from "../nav";
 import { API_BASE } from '../config'
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ArrowUp } from 'lucide-react';
 
 const getImageUrl = (path) => {
   if (!path) return "/placeholder.svg";
@@ -68,6 +68,11 @@ const Products = () => {
   const [openCategory, setOpenCategory] = useState(null);
   const [selectedBrand, setSelectedBrand] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  
+  // Refs for scrolling
+  const productsGridRef = useRef(null);
+  const categoriesRef = useRef(null);
 
   // Fetch products from backend on component mount
   useEffect(() => {
@@ -170,10 +175,36 @@ const Products = () => {
     }
   }, [location.search]);
 
-  // Reset selected brand when category changes
+  // Reset selected brand when category changes and scroll to products
   useEffect(() => {
     setSelectedBrand(null);
+    
+    // Scroll to products grid when category changes
+    if (selectedCategory !== "All" && productsGridRef.current) {
+      setTimeout(() => {
+        productsGridRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start',
+          inline: 'nearest'
+        });
+      }, 100);
+    }
   }, [selectedCategory]);
+  
+  // Show/hide scroll to top button
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 400);
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+  
+  // Scroll to top function
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const loadProducts = async () => {
     setIsLoading(true);
@@ -269,9 +300,14 @@ const Products = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full px-4 py-3 bg-card border-2 border-gray-700 rounded-xl text-primary placeholder-muted focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               />
+              {searchQuery && (
+                <p className="text-sm text-muted mt-2">
+                  Searching for: <span className="font-semibold text-blue-500">{searchQuery}</span>
+                </p>
+              )}
             </div>
 
-            <div className="flex flex-wrap gap-3 mb-8 items-center justify-center md:justify-start">
+            <div ref={categoriesRef} className="flex flex-wrap gap-3 mb-8 items-center justify-center md:justify-start">
               {categories.map((cat) => (
                 <div key={cat} className="relative">
                   <button
@@ -357,6 +393,55 @@ const Products = () => {
               </div>
             </div>
 
+            {/* Product Count & Active Filters Display */}
+            <div className="mb-6 p-4 bg-card rounded-xl border border-gray-700" ref={productsGridRef}>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-blue-500">
+                    {selectedCategory === "All" ? "All Products" : selectedCategory}
+                  </h2>
+                  <p className="text-sm text-muted mt-1">
+                    {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''} found
+                  </p>
+                </div>
+                
+                {(selectedCategory !== "All" || selectedBrand || searchQuery) && (
+                  <button
+                    onClick={() => {
+                      setSelectedCategory("All");
+                      setSelectedBrand(null);
+                      setSearchQuery("");
+                      categoriesRef.current?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-semibold transition-all"
+                  >
+                    Clear All Filters
+                  </button>
+                )}
+              </div>
+              
+              {/* Active Filters */}
+              {(selectedCategory !== "All" || selectedBrand || searchQuery) && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {selectedCategory !== "All" && (
+                    <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs font-semibold">
+                      Category: {selectedCategory}
+                    </span>
+                  )}
+                  {selectedBrand && (
+                    <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-semibold">
+                      Brand: {selectedBrand}
+                    </span>
+                  )}
+                  {searchQuery && (
+                    <span className="px-3 py-1 bg-purple-500/20 text-purple-400 rounded-full text-xs font-semibold">
+                      Search: {searchQuery}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {filteredProducts.map((p, idx) => (
                 <AnimatedProductCard key={p.id} p={p} buynow={buynow} loadingId={loadingId} navigate={navigate} delay={idx * 0.1} />
@@ -364,18 +449,44 @@ const Products = () => {
             </div>
 
             {filteredProducts.length === 0 && (
-              <p className="text-center text-gray-500 mt-10 text-lg">
-                No products found in this range or category.
-              </p>
+              <div className="col-span-full text-center py-20">
+                <p className="text-gray-500 text-lg mb-4">
+                  No products found matching your criteria.
+                </p>
+                <button
+                  onClick={() => {
+                    setSelectedCategory("All");
+                    setSelectedBrand(null);
+                    setSearchQuery("");
+                  }}
+                  className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition-all"
+                >
+                  View All Products
+                </button>
+              </div>
             )}
           </>
         )}
       </div>
+      
+      {/* Scroll to Top Button */}
+      {showScrollTop && (
+        <motion.button
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.8 }}
+          onClick={scrollToTop}
+          className="fixed bottom-8 right-8 p-4 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all z-50 group"
+          aria-label="Scroll to top"
+        >
+          <ArrowUp className="w-6 h-6 group-hover:transform group-hover:-translate-y-1 transition-transform" />
+        </motion.button>
+      )}
     </>
   );
 };
 
-// Single Product Card — Animated with Intersection Observer
+// Animated Product Card Component
 const AnimatedProductCard = ({ p, buynow, loadingId, navigate, delay }) => {
   const controls = useAnimation();
   const [ref, inView] = useInView({ threshold: 0.2, triggerOnce: false });
