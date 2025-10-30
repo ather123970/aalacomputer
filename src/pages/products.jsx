@@ -69,6 +69,7 @@ const Products = () => {
   const [selectedBrand, setSelectedBrand] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showAllCategories, setShowAllCategories] = useState(true);
   
   // Refs for scrolling
   const productsGridRef = useRef(null);
@@ -178,6 +179,13 @@ const Products = () => {
   // Reset selected brand when category changes and scroll to products
   useEffect(() => {
     setSelectedBrand(null);
+    
+    // Hide other categories when a specific category is selected
+    if (selectedCategory !== "All") {
+      setShowAllCategories(false);
+    } else {
+      setShowAllCategories(true);
+    }
     
     // Scroll to products grid when category changes
     if (selectedCategory !== "All" && productsGridRef.current) {
@@ -308,7 +316,18 @@ const Products = () => {
             </div>
 
             <div ref={categoriesRef} className="flex flex-wrap gap-3 mb-8 items-center justify-center md:justify-start">
-              {categories.map((cat) => (
+              {/* Toggle All Categories Button */}
+              {!showAllCategories && selectedCategory !== "All" && (
+                <button
+                  onClick={() => setShowAllCategories(true)}
+                  className="px-6 py-3 rounded-full font-semibold bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+                >
+                  <span>Show All Categories</span>
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+              )}
+              
+              {categories.filter(cat => showAllCategories || cat === selectedCategory).map((cat) => (
                 <div key={cat} className="relative">
                   <button
                     onClick={() => {
@@ -319,7 +338,7 @@ const Products = () => {
                       setSelectedCategory(cat);
                       setOpenCategory((prev) => (prev === cat ? null : cat));
                     }}
-                    className={`px-5 py-2.5 rounded-full font-semibold transition-all duration-200 flex items-center gap-2 ${
+                    className={`px-6 py-3.5 rounded-full font-semibold transition-all duration-200 flex items-center gap-2 min-h-[48px] touch-manipulation ${
                       selectedCategory === cat
                         ? "btn-accent text-white shadow-lg shadow-blue-700/40"
                         : "bg-card text-muted hover:bg-card/90"
