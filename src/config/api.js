@@ -36,6 +36,24 @@ export const getApiUrl = (endpoint) => {
   return `${API_CONFIG.BASE_URL}${endpoint}`;
 };
 
+// Helper function to normalize image URLs
+export const normalizeImageUrl = (url) => {
+  if (!url) return '/placeholder.svg';
+  
+  try {
+    // If it's already a full URL, return it as is
+    new URL(url);
+    return url;
+  } catch (e) {
+    // If it's a relative URL, make it absolute using the API base URL
+    if (url.startsWith('/')) {
+      return `${API_CONFIG.BASE_URL}${url}`;
+    }
+    // If it's neither, return placeholder
+    return '/placeholder.svg';
+  }
+};
+
 // Helper function to get admin token
 export const getAdminToken = () => {
   return localStorage.getItem('aalacomp_admin_token');

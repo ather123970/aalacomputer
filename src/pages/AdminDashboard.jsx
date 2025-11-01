@@ -549,11 +549,16 @@ const AdminDashboard = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden">
-                          {product.img ? (
-                            <img src={product.img} alt={product.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <Package className="w-6 h-6 text-gray-400" />
-                          )}
+                          <img 
+                            src={product.img || product.imageUrl || '/placeholder.svg'} 
+                            alt={product.name} 
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = '/placeholder.svg';
+                              e.target.className = 'w-6 h-6';
+                            }}
+                          />
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">
@@ -862,6 +867,27 @@ const ProductModal = ({ product, onClose, onSave }) => {
     }
 
     try {
+      // Get the base URL for images
+      const apiBaseUrl = getApiUrl('').replace(/\/$/, '');
+      
+      // Clean and normalize the image URL
+      let imgUrl = formData.img || formData.imageUrl || '';
+      if (imgUrl) {
+        // If it's a relative URL, make it absolute
+        if (imgUrl.startsWith('/')) {
+          imgUrl = `${apiBaseUrl}${imgUrl}`;
+        }
+        // Make sure we have a valid URL
+        try {
+          new URL(imgUrl);
+        } catch (e) {
+          console.warn('Invalid image URL:', imgUrl);
+          imgUrl = '/placeholder.svg';
+        }
+      } else {
+        imgUrl = '/placeholder.svg';
+      }
+      
       const payload = {
         ...formData,
         price,
@@ -869,8 +895,9 @@ const ProductModal = ({ product, onClose, onSave }) => {
         sold,
         title: formData.title || formData.name,
         name: formData.name || formData.title,
-        imageUrl: formData.imageUrl || formData.img,
-        img: formData.img || formData.imageUrl,
+        // Use the normalized URL for both fields
+        imageUrl: imgUrl,
+        img: imgUrl,
         specs: typeof formData.specs === 'string' 
           ? formData.specs.split(',').map(s => s.trim()).filter(Boolean)
           : Array.isArray(formData.specs) 
@@ -1046,13 +1073,38 @@ const ProductModal = ({ product, onClose, onSave }) => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Image URL
               </label>
-              <input
-                type="url"
-                value={formData.img}
-                onChange={(e) => setFormData({ ...formData, img: e.target.value })}
-                placeholder="https://example.com/image.jpg"
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              />
+              <div className="space-y-2">
+                <input
+                  type="url"
+                  value={formData.img || ''}
+                  onChange={(e) => {
+                    const url = e.target.value;
+                    setFormData({ 
+                      ...formData, 
+                      img: url,
+                      imageUrl: url // Keep both fields in sync
+                    });
+                  }}
+                  placeholder="https://example.com/image.jpg"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                />
+                {formData.img && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden">
+                      <img 
+                        src={formData.img} 
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = '/placeholder.svg';
+                        }}
+                      />
+                    </div>
+                    <span className="text-xs text-gray-500">Preview</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

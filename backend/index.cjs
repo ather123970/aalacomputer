@@ -597,41 +597,83 @@ app.put('/api/admin/products/:id', async (req, res) => {
     const mongoose = require('mongoose');
     const ProductModel = getProductModel();
 
-    // Check MongoDB connection
-    if (!mongoose.connection.readyState) {
-      console.error('[admin/products/:id] MongoDB not connected');
-      return res.status(503).json({ ok: false, error: 'database unavailable' });
+    // Ensure MongoDB connection
+    const mongoUri = process.env.MONGO_URI || process.env.MONGODB;
+    if (!mongoUri) {
+      console.error('[admin/products/:id] MONGO_URI not configured');
+      return res.status(503).json({ ok: false, error: 'database not configured' });
     }
+
+    // Try to connect if not already connected
+    if (!mongoose.connection.readyState) {
+      try {
+        await mongoose.connect(mongoUri, { 
+          useNewUrlParser: true, 
+          useUnifiedTopology: true,
+          serverSelectionTimeoutMS: 5000 // 5 second timeout
+        });
+      } catch (dbError) {
+        console.error('[admin/products/:id] MongoDB connection failed:', dbError);
+        return res.status(503).json({ ok: false, error: 'database connection failed' });
+      }
+    }
+
+    console.log('[admin/products/:id] MongoDB connected successfully, readyState:', mongoose.connection.readyState);
 
     const id = req.params.id;
     const payload = req.body || {};
 
-    // Synchronize img and imageUrl fields
-    if (payload.img && !payload.imageUrl) {
-      payload.imageUrl = payload.img;
-    } else if (payload.imageUrl && !payload.img) {
-      payload.img = payload.imageUrl;
-    }
+    // Log the incoming update request
+    console.log('[admin/products/:id] Update request:', {
+      id,
+      originalImgUrl: payload.img,
+      originalImageUrl: payload.imageUrl
+    });
 
-    // Try matching by either the custom `id` field or MongoDB `_id` (ObjectId)
-    const query = {
+    // Get the existing product first
+    const existingProduct = await ProductModel.findOne({
       $or: [
         { id: String(id) },
         ...(mongoose.Types.ObjectId.isValid(id) ? [{ _id: new mongoose.Types.ObjectId(id) }] : [])
       ]
+    }).lean();
+
+    if (!existingProduct) {
+      console.log('[admin/products/:id] Product not found:', id);
+      return res.status(404).json({ ok: false, error: 'product not found' });
+    }
+
+    // Determine the final image URLs
+    const finalImgUrl = payload.img || payload.imageUrl || existingProduct.img || existingProduct.imageUrl || '/placeholder.svg';
+    const finalImageUrl = payload.imageUrl || payload.img || existingProduct.imageUrl || existingProduct.img || '/placeholder.svg';
+
+    // Log the image URL resolution
+    console.log('[admin/products/:id] Resolved image URLs:', {
+      finalImgUrl,
+      finalImageUrl,
+      existingImg: existingProduct.img,
+      existingImageUrl: existingProduct.imageUrl
+    });
+
+    // Prepare the update with synchronized image fields
+    const updateData = {
+      $set: {
+        ...payload,
+        img: finalImgUrl,
+        imageUrl: finalImageUrl,
+        updatedAt: new Date()
+      }
     };
 
+    // Perform the update
     const doc = await ProductModel.findOneAndUpdate(
-      query,
+      { _id: existingProduct._id },
+      updateData,
       { 
-        $set: { 
-          ...payload,
-          img: payload.img || payload.imageUrl,
-          imageUrl: payload.imageUrl || payload.img,
-          updatedAt: new Date() 
-        } 
-      },
-      { new: true, upsert: false }
+        new: true, 
+        upsert: false,
+        runValidators: true 
+      }
     ).lean();
 
     if (!doc) {
