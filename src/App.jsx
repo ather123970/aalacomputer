@@ -61,6 +61,14 @@ const App = () => {
           name: p.title || p.name || 'Unnamed Product',
           price: typeof p.price === 'number' ? p.price : Number(p.price) || 0,
           img: p.imageUrl || p.img || '/placeholder.svg',
+          // Ensure we have a fully qualified image URL
+          imageUrl: (() => {
+            const url = p.imageUrl || p.img || '/placeholder.svg';
+            if (url.startsWith('http://') || url.startsWith('https://')) {
+              return url;
+            }
+            return url.startsWith('/') ? url : `/${url}`;
+          })(),
           category: p.category || 'Other',
           specs: Array.isArray(p.specs) ? p.specs : (p.description ? [p.description] : []),
           tags: Array.isArray(p.tags) ? p.tags : [],
@@ -304,10 +312,14 @@ const App = () => {
                     >
                       <div className="relative">
                         <img
-                          src={item.img}
+                          src={item.imageUrl || item.img}
                           alt={item.name}
                           className="w-16 h-16 object-cover rounded-md shadow-sm"
-                          onError={(e) => e.currentTarget.src = '/placeholder.svg'}
+                          onError={(e) => {
+                            console.warn(`Failed to load image: ${e.currentTarget.src}`);
+                            e.currentTarget.src = '/placeholder.svg';
+                            e.currentTarget.onerror = null; // Prevent infinite loop
+                          }}
                         />
                         <span className={`absolute -top-1 -right-1 ${badgeColor} text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase`}>
                           {item.source}
