@@ -33,30 +33,13 @@ export default function Cart() {
 
   useEffect(() => { getCart() }, [])
 
-  // Merge any localStorage cart fallback (used when network unavailable) on mount
+  // Listen for cart update events and refresh data
   useEffect(() => {
-    // listen for programmatic cart updates (from AI fallback or other pages)
     function onCartUpdated(e) {
-      try {
-        const incoming = (e && e.detail && e.detail.cart) || [];
-        if (!Array.isArray(incoming) || !incoming.length) return;
-        const merged = [...(data || [])];
-        for (const it of incoming) {
-          const key = idKey(it);
-          const idx = merged.findIndex(m => String(m.id) === String(key));
-          if (idx !== -1) merged[idx].qty = Math.max(1, (merged[idx].qty || 1) + (it.qty || 1));
-          else merged.push({ id: key, name: it.name || key, price: Number(it.price || 0), img: it.img || '', spec: it.spec || '', qty: Number(it.qty || 1) });
-        }
-        setData(merged);
-        const q = {};
-        merged.forEach(it => (q[it.id] = it.qty || 1));
-        setQuantities(q);
-        saveCart(merged).catch(() => {});
-      } catch (err) { console.error('onCartUpdated handler error', err); }
+      getCart().catch(err => console.error('Failed to refresh cart:', err));
     }
     window.addEventListener('cart:updated', onCartUpdated);
     return () => window.removeEventListener('cart:updated', onCartUpdated);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ✅ Recalculate total whenever data or quantities change
@@ -112,32 +95,38 @@ export default function Cart() {
   // ✅ Add to cart from outside pages
   useEffect(() => {
     window.addToCart = async item => {
-      const key = idKey(item)
-      if (!key) return
-      const found = data.find(p => p.id === key)
-      let updatedCart
-      if (found) {
-        updatedCart = data.map(p =>
-          p.id === key ? { ...p, qty: (p.qty || 1) + Number(item.qty || 1) } : p
-        )
-      } else {
-        const newItem = {
-          id: key,
-          name: item.name ?? key,
-          price: Number(item.price || 0),
-          img: item.img || '',
-          spec: item.spec || '',
-          qty: Number(item.qty || 1)
+      const key = idKey(item);
+      if (!key) return;
+      
+      try {
+        // Add to cart through API
+        const res = await fetch(API_CART, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            id: key,
+            name: item.name ?? key,
+            price: Number(item.price || 0),
+            img: item.img || '',
+            specs: item.spec || [],
+            type: item.type || 'Pre-Build',
+            qty: Number(item.qty || 1),
+          })
+        });
+
+        if (!res.ok) {
+          throw new Error(`Server returned ${res.status}`);
         }
-        updatedCart = [...data, newItem]
+
+        // Refresh cart data from server
+        await getCart();
+      } catch (err) {
+        console.error('Failed to add item to cart:', err);
       }
-      setData(updatedCart)
-      const q = { ...quantities, [key]: (quantities[key] || 0) + Number(item.qty || 1) }
-      setQuantities(q)
-      await saveCart(updatedCart)
     }
-    return () => delete window.addToCart
-  }, [data, quantities])
+    return () => delete window.addToCart;
+  }, [])
 
   // ✅ Place Order (fixed clickable)
   const placeOrder = async () => {

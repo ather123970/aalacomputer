@@ -286,7 +286,20 @@ const App = () => {
                       className="flex items-center space-x-4 border-b border-blue-100 pb-3 last:border-b-0 hover:bg-blue-50 hover:shadow-md transition-all rounded-md p-3 cursor-pointer group"
                       onClick={() => {
                         console.log('🔗 Navigating to:', targetUrl, '| Product:', item.name);
-                        navigate(targetUrl);
+                        navigate(targetUrl, { 
+                          state: { 
+                            product: {
+                              _id: item.id,
+                              id: item.id,
+                              Name: item.name,
+                              price: item.price,
+                              img: item.img,
+                              Spec: item.specs || [],
+                              category: item.category || 'PC',
+                              description: item.specs?.join('\n') || ''
+                            } 
+                          } 
+                        });
                       }}
                     >
                       <div className="relative">

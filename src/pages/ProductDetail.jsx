@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { motion as FM } from "framer-motion";
 import Nav from "../nav";
 import { ArrowLeft, ShoppingCart } from "lucide-react";
@@ -22,20 +22,84 @@ function parsePrice(price) {
 const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [product, setProduct] = useState(null);
+  const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    try {
-      const productsList = localStorage.getItem("products");
-      if (productsList) {
-        const all = JSON.parse(productsList);
-        const found = all.find((p) => p.id.toString() === id);
-        if (found) setProduct(found);
+    let alive = true;
+    const tryLoad = async () => {
+      setNotFound(false);
+      try {
+        // 1) check location.state (navigate with state)
+        if (location?.state?.product) {
+          if (!alive) return;
+          setProduct(location.state.product);
+          return;
+        }
+
+        // 2) Fetch from API with appropriate headers
+        const base = (typeof API_BASE === 'string' ? API_BASE.replace(/\/+$/, '') : window.location.origin).replace(/\/+$/, '');
+        console.log('[DEBUG] Fetching product from database, id:', id);
+        
+        // Only try official API endpoints with auth
+        const endpoints = [
+          `${base}/api/products/${id}`,
+          `${base}/api/prebuilds/${id}`,
+          `${base}/api/v1/products/${id}`,
+        ];
+
+        for (const url of endpoints) {
+          try {
+            console.log('[DEBUG] Trying endpoint:', url);
+            const res = await fetch(url, {
+              credentials: 'include',
+              headers: { 
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (!res.ok) {
+              console.log('[DEBUG] Failed from', url, 'with status:', res.status);
+              continue;
+            }
+
+            const data = await res.json();
+            const src = data.product || data;
+            if (src) {
+              const formatted = {
+                id: src._id || src.id || id,
+                _id: src._id || src.id || id,
+                Name: src.title || src.name || src.Name || 'Unnamed Product',
+                price: typeof src.price === 'number' ? src.price : parsePrice(src.price || src.cost || 0),
+                img: src.imageUrl || src.img || src.image || src.photo || '',
+                Spec: Array.isArray(src.specs) ? src.specs : (src.Spec || (src.description ? [src.description] : [])),
+                category: src.category || src.type || 'PC',
+                description: src.description || src.longDescription || ''
+              };
+              if (!alive) return;
+              console.log('[DEBUG] Found and formatted product:', formatted);
+              setProduct(formatted);
+              return;
+            }
+          } catch (e) {
+            console.warn('[DEBUG] Error fetching from', url, ':', e.message);
+          }
+        }
+
+        if (!alive) return;
+        setNotFound(true);
+      } catch (e) {
+        console.warn("Failed to load product", e);
+        if (alive) setNotFound(true);
       }
-    } catch (e) {
-      console.warn("Failed to load product", e);
-    }
+    };
+
+    tryLoad();
+
+    return () => { alive = false; };
   }, [id]);
 
   const addToCart = async () => {
@@ -43,7 +107,7 @@ const ProductDetail = () => {
     setLoading(true);
     try {
       const payload = {
-        id: product.id.toString(),
+        id: (product._id || product.id).toString(),
         name: product.Name,
         price: parsePrice(product.price),
         img: product.img,
@@ -65,12 +129,6 @@ const ProductDetail = () => {
         throw new Error(errMsg)
       }
       await res.json();
-      const raw = localStorage.getItem("cart");
-      const arr = raw ? JSON.parse(raw) : [];
-      const idx = arr.findIndex((i) => i.id === payload.id);
-      if (idx === -1) arr.unshift({ ...payload });
-      else arr[idx] = { ...arr[idx], qty: (arr[idx].qty || 1) + 1 };
-      localStorage.setItem("cart", JSON.stringify(arr));
 
       navigate("/cart");
     } catch (err) {
@@ -86,7 +144,7 @@ const ProductDetail = () => {
       <>
         <Nav />
         <div className="min-h-screen bg-panel text-primary flex items-center justify-center">
-          <p>Product not found</p>
+          {notFound ? <p>Product not found</p> : <p>Loading product...</p>}
         </div>
       </>
     );

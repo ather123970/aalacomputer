@@ -44,23 +44,7 @@ const Products = () => {
   // Fetch products from backend on component mount
   useEffect(() => {
     loadProducts();
-
-    // Listen for product updates from admin (same-tab) and storage events (cross-tab)
-    const onProductsUpdated = () => {
-      loadProducts();
-    };
-
-    const onStorage = (e) => {
-      if (e && e.key === 'products_last_updated') onProductsUpdated();
-    };
-
-    window.addEventListener('products-updated', onProductsUpdated);
-    window.addEventListener('storage', onStorage);
-
-    return () => {
-      window.removeEventListener('products-updated', onProductsUpdated);
-      window.removeEventListener('storage', onStorage);
-    };
+    // No need for storage events since we're using real DB
   }, []);
 
   // Extract brands from product names and update brand options
@@ -202,7 +186,8 @@ const Products = () => {
       
       if (allData.length > 0) {
         const formattedProducts = allData.map(p => ({
-          id: p._id || p.id,
+          id: p._id || p.id || p.productId,
+          _id: p._id || p.id || p.productId, // keep original MongoDB ID
           Name: p.title || p.name || 'Unnamed Product',
           price: (typeof p.price === 'number' ? p.price : Number(p.price)) || 0,
           img: getImageUrl(p.imageUrl || p.img),
@@ -210,11 +195,6 @@ const Products = () => {
           category: p.category || 'PC'
         }));
         setAllProducts(formattedProducts);
-        try {
-          localStorage.setItem("products", JSON.stringify(formattedProducts));
-        } catch (e) {
-          console.warn("Failed to cache products", e);
-        }
       } else {
         // Fallback to empty if backend returns nothing
         setAllProducts([]);
@@ -248,11 +228,47 @@ const Products = () => {
     return [];
   };
 
-  const buynow = (product) => {
+  const buynow = async (product) => {
+    // Add item to cart through API
     setLoadingId(product.id);
-    setTimeout(() => {
-      navigate(`/products/${product.id}`);
-    }, 150);
+    try {
+      const base = API_BASE ? API_BASE.replace(/\/+$/, '') : '';
+      const payload = {
+        id: product._id || product.id,
+        name: product.Name,
+        price: Number(product.price) || 0,
+        img: product.img,
+        specs: product.Spec || [],
+        type: product.category || product.type || 'Pre-Build',
+        qty: 1,
+      };
+
+      const res = await fetch(`${base}/api/v1/cart`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        let errMsg = `Server returned ${res.status}`;
+        try {
+          const errJson = await res.json();
+          if (errJson && (errJson.error || errJson.message)) {
+            errMsg = errJson.error || errJson.message;
+          }
+        } catch (e) {}
+        throw new Error(errMsg);
+      }
+      
+      await res.json(); // Wait for response
+      navigate('/cart'); // Navigate on success
+    } catch (e) {
+      console.error('Failed to add to cart:', e);
+      alert('Failed to add to cart ❌');
+    } finally {
+      setLoadingId(null);
+    }
   };
 
   // Handle category selection with auto-scroll
@@ -451,7 +467,7 @@ const AnimatedProductCard = ({ p, buynow, loadingId, navigate, delay }) => {
       initial={{ opacity: 0, y: 50, scale: 0.95 }}
       animate={controls}
       transition={{ duration: 0.4, delay, ease: "easeOut" }}
-      onClick={() => navigate(`/products/${p.id}`)}
+      onClick={() => navigate(`/products/${p._id || p.id}`, { state: { product: p } })}
       className="bg-card rounded-2xl p-4 cursor-pointer hover:shadow-xl transition-all duration-300 hover:scale-105 border border-gray-800"
     >
       <div className="relative h-48 mb-4 rounded-xl bg-gray-800 flex items-center justify-center p-2">
@@ -475,7 +491,7 @@ const AnimatedProductCard = ({ p, buynow, loadingId, navigate, delay }) => {
         disabled={loadingId === p.id}
         className="w-full mt-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-lg font-semibold transition-colors"
       >
-        {loadingId === p.id ? "Loading..." : "View Details"}
+        {loadingId === p.id ? "Loading..." : "Buy Now"}
       </button>
     </motion.div>
   );

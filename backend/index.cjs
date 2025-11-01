@@ -844,30 +844,105 @@ app.get('/api/admin/products', async (req, res) => {
   }
 });
 
-// Get single product by ID (protected)
-app.get('/api/products/:id', (req, res) => {
-  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+// Get single product by ID
+app.get('/api/products/:id', async (req, res) => {
   const id = req.params.id;
   try {
+    // Try MongoDB first
     const mongoose = require('mongoose');
     const ProductModel = getProductModel();
+    
     if (ProductModel && mongoose.connection.readyState === 1) {
-      ProductModel.findOne({ id: String(id) }).lean().then((doc) => {
-        if (!doc) return res.status(404).json({ ok: false, error: 'product not found' });
-        return res.json(doc);
-      }).catch(err => {
-        console.error('[products/:id] product get failed', err && (err.stack || err.message));
-        res.status(500).json({ ok: false, error: 'db error' });
-      });
-      return;
+      const query = {
+        $or: [
+          // Try as ObjectId
+          ...(mongoose.Types.ObjectId.isValid(id) ? [{ _id: new mongoose.Types.ObjectId(id) }] : []),
+          // Try as string ID
+          { id: String(id) },
+          // Try as string _id
+          { _id: String(id) }
+        ]
+      };
+
+      const product = await ProductModel.findOne(query).lean();
+
+      // Add detailed logging for debugging
+      console.log('[DEBUG] Product search query:', JSON.stringify(query));
+      console.log('[DEBUG] Product search result:', product ? 'Found' : 'Not found');
+      
+      if (product) {
+        // Normalize the response format
+        const formatted = {
+          id: product._id || product.id,
+          _id: product._id || product.id,
+          Name: product.title || product.name || 'Unnamed Product',
+          price: typeof product.price === 'number' ? product.price : Number(product.price) || 0,
+          img: product.imageUrl || product.img || '/placeholder.svg',
+          Spec: Array.isArray(product.specs) ? product.specs : (product.description ? [product.description] : []),
+          category: product.category || 'PC',
+          description: product.description || ''
+        };
+        console.log('[product] Found in MongoDB:', formatted.id);
+        return res.json(formatted);
+      }
     }
+
+    // Try prebuilds collection
+    const PrebuildModel = getPrebuildModel();
+    if (PrebuildModel && mongoose.connection.readyState === 1) {
+      const prebuild = await PrebuildModel.findOne({
+        $or: [
+          { _id: id },
+          { id: String(id) }
+        ]
+      }).lean();
+      
+      if (prebuild) {
+        const formatted = {
+          id: prebuild._id || prebuild.id,
+          _id: prebuild._id || prebuild.id,
+          Name: prebuild.title || prebuild.name || 'Unnamed Product',
+          price: typeof prebuild.price === 'number' ? prebuild.price : Number(prebuild.price) || 0,
+          img: prebuild.imageUrl || prebuild.img || '/placeholder.svg',
+          Spec: Array.isArray(prebuild.specs) ? prebuild.specs : (prebuild.description ? [prebuild.description] : []),
+          category: 'PC',
+          description: prebuild.description || ''
+        };
+        console.log('[product] Found in prebuilds:', formatted.id);
+        return res.json(formatted);
+      }
+    }
+
+    // Fallback to file storage
     const prods = readDataFile('products.json') || [];
-    const product = prods.find(p => String(p.id) === String(id));
-    if (!product) return res.status(404).json({ ok: false, error: 'product not found' });
-    res.json(product);
+    const fileProduct = prods.find(p => {
+      const pid = p._id || p.id;
+      return String(pid) === String(id);
+    });
+    
+    if (fileProduct) {
+      console.log('[product] Found in file storage:', fileProduct.id);
+      return res.json(fileProduct);
+    }
+
+    // Check prebuilds.json as last resort
+    const prebuilds = readDataFile('prebuilds.json') || [];
+    const filePrebuild = prebuilds.find(p => {
+      const pid = p._id || p.id;
+      return String(pid) === String(id);
+    });
+
+    if (filePrebuild) {
+      console.log('[product] Found in prebuilds.json:', filePrebuild.id);
+      return res.json(filePrebuild);
+    }
+
+    // Not found anywhere
+    console.log('[product] Not found:', id);
+    return res.status(404).json({ ok: false, error: 'Product not found' });
   } catch (e) {
-    console.error('get product failed', e);
-    res.status(500).json({ ok: false, error: 'server error' });
+    console.error('[product] Get failed:', e);
+    res.status(500).json({ ok: false, error: 'Server error' });
   }
 });
 
@@ -1147,19 +1222,54 @@ app.post('/api/admin/prebuilds', async (req, res) => {
 
 // PUBLIC: Get prebuild by ID
 app.get('/api/prebuilds/:id', async (req, res) => {
+  const id = req.params.id;
   try {
+    // Try MongoDB first
     const mongoose = require('mongoose');
     const PrebuildModel = getPrebuildModel();
     if (PrebuildModel && mongoose.connection.readyState === 1) {
-      const prebuild = await PrebuildModel.findOne({ id: req.params.id }).lean();
-      if (!prebuild) return res.status(404).json({ ok: false, error: 'Prebuild not found' });
-      return res.json(prebuild);
+      const prebuild = await PrebuildModel.findOne({
+        $or: [
+          { _id: id },
+          { id: String(id) }
+        ]
+      }).lean();
+      
+      if (prebuild) {
+        // Normalize response format
+        const formatted = {
+          id: prebuild._id || prebuild.id,
+          _id: prebuild._id || prebuild.id,
+          Name: prebuild.title || prebuild.name || 'Unnamed Product',
+          price: typeof prebuild.price === 'number' ? prebuild.price : Number(prebuild.price) || 0,
+          img: prebuild.imageUrl || prebuild.img || '/placeholder.svg',
+          Spec: Array.isArray(prebuild.specs) ? prebuild.specs : (prebuild.description ? [prebuild.description] : []),
+          category: 'PC',
+          description: prebuild.description || ''
+        };
+        console.log('[prebuild] Found in MongoDB:', formatted.id);
+        return res.json(formatted);
+      }
     }
-  } catch (e) { /* fallback to file */ }
-  const prebuilds = readDataFile('prebuilds.json') || [];
-  const prebuild = prebuilds.find(p => p.id === req.params.id || p.id === Number(req.params.id));
-  if (!prebuild) return res.status(404).json({ ok: false, error: 'Prebuild not found' });
-  res.json(prebuild);
+
+    // Fallback to file storage
+    const prebuilds = readDataFile('prebuilds.json') || [];
+    const filePrebuild = prebuilds.find(p => {
+      const pid = p._id || p.id;
+      return String(pid) === String(id);
+    });
+
+    if (filePrebuild) {
+      console.log('[prebuild] Found in file storage:', filePrebuild.id);
+      return res.json(filePrebuild);
+    }
+
+    console.log('[prebuild] Not found:', id);
+    return res.status(404).json({ ok: false, error: 'Prebuild not found' });
+  } catch (e) {
+    console.error('[prebuild] Get failed:', e);
+    return res.status(500).json({ ok: false, error: 'Server error' });
+  }
 });
 
 // PROTECTED: Update prebuild
