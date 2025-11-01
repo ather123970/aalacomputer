@@ -596,8 +596,17 @@ app.put('/api/admin/products/:id', (req, res) => {
     const mongoose = require('mongoose');
     const ProductModel = getProductModel();
     if (ProductModel && mongoose.connection.readyState === 1) {
-      ProductModel.findOneAndUpdate({ id: String(id) }, { $set: { ...payload, updatedAt: new Date() } }, { new: true, upsert: false }).lean().then(doc => {
+      // Try matching by either the custom `id` field or MongoDB `_id` (ObjectId)
+      const query = {
+        $or: [
+          { id: String(id) },
+          ...(mongoose.Types.ObjectId.isValid(id) ? [{ _id: new mongoose.Types.ObjectId(id) }] : [])
+        ]
+      };
+
+      ProductModel.findOneAndUpdate(query, { $set: { ...payload, updatedAt: new Date() } }, { new: true, upsert: false }).lean().then(doc => {
         if (!doc) return res.status(404).json({ ok: false, error: 'product not found' });
+        console.log('[admin/products/:id] Updated product in DB:', doc.id || doc._id);
         return res.json({ ok: true, product: doc });
       }).catch(err => { console.error('[admin/products/:id] product update failed', err && (err.stack || err.message)); res.status(500).json({ ok: false, error: 'db error' }); });
       return;
