@@ -1006,6 +1006,81 @@ app.post('/api/admin/deals', async (req, res) => {
   }
 });
 
+// PUBLIC: Get deal by ID
+app.get('/api/deals/:id', async (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    const DealModel = getDealModel();
+    if (DealModel && mongoose.connection.readyState === 1) {
+      const deal = await DealModel.findOne({ id: req.params.id }).lean();
+      if (!deal) return res.status(404).json({ ok: false, error: 'Deal not found' });
+      return res.json(deal);
+    }
+  } catch (e) { /* fallback to file */ }
+  const deals = readDataFile('deals.json') || [];
+  const deal = deals.find(d => d.id === req.params.id || d.id === Number(req.params.id));
+  if (!deal) return res.status(404).json({ ok: false, error: 'Deal not found' });
+  res.json(deal);
+});
+
+// PROTECTED: Update deal
+app.put('/api/admin/deals/:id', async (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  
+  const payload = req.body || {};
+  try {
+    const mongoose = require('mongoose');
+    const DealModel = getDealModel();
+    if (DealModel && mongoose.connection.readyState === 1) {
+      const updated = await DealModel.findOneAndUpdate(
+        { id: req.params.id },
+        { 
+          ...payload,
+          updatedAt: new Date()
+        },
+        { new: true }
+      ).lean();
+      if (!updated) return res.status(404).json({ ok: false, error: 'Deal not found' });
+      return res.json({ ok: true, product: updated });
+    }
+    
+    const deals = readDataFile('deals.json') || [];
+    const idx = deals.findIndex(d => d.id === req.params.id || d.id === Number(req.params.id));
+    if (idx === -1) return res.status(404).json({ ok: false, error: 'Deal not found' });
+    deals[idx] = { ...deals[idx], ...payload, updatedAt: new Date().toISOString() };
+    writeDataFile('deals.json', deals);
+    return res.json({ ok: true, product: deals[idx] });
+  } catch (e) {
+    console.error('[deal] Update failed:', e);
+    return res.status(500).json({ ok: false, error: `Server error: ${e.message}` });
+  }
+});
+
+// PROTECTED: Delete deal
+app.delete('/api/admin/deals/:id', async (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  
+  try {
+    const mongoose = require('mongoose');
+    const DealModel = getDealModel();
+    if (DealModel && mongoose.connection.readyState === 1) {
+      const deleted = await DealModel.findOneAndDelete({ id: req.params.id });
+      if (!deleted) return res.status(404).json({ ok: false, error: 'Deal not found' });
+      return res.json({ ok: true, message: 'Deal deleted' });
+    }
+    
+    const deals = readDataFile('deals.json') || [];
+    const idx = deals.findIndex(d => d.id === req.params.id || d.id === Number(req.params.id));
+    if (idx === -1) return res.status(404).json({ ok: false, error: 'Deal not found' });
+    deals.splice(idx, 1);
+    writeDataFile('deals.json', deals);
+    return res.json({ ok: true, message: 'Deal deleted' });
+  } catch (e) {
+    console.error('[deal] Delete failed:', e);
+    return res.status(500).json({ ok: false, error: `Server error: ${e.message}` });
+  }
+});
+
 // PUBLIC: Get all prebuilds
 app.get('/api/prebuilds', (req, res) => {
   try {
@@ -1066,6 +1141,81 @@ app.post('/api/admin/prebuilds', async (req, res) => {
     return res.json({ ok: true, product: newPrebuild });
   } catch (e) {
     console.error('[prebuild] Create failed:', e);
+    return res.status(500).json({ ok: false, error: `Server error: ${e.message}` });
+  }
+});
+
+// PUBLIC: Get prebuild by ID
+app.get('/api/prebuilds/:id', async (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    const PrebuildModel = getPrebuildModel();
+    if (PrebuildModel && mongoose.connection.readyState === 1) {
+      const prebuild = await PrebuildModel.findOne({ id: req.params.id }).lean();
+      if (!prebuild) return res.status(404).json({ ok: false, error: 'Prebuild not found' });
+      return res.json(prebuild);
+    }
+  } catch (e) { /* fallback to file */ }
+  const prebuilds = readDataFile('prebuilds.json') || [];
+  const prebuild = prebuilds.find(p => p.id === req.params.id || p.id === Number(req.params.id));
+  if (!prebuild) return res.status(404).json({ ok: false, error: 'Prebuild not found' });
+  res.json(prebuild);
+});
+
+// PROTECTED: Update prebuild
+app.put('/api/admin/prebuilds/:id', async (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  
+  const payload = req.body || {};
+  try {
+    const mongoose = require('mongoose');
+    const PrebuildModel = getPrebuildModel();
+    if (PrebuildModel && mongoose.connection.readyState === 1) {
+      const updated = await PrebuildModel.findOneAndUpdate(
+        { id: req.params.id },
+        { 
+          ...payload,
+          updatedAt: new Date()
+        },
+        { new: true }
+      ).lean();
+      if (!updated) return res.status(404).json({ ok: false, error: 'Prebuild not found' });
+      return res.json({ ok: true, product: updated });
+    }
+    
+    const prebuilds = readDataFile('prebuilds.json') || [];
+    const idx = prebuilds.findIndex(p => p.id === req.params.id || p.id === Number(req.params.id));
+    if (idx === -1) return res.status(404).json({ ok: false, error: 'Prebuild not found' });
+    prebuilds[idx] = { ...prebuilds[idx], ...payload, updatedAt: new Date().toISOString() };
+    writeDataFile('prebuilds.json', prebuilds);
+    return res.json({ ok: true, product: prebuilds[idx] });
+  } catch (e) {
+    console.error('[prebuild] Update failed:', e);
+    return res.status(500).json({ ok: false, error: `Server error: ${e.message}` });
+  }
+});
+
+// PROTECTED: Delete prebuild
+app.delete('/api/admin/prebuilds/:id', async (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  
+  try {
+    const mongoose = require('mongoose');
+    const PrebuildModel = getPrebuildModel();
+    if (PrebuildModel && mongoose.connection.readyState === 1) {
+      const deleted = await PrebuildModel.findOneAndDelete({ id: req.params.id });
+      if (!deleted) return res.status(404).json({ ok: false, error: 'Prebuild not found' });
+      return res.json({ ok: true, message: 'Prebuild deleted' });
+    }
+    
+    const prebuilds = readDataFile('prebuilds.json') || [];
+    const idx = prebuilds.findIndex(p => p.id === req.params.id || p.id === Number(req.params.id));
+    if (idx === -1) return res.status(404).json({ ok: false, error: 'Prebuild not found' });
+    prebuilds.splice(idx, 1);
+    writeDataFile('prebuilds.json', prebuilds);
+    return res.json({ ok: true, message: 'Prebuild deleted' });
+  } catch (e) {
+    console.error('[prebuild] Delete failed:', e);
     return res.status(500).json({ ok: false, error: `Server error: ${e.message}` });
   }
 });

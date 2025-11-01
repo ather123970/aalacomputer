@@ -27,6 +27,7 @@ import { apiCall, getApiUrl } from '../config/api';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('products');
   const [stats, setStats] = useState({
     totalProducts: 0,
     totalOrders: 0,
@@ -34,6 +35,8 @@ const AdminDashboard = () => {
     topSelling: []
   });
   const [products, setProducts] = useState([]);
+  const [deals, setDeals] = useState([]);
+  const [prebuilds, setPrebuilds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -61,7 +64,9 @@ const AdminDashboard = () => {
       // Load stats and products in parallel
       await Promise.all([
         loadStats(),
-        loadProducts()
+        loadProducts(),
+        loadDeals(),
+        loadPrebuilds()
       ]);
       
       // Load categories after products are loaded
@@ -108,6 +113,30 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error('Error loading products:', error);
       setProducts([]);
+    }
+  };
+
+  const loadDeals = async () => {
+    try {
+      const data = await apiCall('/api/deals');
+      if (Array.isArray(data)) {
+        setDeals(data);
+      }
+    } catch (error) {
+      console.error('Error loading deals:', error);
+      setDeals([]);
+    }
+  };
+
+  const loadPrebuilds = async () => {
+    try {
+      const data = await apiCall('/api/prebuilds');
+      if (Array.isArray(data)) {
+        setPrebuilds(data);
+      }
+    } catch (error) {
+      console.error('Error loading prebuilds:', error);
+      setPrebuilds([]);
     }
   };
 
@@ -169,6 +198,48 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error('Error deleting product:', error);
       setError(`Failed to delete product: ${error.message}`);
+    }
+  };
+
+  const handleDeleteDeal = async (dealId) => {
+    if (!confirm('Are you sure you want to delete this deal?')) return;
+    
+    try {
+      const response = await apiCall(`/api/admin/deals/${dealId}`, { 
+        method: 'DELETE'
+      });
+
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      setDeals(prevDeals => prevDeals.filter(d => d.id !== dealId));
+      setError('Deal deleted successfully');
+      setTimeout(() => setError(''), 3000);
+    } catch (error) {
+      console.error('Error deleting deal:', error);
+      setError(`Failed to delete deal: ${error.message}`);
+    }
+  };
+
+  const handleDeletePrebuild = async (prebuildId) => {
+    if (!confirm('Are you sure you want to delete this prebuild?')) return;
+    
+    try {
+      const response = await apiCall(`/api/admin/prebuilds/${prebuildId}`, { 
+        method: 'DELETE'
+      });
+
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      setPrebuilds(prevPrebuilds => prevPrebuilds.filter(p => p.id !== prebuildId));
+      setError('Prebuild deleted successfully');
+      setTimeout(() => setError(''), 3000);
+    } catch (error) {
+      console.error('Error deleting prebuild:', error);
+      setError(`Failed to delete prebuild: ${error.message}`);
     }
   };
 
@@ -357,7 +428,51 @@ const AdminDashboard = () => {
         </motion.div>
       )}
 
+      {/* Tabs */}
+      <motion.div variants={itemVariants} className="flex space-x-2 border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('products')}
+          className={`px-6 py-3 font-medium transition-all ${
+            activeTab === 'products'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-600 hover:text-blue-600'
+          }`}
+        >
+          <div className="flex items-center space-x-2">
+            <Package className="w-4 h-4" />
+            <span>Products ({products.length})</span>
+          </div>
+        </button>
+        <button
+          onClick={() => setActiveTab('deals')}
+          className={`px-6 py-3 font-medium transition-all ${
+            activeTab === 'deals'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-600 hover:text-blue-600'
+          }`}
+        >
+          <div className="flex items-center space-x-2">
+            <Sparkles className="w-4 h-4" />
+            <span>Deals ({deals.length})</span>
+          </div>
+        </button>
+        <button
+          onClick={() => setActiveTab('prebuilds')}
+          className={`px-6 py-3 font-medium transition-all ${
+            activeTab === 'prebuilds'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-600 hover:text-blue-600'
+          }`}
+        >
+          <div className="flex items-center space-x-2">
+            <Target className="w-4 h-4" />
+            <span>Prebuilds ({prebuilds.length})</span>
+          </div>
+        </button>
+      </motion.div>
+
       {/* Products Section */}
+      {activeTab === 'products' && (
       <motion.div variants={itemVariants} className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
         <div className="p-6 border-b border-gray-200">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
@@ -512,6 +627,167 @@ const AdminDashboard = () => {
           )}
         </div>
       </motion.div>
+      )}
+
+      {/* Deals Section */}
+      {activeTab === 'deals' && (
+        <motion.div variants={itemVariants} className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
+            <h3 className="text-xl font-semibold text-gray-900 flex items-center">
+              <Sparkles className="w-5 h-5 mr-2 text-blue-600" />
+              Deals Management
+            </h3>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deal</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {deals.map((deal) => (
+                  <tr key={deal.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden">
+                          {deal.img || deal.imageUrl ? (
+                            <img src={deal.img || deal.imageUrl} alt={deal.name || deal.title} className="w-full h-full object-cover" />
+                          ) : (
+                            <Sparkles className="w-6 h-6 text-gray-400" />
+                          )}
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">{deal.name || deal.title}</div>
+                          <div className="text-sm text-gray-500">ID: {deal.id}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                      PKR {typeof deal.price === 'number' ? deal.price.toLocaleString() : deal.price}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        (deal.stock || 0) < 5 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                      }`}>
+                        {deal.stock || 0}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => setEditingProduct({...deal, type: 'deal'})}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteDeal(deal.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            
+            {deals.length === 0 && (
+              <div className="text-center py-12">
+                <Sparkles className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-600 mb-2">No deals found</h3>
+                <p className="text-gray-500">Create deals from the product section by checking "Deals Product"</p>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Prebuilds Section */}
+      {activeTab === 'prebuilds' && (
+        <motion.div variants={itemVariants} className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
+            <h3 className="text-xl font-semibold text-gray-900 flex items-center">
+              <Target className="w-5 h-5 mr-2 text-blue-600" />
+              Prebuilds Management
+            </h3>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prebuild</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {prebuilds.map((prebuild) => (
+                  <tr key={prebuild.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden">
+                          {prebuild.img || prebuild.imageUrl ? (
+                            <img src={prebuild.img || prebuild.imageUrl} alt={prebuild.name || prebuild.title} className="w-full h-full object-cover" />
+                          ) : (
+                            <Target className="w-6 h-6 text-gray-400" />
+                          )}
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">{prebuild.name || prebuild.title}</div>
+                          <div className="text-sm text-gray-500">ID: {prebuild.id}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                      PKR {typeof prebuild.price === 'number' ? prebuild.price.toLocaleString() : prebuild.price}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        (prebuild.stock || 0) < 5 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                      }`}>
+                        {prebuild.stock || 0}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => setEditingProduct({...prebuild, type: 'prebuild'})}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeletePrebuild(prebuild.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            
+            {prebuilds.length === 0 && (
+              <div className="text-center py-12">
+                <Target className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-600 mb-2">No prebuilds found</h3>
+                <p className="text-gray-500">Create prebuilds from the product section by checking "Prebuild Product"</p>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
 
       {/* Create/Edit Product Modal */}
       <AnimatePresence>

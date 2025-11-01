@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, useAnimation } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 import Nav from "../nav";
 import { API_BASE } from '../config'
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 const getImageUrl = (path) => {
   if (!path) return "/placeholder.svg";
@@ -14,7 +14,8 @@ const getImageUrl = (path) => {
 
 const categories = ["All", "PC", "Keyboard", "Mouse", "GPU", "RAM", "SSD", "Case"];
 
-const brandOptionsByCategory = {
+// Initial brand suggestions (will be merged with database brands)
+const initialBrandSuggestions = {
   GPU: ["NVIDIA", "ASUS", "MSI", "Gigabyte", "ZOTAC", "PNY"],
   RAM: ["Corsair", "Kingston", "G.Skill", "ADATA", "Crucial"],
   SSD: ["Samsung", "WD (Western Digital)", "Seagate", "Kingston"],
@@ -36,6 +37,9 @@ const Products = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [openCategory, setOpenCategory] = useState(null);
   const [selectedBrand, setSelectedBrand] = useState(null);
+  const [showAllCategories, setShowAllCategories] = useState(true);
+  const [brandOptionsByCategory, setBrandOptionsByCategory] = useState(initialBrandSuggestions);
+  const productsRef = useRef(null);
 
   // Fetch products from backend on component mount
   useEffect(() => {
@@ -58,6 +62,67 @@ const Products = () => {
       window.removeEventListener('storage', onStorage);
     };
   }, []);
+
+  // Extract brands from product names and update brand options
+  useEffect(() => {
+    if (allProducts.length > 0) {
+      const extractedBrands = {};
+      
+      // Common brand keywords to detect
+      const brandKeywords = {
+        GPU: ["nvidia", "asus", "msi", "gigabyte", "zotac", "pny", "evga", "sapphire", "xfx", "amd", "intel"],
+        RAM: ["corsair", "kingston", "g.skill", "gskill", "adata", "crucial", "teamgroup", "patriot", "hyperx"],
+        SSD: ["samsung", "wd", "western digital", "seagate", "kingston", "crucial", "sandisk", "intel", "sabrent"],
+        Case: ["cougar", "cooler master", "thermaltake", "nzxt", "corsair", "lian li", "fractal"],
+        Keyboard: ["corsair", "razer", "logitech", "steelseries", "hyperx", "ducky", "keychron"],
+        Mouse: ["logitech", "razer", "corsair", "steelseries", "glorious", "zowie"],
+        PC: []
+      };
+
+      categories.forEach(cat => {
+        if (cat === "All") {
+          extractedBrands[cat] = [];
+          return;
+        }
+
+        const brandsSet = new Set(initialBrandSuggestions[cat] || []);
+        
+        // Find products in this category
+        allProducts.forEach(product => {
+          const productName = (product.Name || '').toLowerCase();
+          const productCategory = (product.category || '').toLowerCase();
+          
+          // Check if product belongs to this category
+          if (productCategory.includes(cat.toLowerCase())) {
+            // Extract brand from product name
+            (brandKeywords[cat] || []).forEach(keyword => {
+              if (productName.includes(keyword)) {
+                // Capitalize first letter of each word
+                const brandName = keyword.split(' ')
+                  .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                  .join(' ');
+                brandsSet.add(brandName);
+              }
+            });
+
+            // Also check if product name starts with a brand (first word)
+            const firstWord = productName.split(' ')[0];
+            if (firstWord && firstWord.length > 2) {
+              const capitalizedFirst = firstWord.charAt(0).toUpperCase() + firstWord.slice(1);
+              if ((brandKeywords[cat] || []).some(kw => firstWord.includes(kw))) {
+                brandsSet.add(capitalizedFirst);
+              }
+            }
+          }
+        });
+
+        extractedBrands[cat] = Array.from(brandsSet).sort();
+      });
+
+      console.log('🏷️ Auto-detected brands from database:', extractedBrands);
+      setBrandOptionsByCategory(extractedBrands);
+    }
+  }, [allProducts]);
 
   // Filter products when category or price changes
   useEffect(() => {
@@ -124,35 +189,25 @@ const Products = () => {
   const loadProducts = async () => {
     setIsLoading(true);
     try {
-  const base = API_BASE ? API_BASE.replace(/\/+$/, '') : '';
-  const endpoints = [`${base}/api/v1/products`, `${base}/api/products`];
-  let data = [];
-  for (const url of endpoints) {
-    try {
-      const resp = await fetch(url);
-      if (resp.ok) {
-        const json = await resp.json();
-        if (Array.isArray(json)) {
-          data = json;
-          break;
-        }
-        if (json && Array.isArray(json.products)) {
-          data = json.products;
-          break;
-        }
-      }
-    } catch (_) {
-    }
-  }
+      const base = API_BASE ? API_BASE.replace(/\/+$/, '') : '';
       
-      if (Array.isArray(data) && data.length > 0) {
-        const formattedProducts = data.map(p => ({
+      // Fetch both products and prebuilds in parallel
+      const [productsData, prebuildsData] = await Promise.all([
+        fetchFromEndpoints([`${base}/api/v1/products`, `${base}/api/products`]),
+        fetchFromEndpoints([`${base}/api/prebuilds`])
+      ]);
+      
+      // Combine products and prebuilds
+      const allData = [...productsData, ...prebuildsData];
+      
+      if (allData.length > 0) {
+        const formattedProducts = allData.map(p => ({
           id: p._id || p.id,
           Name: p.title || p.name || 'Unnamed Product',
           price: (typeof p.price === 'number' ? p.price : Number(p.price)) || 0,
           img: getImageUrl(p.imageUrl || p.img),
           Spec: Array.isArray(p.specs) ? p.specs : (p.description ? [p.description] : []),
-          category: p.category || 'Other'
+          category: p.category || 'PC'
         }));
         setAllProducts(formattedProducts);
         try {
@@ -161,20 +216,36 @@ const Products = () => {
           console.warn("Failed to cache products", e);
         }
       } else {
-        // Fallback to sample data if backend returns empty
-        const productList = [
-        ];
-        setAllProducts(productList);
+        // Fallback to empty if backend returns nothing
+        setAllProducts([]);
       }
     } catch (error) {
       console.error('Failed to load products from backend:', error);
-      // Use fallback data
-      const productList = [
-      ];
-      setAllProducts(productList);
+      setAllProducts([]);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Helper function to fetch from multiple endpoints and return first successful response
+  const fetchFromEndpoints = async (endpoints) => {
+    for (const url of endpoints) {
+      try {
+        const resp = await fetch(url);
+        if (resp.ok) {
+          const json = await resp.json();
+          if (Array.isArray(json)) {
+            return json;
+          }
+          if (json && Array.isArray(json.products)) {
+            return json.products;
+          }
+        }
+      } catch (_) {
+        // Continue to next endpoint
+      }
+    }
+    return [];
   };
 
   const buynow = (product) => {
@@ -182,6 +253,29 @@ const Products = () => {
     setTimeout(() => {
       navigate(`/products/${product.id}`);
     }, 150);
+  };
+
+  // Handle category selection with auto-scroll
+  const handleCategorySelect = (cat) => {
+    setSelectedCategory(cat);
+    setOpenCategory((prev) => (prev === cat ? null : cat));
+    
+    // Show all categories if "All" is selected, hide if specific category
+    if (cat === "All") {
+      setShowAllCategories(true);
+    } else {
+      setShowAllCategories(false);
+    }
+    
+    // Scroll to products section
+    setTimeout(() => {
+      if (productsRef.current) {
+        productsRef.current.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        });
+      }
+    }, 100);
   };
 
   return (
@@ -206,29 +300,55 @@ const Products = () => {
         {/* Filters and Products Section */}
         {!isLoading && (
           <>
-            <div className="flex flex-wrap gap-3 mb-8 items-center justify-center md:justify-start">
-              {categories.map((cat) => (
-                <div key={cat} className="relative">
+            <div className="mb-8">
+              {/* Category Section Header with Toggle */}
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg font-semibold text-primary">Categories</h2>
+                  <span className="text-xs bg-green-500 text-white px-2 py-1 rounded-full">
+                    🏷️ Brands Auto-Detected from DB
+                  </span>
+                </div>
+                {selectedCategory !== "All" && (
                   <button
-                    onClick={() => {
-                      setSelectedCategory(cat);
-                      setOpenCategory((prev) => (prev === cat ? null : cat));
-                    }}
-                    onTouchEnd={() => {
-                      setSelectedCategory(cat);
-                      setOpenCategory((prev) => (prev === cat ? null : cat));
-                    }}
-                    className={`px-5 py-2.5 rounded-full font-semibold transition-all duration-200 flex items-center gap-2 ${
-                      selectedCategory === cat
-                        ? "btn-accent text-white shadow-lg shadow-blue-700/40"
-                        : "bg-card text-muted hover:bg-card/90"
-                    }`}
+                    onClick={() => setShowAllCategories(!showAllCategories)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                   >
-                    <span>{cat}</span>
-                    <ChevronDown
-                      className={`w-4 h-4 transition-transform ${openCategory === cat ? "rotate-180" : "rotate-0"}`}
-                    />
+                    {showAllCategories ? (
+                      <>
+                        <ChevronUp className="w-4 h-4" />
+                        Hide Categories
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-4 h-4" />
+                        Show All Categories
+                      </>
+                    )}
                   </button>
+                )}
+              </div>
+
+              {/* Categories */}
+              <div className="flex flex-wrap gap-3 items-center justify-center md:justify-start">
+                {categories
+                  .filter(cat => showAllCategories || cat === selectedCategory)
+                  .map((cat) => (
+                    <div key={cat} className="relative">
+                      <button
+                        onClick={() => handleCategorySelect(cat)}
+                        onTouchEnd={() => handleCategorySelect(cat)}
+                        className={`px-5 py-2.5 rounded-full font-semibold transition-all duration-200 flex items-center gap-2 ${
+                          selectedCategory === cat
+                            ? "btn-accent text-white shadow-lg shadow-blue-700/40"
+                            : "bg-card text-muted hover:bg-card/90"
+                        }`}
+                      >
+                        <span>{cat}</span>
+                        <ChevronDown
+                          className={`w-4 h-4 transition-transform ${openCategory === cat ? "rotate-180" : "rotate-0"}`}
+                        />
+                      </button>
 
                   {openCategory === cat && (brandOptionsByCategory[cat] || []).length > 0 && (
                     <motion.div
@@ -260,39 +380,41 @@ const Products = () => {
                 </div>
               ))}
 
-              {selectedBrand && (
-                <div className="flex items-center gap-2 bg-card border border-gray-700 px-3 py-1 rounded-full text-sm">
-                  <span>Brand: <span className="font-semibold">{selectedBrand}</span></span>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedBrand(null)}
-                    className="text-muted hover:text-white"
-                    aria-label="Clear selected brand"
-                  >
-                    ×
-                  </button>
-                </div>
-              )}
+                {selectedBrand && (
+                  <div className="flex items-center gap-2 bg-card border border-gray-700 px-3 py-1 rounded-full text-sm">
+                    <span>Brand: <span className="font-semibold">{selectedBrand}</span></span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBrand(null)}
+                      className="text-muted hover:text-white"
+                      aria-label="Clear selected brand"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
 
-              <div className="ml-auto flex items-center gap-2 bg-card p-2 rounded-lg">
-                <span className="text-muted text-sm">Price:</span>
-                <input
-                  type="number"
-                  value={priceRange[0]}
-                  onChange={(e) => setPriceRange([Number(e.target.value || 0), priceRange[1]])}
-                  className="w-20 p-1 bg-card rounded text-primary border border-gray-700"
-                />
-                <span className="text-muted">-</span>
-                <input
-                  type="number"
-                  value={priceRange[1]}
-                  onChange={(e) => setPriceRange([priceRange[0], Number(e.target.value || 500000)])}
-                  className="w-20 p-1 bg-card rounded text-primary border border-gray-700"
-                />
+                <div className="ml-auto flex items-center gap-2 bg-card p-2 rounded-lg">
+                  <span className="text-muted text-sm">Price:</span>
+                  <input
+                    type="number"
+                    value={priceRange[0]}
+                    onChange={(e) => setPriceRange([Number(e.target.value || 0), priceRange[1]])}
+                    className="w-20 p-1 bg-card rounded text-primary border border-gray-700"
+                  />
+                  <span className="text-muted">-</span>
+                  <input
+                    type="number"
+                    value={priceRange[1]}
+                    onChange={(e) => setPriceRange([priceRange[0], Number(e.target.value || 500000)])}
+                    className="w-20 p-1 bg-card rounded text-primary border border-gray-700"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {/* Products Grid with ref for auto-scroll */}
+            <div ref={productsRef} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {filteredProducts.map((p, idx) => (
                 <AnimatedProductCard key={p.id} p={p} buynow={buynow} loadingId={loadingId} navigate={navigate} delay={idx * 0.1} />
               ))}

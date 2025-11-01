@@ -7,8 +7,9 @@ import { API_BASE } from "./config";
 const App = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
-  const [prebuilds, setPrebuilds] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [scrollSpeed, setScrollSpeed] = useState(30); // seconds for one loop
 
   const { ref: sectionRef, inView } = useInView({
     triggerOnce: false,
@@ -16,37 +17,140 @@ const App = () => {
   });
 
   useEffect(() => {
-    const fetchPrebuilds = async () => {
+    const fetchAllProducts = async () => {
       setLoading(true);
       try {
         const base = API_BASE ? API_BASE.replace(/\/+$/, '') : '';
-        const response = await fetch(`${base}/api/prebuilds`);
-        if (response.ok) {
-          const data = await response.json();
-          const formatted = Array.isArray(data) ? data.map(p => ({
-            id: p._id || p.id,
-            name: p.title || p.name || 'Unnamed Product',
-            price: typeof p.price === 'number' ? p.price : Number(p.price) || 0,
-            img: p.imageUrl || p.img || '/placeholder.svg'
-          })) : [];
-          setPrebuilds(formatted);
+        console.log('🔍 Fetching all products from database...');
+        
+        // Fetch products, prebuilds, and deals in parallel
+        const [productsRes, prebuildsRes, dealsRes] = await Promise.all([
+          fetch(`${base}/api/products`),
+          fetch(`${base}/api/prebuilds`),
+          fetch(`${base}/api/deals`)
+        ]);
+
+        let allData = [];
+
+        // Process products
+        if (productsRes.ok) {
+          const products = await productsRes.json();
+          if (Array.isArray(products)) {
+            allData = [...allData, ...products.map(p => ({...p, source: 'product'}))];
+          }
         }
+
+        // Process prebuilds
+        if (prebuildsRes.ok) {
+          const prebuilds = await prebuildsRes.json();
+          if (Array.isArray(prebuilds)) {
+            allData = [...allData, ...prebuilds.map(p => ({...p, source: 'prebuild'}))];
+          }
+        }
+
+        // Process deals
+        if (dealsRes.ok) {
+          const deals = await dealsRes.json();
+          if (Array.isArray(deals)) {
+            allData = [...allData, ...deals.map(p => ({...p, source: 'deal'}))];
+          }
+        }
+
+        // Format all products
+        const formatted = allData.map(p => ({
+          id: p._id || p.id,
+          name: p.title || p.name || 'Unnamed Product',
+          price: typeof p.price === 'number' ? p.price : Number(p.price) || 0,
+          img: p.imageUrl || p.img || '/placeholder.svg',
+          category: p.category || 'Other',
+          specs: Array.isArray(p.specs) ? p.specs : (p.description ? [p.description] : []),
+          tags: Array.isArray(p.tags) ? p.tags : [],
+          source: p.source || 'product'
+        }));
+
+        console.log('✅ Total products loaded:', formatted.length);
+        setAllProducts(formatted);
       } catch (error) {
-        console.error('Failed to fetch prebuilds:', error);
-        setPrebuilds([]);
+        console.error('❌ Failed to fetch products:', error);
+        setAllProducts([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPrebuilds();
+    fetchAllProducts();
+
+    // Listen for product updates from admin
+    const onProductsUpdated = () => {
+      fetchAllProducts();
+    };
+
+    const onStorage = (e) => {
+      if (e && e.key === 'products_last_updated') {
+        fetchAllProducts();
+      }
+    };
+
+    window.addEventListener('products-updated', onProductsUpdated);
+    window.addEventListener('storage', onStorage);
+
+    return () => {
+      window.removeEventListener('products-updated', onProductsUpdated);
+      window.removeEventListener('storage', onStorage);
+    };
   }, []);
 
+  // Intelligent fuzzy search function
+  const smartSearch = (product, query) => {
+    const q = query.toLowerCase().trim();
+    if (!q) return true;
+
+    // Common aliases for better matching
+    const aliases = {
+      'gpu': ['gpu', 'graphic card', 'graphics card', 'video card', 'vga', 'graphics'],
+      'ram': ['ram', 'memory', 'ddr', 'ddr4', 'ddr5'],
+      'ssd': ['ssd', 'nvme', 'm.2', 'm2', 'solid state'],
+      'hdd': ['hdd', 'hard drive', 'hard disk'],
+      'cpu': ['cpu', 'processor', 'intel', 'amd', 'ryzen', 'core'],
+      'keyboard': ['keyboard', 'key board', 'keys'],
+      'mouse': ['mouse', 'mice'],
+      'pc': ['pc', 'computer', 'desktop', 'system', 'prebuild', 'prebuilt']
+    };
+
+    // Expand search query with aliases
+    let searchTerms = [q];
+    for (const [key, values] of Object.entries(aliases)) {
+      if (values.some(v => q.includes(v))) {
+        searchTerms.push(key, ...values);
+      }
+    }
+
+    // Fields to search in
+    const searchableText = [
+      product.name,
+      product.category,
+      ...product.specs,
+      ...product.tags,
+      product.source
+    ].join(' ').toLowerCase();
+
+    // Check if any search term matches
+    return searchTerms.some(term => {
+      // Partial match - even first letter
+      return searchableText.includes(term);
+    });
+  };
+
+  // Filter products based on search - only show when user searches
   const filteredResults = searchTerm.trim()
-    ? prebuilds.filter((item) =>
-        item.name.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : [];
+    ? allProducts.filter((item) => smartSearch(item, searchTerm))
+    : []; // Empty when no search term
+
+  // Log search results for debugging
+  if (searchTerm.trim()) {
+    console.log(`🔍 Searching "${searchTerm}" in ${allProducts.length} products`);
+    console.log(`✅ Found ${filteredResults.length} matches`);
+  }
 
   return (
     <>
@@ -101,51 +205,223 @@ const App = () => {
             transition={{ duration: 0.8, ease: "easeInOut" }}
             className="flex flex-col items-center md:items-start space-y-4 w-full"
           >
-            <div className="relative w-full md:w-[80%] lg:w-[70%]">
-              <input
-                type="text"
-                placeholder={loading ? "Loading prebuilds..." : "Search Prebuilds..."}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                disabled={loading}
-                className="w-full px-4 py-3 rounded-lg border-2 border-blue-300 bg-white/90 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-md text-blue-900 placeholder-blue-400 disabled:opacity-60 disabled:cursor-not-allowed"
-              />
-              {loading && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-full md:w-[80%] lg:w-[70%]">
+              {/* Database info badge */}
+              {!loading && allProducts.length > 0 && (
+                <div className="mb-2 text-center">
+                  <span className="inline-block bg-blue-600 text-white text-xs px-3 py-1 rounded-full">
+                    🗄️ Searching {allProducts.length} products from database
+                  </span>
                 </div>
               )}
+              
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder={loading ? "Loading products..." : `Search ${allProducts.length} products from database...`}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  disabled={loading}
+                  className="w-full px-4 py-3 rounded-lg border-2 border-blue-300 bg-white/90 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-md text-blue-900 placeholder-blue-400 disabled:opacity-60 disabled:cursor-not-allowed"
+                />
+                {loading && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+                {!loading && searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xl font-bold"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             </div>
 
-            {searchTerm.trim() && filteredResults.length === 0 && !loading && (
+            {!loading && filteredResults.length === 0 && allProducts.length === 0 && (
               <div className="w-full md:w-[80%] lg:w-[70%] bg-white/95 backdrop-blur-sm rounded-lg shadow-xl p-6 border border-blue-200 text-center">
-                <p className="text-blue-600">No prebuilds found matching "{searchTerm}"</p>
+                <p className="text-blue-600">No products available yet. Add some in the admin dashboard!</p>
               </div>
             )}
 
-            {filteredResults.length > 0 && (
-              <div className="w-full md:w-[80%] lg:w-[70%] bg-white/95 backdrop-blur-sm rounded-lg shadow-xl p-4 max-h-[60vh] overflow-y-auto space-y-3 border border-blue-200">
-                {filteredResults.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center space-x-4 border-b border-blue-100 pb-3 last:border-b-0 hover:bg-blue-50 transition-colors rounded-md p-2 cursor-pointer"
-                    onClick={() => navigate("/products")}
-                  >
-                    <img
-                      src={item.img}
-                      alt={item.name}
-                      className="w-16 h-16 object-cover rounded-md shadow-sm"
-                    />
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-blue-900 text-sm sm:text-base">
-                        {item.name}
-                      </h3>
-                      <p className="text-blue-600 font-medium text-sm">
-                        Rs {item.price.toLocaleString()}
-                      </p>
+            {searchTerm.trim() && filteredResults.length === 0 && allProducts.length > 0 && !loading && (
+              <div className="w-full md:w-[80%] lg:w-[70%] bg-white/95 backdrop-blur-sm rounded-lg shadow-xl p-6 border border-blue-200 text-center">
+                <p className="text-blue-600 mb-2">No products found matching "{searchTerm}"</p>
+                <p className="text-gray-500 text-sm mb-2">Searched through all {allProducts.length} products in database</p>
+                <p className="text-gray-500 text-xs">Try: GPU, RAM, SSD, Keyboard, Mouse, PC, or any brand name</p>
+              </div>
+            )}
+
+            {/* Infinite Horizontal Scrolling Carousel - Pure CSS */}
+            {!loading && filteredResults.length > 0 && (
+              <div className="w-full overflow-hidden">
+                {/* Header with Controls */}
+                <div className="flex items-center justify-between mb-3 px-2 flex-wrap gap-2">
+                  <div className="text-sm font-semibold text-blue-700">
+                    🔍 Found {filteredResults.length} of {allProducts.length} products
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {/* Speed Control */}
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-gray-600">Speed:</span>
+                      <button
+                        onClick={() => setScrollSpeed(s => Math.max(10, s - 5))}
+                        className="bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded"
+                      >
+                        ⚡ Fast
+                      </button>
+                      <button
+                        onClick={() => setScrollSpeed(s => Math.min(60, s + 5))}
+                        className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded"
+                      >
+                        🐌 Slow
+                      </button>
+                    </div>
+                    {searchTerm.trim() && (
+                      <button
+                        onClick={() => setSearchTerm('')}
+                        className="text-xs bg-red-100 hover:bg-red-200 text-red-600 px-2 py-1 rounded transition-colors"
+                      >
+                        Clear ×
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* CSS Keyframes Styles */}
+                <style>{`
+                  @keyframes scrollX {
+                    from {
+                      transform: translateX(0);
+                    }
+                    to {
+                      transform: translateX(-50%);
+                    }
+                  }
+                  
+                  @keyframes bob {
+                    0%, 100% {
+                      transform: translateY(0px) rotate(0deg);
+                    }
+                    25% {
+                      transform: translateY(-8px) rotate(1deg);
+                    }
+                    50% {
+                      transform: translateY(-4px) rotate(0deg);
+                    }
+                    75% {
+                      transform: translateY(-8px) rotate(-1deg);
+                    }
+                  }
+                  
+                  .scroll-track {
+                    animation: scrollX var(--scroll-duration, 30s) linear infinite;
+                  }
+                  
+                  .scroll-track:hover {
+                    animation-play-state: paused;
+                  }
+                  
+                  .bob-item {
+                    animation: bob 3s ease-in-out infinite;
+                  }
+                  
+                  .bob-item:nth-child(2n) {
+                    animation-delay: 0.5s;
+                  }
+                  
+                  .bob-item:nth-child(3n) {
+                    animation-delay: 1s;
+                  }
+                  
+                  .bob-item:nth-child(4n) {
+                    animation-delay: 1.5s;
+                  }
+                `}</style>
+
+                {/* Horizontal Infinite Scroll Container */}
+                <div className="relative group">
+                  {/* Left Gradient Fade */}
+                  <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-blue-50 via-blue-50/50 to-transparent z-10 pointer-events-none"></div>
+                  
+                  {/* Right Gradient Fade */}
+                  <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-blue-50 via-blue-50/50 to-transparent z-10 pointer-events-none"></div>
+                  
+                  {/* Hover Indicator */}
+                  <div className="absolute top-2 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-600 text-white text-xs px-3 py-1 rounded-full z-20 shadow-lg">
+                    ⏸ Hover to pause • ⚡ Adjust speed above
+                  </div>
+                  
+                  {/* Scrolling Track */}
+                  <div className="overflow-hidden py-4">
+                    <div 
+                      className="scroll-track flex gap-6"
+                      style={{ '--scroll-duration': `${scrollSpeed}s` }}
+                    >
+                      {/* Duplicate items twice for smooth infinite loop */}
+                      {[...filteredResults, ...filteredResults].map((item, index) => {
+                        const targetUrl = item.source === 'deal' 
+                          ? `/deal/${item.id}` 
+                          : `/products/${item.id}`;
+                        
+                        const badgeColor = item.source === 'deal' 
+                          ? 'bg-red-500' 
+                          : item.source === 'prebuild'
+                          ? 'bg-blue-500'
+                          : 'bg-green-500';
+                        
+                        return (
+                          <div
+                            key={`${item.id}-${index}`}
+                            className="bob-item flex-shrink-0 w-[280px] bg-white/95 backdrop-blur-sm rounded-xl shadow-lg hover:shadow-2xl p-4 cursor-pointer transition-all border-2 border-blue-200 hover:border-blue-400 group/card"
+                            onClick={() => {
+                              console.log('🔗 Navigating to:', targetUrl, '| Product:', item.name);
+                              navigate(targetUrl);
+                            }}
+                          >
+                            {/* Image */}
+                            <div className="relative mb-3 overflow-hidden rounded-lg">
+                              <img
+                                src={item.img}
+                                alt={item.name}
+                                className="w-full h-36 object-cover group-hover/card:scale-110 transition-transform duration-500"
+                                onError={(e) => e.currentTarget.src = '/placeholder.svg'}
+                              />
+                              <span className={`absolute top-2 right-2 ${badgeColor} text-white text-xs font-bold px-2 py-1 rounded-full uppercase shadow-lg`}>
+                                {item.source}
+                              </span>
+                              {/* View Details Overlay */}
+                              <div className="absolute inset-0 bg-blue-600/0 group-hover/card:bg-blue-600/20 transition-colors flex items-center justify-center">
+                                <span className="opacity-0 group-hover/card:opacity-100 bg-white text-blue-600 px-3 py-1 rounded-full text-xs font-bold transition-opacity">
+                                  View Details →
+                                </span>
+                              </div>
+                            </div>
+                            
+                            {/* Product Name */}
+                            <h3 className="font-bold text-blue-900 text-sm mb-2 line-clamp-2 min-h-[40px]">
+                              {item.name}
+                            </h3>
+                            
+                            {/* Price and Category */}
+                            <div className="flex items-center justify-between">
+                              <p className="text-blue-600 font-bold text-base">
+                                PKR {item.price.toLocaleString()}
+                              </p>
+                              {item.category && (
+                                <span className="text-gray-500 text-[10px] bg-gray-100 px-2 py-0.5 rounded-full">
+                                  {item.category}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                ))}
+                </div>
               </div>
             )}
           </FM.div>

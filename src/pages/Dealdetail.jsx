@@ -3,7 +3,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Check, ShoppingCart } from "lucide-react";
 import { motion as FM } from "framer-motion";
 import { useInView } from "react-intersection-observer";
-import deals from "./_dealsListForImport";
 import { API_BASE } from '../config'
 
 const DealDetail = () => {
@@ -11,16 +10,32 @@ const DealDetail = () => {
   const navigate = useNavigate();
   const [deal, setDeal] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [fetchLoading, setFetchLoading] = useState(true);
   const { ref, inView } = useInView({
     triggerOnce: false,
     threshold: 0.2,
   });
 
-  // Get selected deal by id
+  // Fetch deal from database
   useEffect(() => {
-    const found = deals.find((d) => d.id === Number(id));
-    if (found) setDeal(found);
-    else navigate("/deals");
+    const fetchDeal = async () => {
+      try {
+        setFetchLoading(true);
+        const response = await fetch(`${API_BASE}/api/deals/${id}`);
+        if (!response.ok) {
+          throw new Error('Deal not found');
+        }
+        const data = await response.json();
+        setDeal(data);
+      } catch (err) {
+        console.error('Error fetching deal:', err);
+        navigate("/deals");
+      } finally {
+        setFetchLoading(false);
+      }
+    };
+    
+    fetchDeal();
   }, [id, navigate]);
 
   // Add to cart
@@ -30,8 +45,8 @@ const DealDetail = () => {
       setLoading(true);
       const payload = {
         id: deal.id?.toString(),
-        name: deal.name,
-        img: deal.img,
+        name: deal.name || deal.title,
+        img: deal.img || deal.imageUrl,
         specs: deal.specs || [],
         type: deal.type || "deal",
         price: deal.price,
@@ -64,12 +79,20 @@ const DealDetail = () => {
     }
   };
 
-  if (!deal) return null;
-
   const fadeVariant = {
     hidden: { opacity: 1, y: 50 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } },
   };
+
+  if (fetchLoading) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-xl">Loading deal...</div>
+      </div>
+    );
+  }
+
+  if (!deal) return null;
 
   return (
     <div
@@ -103,9 +126,10 @@ const DealDetail = () => {
           className="w-full md:w-1/2 bg-gray-800 rounded-xl overflow-hidden flex items-center justify-center p-4"
         >
           <img
-            src={deal.img}
-            alt={deal.name}
+            src={deal.img || deal.imageUrl}
+            alt={deal.name || deal.title}
             className="max-h-80 object-contain w-full hover:scale-105 transition-transform duration-300"
+            onError={(e) => e.currentTarget.src="/images/placeholder.svg"}
           />
         </FM.div>
 
@@ -120,11 +144,13 @@ const DealDetail = () => {
           className="flex-1"
         >
           <h1 className="text-3xl font-bold text-blue-400 mb-2 text-center md:text-left">
-            {deal.name}
+            {deal.name || deal.title}
           </h1>
-          <p className="text-lg text-gray-300 mb-4 text-center md:text-left">
-            {deal.target}
-          </p>
+          {deal.target && (
+            <p className="text-lg text-gray-300 mb-4 text-center md:text-left">
+              {deal.target}
+            </p>
+          )}
           <p className="text-2xl font-semibold text-yellow-400 mb-6 text-center md:text-left">
             {deal.price}
           </p>

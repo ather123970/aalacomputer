@@ -224,29 +224,6 @@ const AdminLogin = () => {
               )}
             </motion.button>
           </form>
-
-          {/* Demo Credentials */}
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1 }}
-            className="mt-8 p-4 bg-slate-700/30 rounded-xl border border-slate-600"
-          >
-            <h3 className="text-sm font-medium text-slate-300 mb-3 flex items-center">
-              <Sparkles className="w-4 h-4 mr-2 text-purple-400" />
-              Demo Credentials:
-            </h3>
-            <div className="text-sm text-slate-400 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">Email:</span>
-                <span className="text-white font-mono">aalacomputerstore@gmail.com</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">Password:</span>
-                <span className="text-white font-mono">karachi123</span>
-              </div>
-            </div>
-          </motion.div>
         </motion.div>
 
         {/* Footer */}
