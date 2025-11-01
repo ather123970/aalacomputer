@@ -587,39 +587,64 @@ app.get('/api/admin/products', (req, res) => {
   res.json({ ok: true, products: prods });
 });
 
-// Update product by id (replace object)
-app.put('/api/admin/products/:id', (req, res) => {
-  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
-  const id = req.params.id;
-  const payload = req.body || {};
+// Update product by id (replace object) - DB only
+app.put('/api/admin/products/:id', async (req, res) => {
   try {
+    if (!requireAdmin(req)) {
+      return res.status(401).json({ ok: false, error: 'unauthorized' });
+    }
+
     const mongoose = require('mongoose');
     const ProductModel = getProductModel();
-    if (ProductModel && mongoose.connection.readyState === 1) {
-      // Try matching by either the custom `id` field or MongoDB `_id` (ObjectId)
-      const query = {
-        $or: [
-          { id: String(id) },
-          ...(mongoose.Types.ObjectId.isValid(id) ? [{ _id: new mongoose.Types.ObjectId(id) }] : [])
-        ]
-      };
 
-      ProductModel.findOneAndUpdate(query, { $set: { ...payload, updatedAt: new Date() } }, { new: true, upsert: false }).lean().then(doc => {
-        if (!doc) return res.status(404).json({ ok: false, error: 'product not found' });
-        console.log('[admin/products/:id] Updated product in DB:', doc.id || doc._id);
-        return res.json({ ok: true, product: doc });
-      }).catch(err => { console.error('[admin/products/:id] product update failed', err && (err.stack || err.message)); res.status(500).json({ ok: false, error: 'db error' }); });
-      return;
+    // Check MongoDB connection
+    if (!mongoose.connection.readyState) {
+      console.error('[admin/products/:id] MongoDB not connected');
+      return res.status(503).json({ ok: false, error: 'database unavailable' });
     }
-  } catch (e) { /* fallback */ }
-  const prods = readDataFile('products.json') || [];
-  const idx = prods.findIndex(p => String(p.id) === String(id));
-  if (idx === -1) return res.status(404).json({ ok: false, error: 'product not found' });
-  // Merge/replace
-  prods[idx] = { ...prods[idx], ...payload };
-  const ok = writeDataFile('products.json', prods);
-  if (!ok) return res.status(500).json({ ok: false, error: 'failed to save' });
-  res.json({ ok: true, product: prods[idx] });
+
+    const id = req.params.id;
+    const payload = req.body || {};
+
+    // Synchronize img and imageUrl fields
+    if (payload.img && !payload.imageUrl) {
+      payload.imageUrl = payload.img;
+    } else if (payload.imageUrl && !payload.img) {
+      payload.img = payload.imageUrl;
+    }
+
+    // Try matching by either the custom `id` field or MongoDB `_id` (ObjectId)
+    const query = {
+      $or: [
+        { id: String(id) },
+        ...(mongoose.Types.ObjectId.isValid(id) ? [{ _id: new mongoose.Types.ObjectId(id) }] : [])
+      ]
+    };
+
+    const doc = await ProductModel.findOneAndUpdate(
+      query,
+      { 
+        $set: { 
+          ...payload,
+          img: payload.img || payload.imageUrl,
+          imageUrl: payload.imageUrl || payload.img,
+          updatedAt: new Date() 
+        } 
+      },
+      { new: true, upsert: false }
+    ).lean();
+
+    if (!doc) {
+      console.log('[admin/products/:id] Product not found:', id);
+      return res.status(404).json({ ok: false, error: 'product not found' });
+    }
+
+    console.log('[admin/products/:id] Updated product in DB:', doc.id || doc._id, 'with image:', doc.img);
+    return res.json({ ok: true, product: doc });
+  } catch (err) {
+    console.error('[admin/products/:id] Update failed:', err.message);
+    return res.status(500).json({ ok: false, error: 'database error' });
+  }
 });
 
 // Create new product
@@ -763,21 +788,28 @@ app.delete('/api/admin/products/:id', async (req, res) => {
   }
 });
 
-// List all products (PUBLIC - for frontend products page)
-app.get('/api/products', (req, res) => {
+// List all products (PUBLIC - for frontend products page) - DB only
+app.get('/api/products', async (req, res) => {
   try {
     const mongoose = require('mongoose');
     const ProductModel = getProductModel();
-    if (ProductModel && mongoose.connection.readyState === 1) {
-      ProductModel.find({}).lean().sort({ createdAt: -1 }).then((docs) => res.json(docs)).catch(err => { 
-        console.error('[products] products list failed', err && (err.stack || err.message)); 
-        res.status(500).json({ ok: false, error: 'db error' }); 
-      });
-      return;
+
+    // Check MongoDB connection
+    if (!mongoose.connection.readyState) {
+      console.error('[products] MongoDB not connected');
+      return res.status(503).json({ ok: false, error: 'database unavailable' });
     }
-  } catch (e) { /* fallback to file */ }
-  const prods = readDataFile('products.json') || [];
-  res.json(prods);
+
+    const docs = await ProductModel.find({})
+      .lean()
+      .sort({ createdAt: -1 });
+
+    console.log(`[products] Retrieved ${docs.length} products from database`);
+    return res.json(docs);
+  } catch (err) {
+    console.error('[products] List failed:', err.message);
+    return res.status(500).json({ ok: false, error: 'database error' });
+  }
 });
 
 // List all products (PROTECTED - for admin dashboard)
@@ -853,105 +885,52 @@ app.get('/api/admin/products', async (req, res) => {
   }
 });
 
-// Get single product by ID
+// Get single product by ID - DB only
 app.get('/api/products/:id', async (req, res) => {
-  const id = req.params.id;
   try {
-    // Try MongoDB first
     const mongoose = require('mongoose');
     const ProductModel = getProductModel();
     
-    if (ProductModel && mongoose.connection.readyState === 1) {
-      const query = {
-        $or: [
-          // Try as ObjectId
-          ...(mongoose.Types.ObjectId.isValid(id) ? [{ _id: new mongoose.Types.ObjectId(id) }] : []),
-          // Try as string ID
-          { id: String(id) },
-          // Try as string _id
-          { _id: String(id) }
-        ]
-      };
-
-      const product = await ProductModel.findOne(query).lean();
-
-      // Add detailed logging for debugging
-      console.log('[DEBUG] Product search query:', JSON.stringify(query));
-      console.log('[DEBUG] Product search result:', product ? 'Found' : 'Not found');
-      
-      if (product) {
-        // Normalize the response format
-        const formatted = {
-          id: product._id || product.id,
-          _id: product._id || product.id,
-          Name: product.title || product.name || 'Unnamed Product',
-          price: typeof product.price === 'number' ? product.price : Number(product.price) || 0,
-          img: product.imageUrl || product.img || '/placeholder.svg',
-          Spec: Array.isArray(product.specs) ? product.specs : (product.description ? [product.description] : []),
-          category: product.category || 'PC',
-          description: product.description || ''
-        };
-        console.log('[product] Found in MongoDB:', formatted.id);
-        return res.json(formatted);
-      }
+    // Check MongoDB connection
+    if (!mongoose.connection.readyState) {
+      console.error('[product] MongoDB not connected');
+      return res.status(503).json({ ok: false, error: 'database unavailable' });
     }
 
-    // Try prebuilds collection
-    const PrebuildModel = getPrebuildModel();
-    if (PrebuildModel && mongoose.connection.readyState === 1) {
-      const prebuild = await PrebuildModel.findOne({
-        $or: [
-          { _id: id },
-          { id: String(id) }
-        ]
-      }).lean();
-      
-      if (prebuild) {
-        const formatted = {
-          id: prebuild._id || prebuild.id,
-          _id: prebuild._id || prebuild.id,
-          Name: prebuild.title || prebuild.name || 'Unnamed Product',
-          price: typeof prebuild.price === 'number' ? prebuild.price : Number(prebuild.price) || 0,
-          img: prebuild.imageUrl || prebuild.img || '/placeholder.svg',
-          Spec: Array.isArray(prebuild.specs) ? prebuild.specs : (prebuild.description ? [prebuild.description] : []),
-          category: 'PC',
-          description: prebuild.description || ''
-        };
-        console.log('[product] Found in prebuilds:', formatted.id);
-        return res.json(formatted);
-      }
-    }
+    const id = req.params.id;
+    const query = {
+      $or: [
+        // Try as ObjectId
+        ...(mongoose.Types.ObjectId.isValid(id) ? [{ _id: new mongoose.Types.ObjectId(id) }] : []),
+        // Try as string ID
+        { id: String(id) }
+      ]
+    };
 
-    // Fallback to file storage
-    const prods = readDataFile('products.json') || [];
-    const fileProduct = prods.find(p => {
-      const pid = p._id || p.id;
-      return String(pid) === String(id);
-    });
+    const product = await ProductModel.findOne(query).lean();
     
-    if (fileProduct) {
-      console.log('[product] Found in file storage:', fileProduct.id);
-      return res.json(fileProduct);
+    if (!product) {
+      console.log('[product] Not found:', id);
+      return res.status(404).json({ ok: false, error: 'Product not found' });
     }
 
-    // Check prebuilds.json as last resort
-    const prebuilds = readDataFile('prebuilds.json') || [];
-    const filePrebuild = prebuilds.find(p => {
-      const pid = p._id || p.id;
-      return String(pid) === String(id);
-    });
+    // Normalize the response format
+    const formatted = {
+      id: product._id || product.id,
+      _id: product._id || product.id,
+      Name: product.title || product.name || 'Unnamed Product',
+      price: typeof product.price === 'number' ? product.price : Number(product.price) || 0,
+      img: product.imageUrl || product.img || '/placeholder.svg',
+      Spec: Array.isArray(product.specs) ? product.specs : (product.description ? [product.description] : []),
+      category: product.category || 'PC',
+      description: product.description || ''
+    };
 
-    if (filePrebuild) {
-      console.log('[product] Found in prebuilds.json:', filePrebuild.id);
-      return res.json(filePrebuild);
-    }
-
-    // Not found anywhere
-    console.log('[product] Not found:', id);
-    return res.status(404).json({ ok: false, error: 'Product not found' });
+    console.log('[product] Found in MongoDB:', formatted.id);
+    return res.json(formatted);
   } catch (e) {
-    console.error('[product] Get failed:', e);
-    res.status(500).json({ ok: false, error: 'Server error' });
+    console.error('[product] Get failed:', e.message);
+    return res.status(500).json({ ok: false, error: 'database error' });
   }
 });
 
