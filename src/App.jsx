@@ -9,7 +9,6 @@ const App = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [allProducts, setAllProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [scrollSpeed, setScrollSpeed] = useState(30); // seconds for one loop
 
   const { ref: sectionRef, inView } = useInView({
     triggerOnce: false,
@@ -254,174 +253,75 @@ const App = () => {
               </div>
             )}
 
-            {/* Infinite Horizontal Scrolling Carousel - Pure CSS */}
+            {/* Search Results - Simple Column List */}
             {!loading && filteredResults.length > 0 && (
-              <div className="w-full overflow-hidden">
-                {/* Header with Controls */}
-                <div className="flex items-center justify-between mb-3 px-2 flex-wrap gap-2">
+              <div className="w-full md:w-[80%] lg:w-[70%] bg-white/95 backdrop-blur-sm rounded-lg shadow-xl p-4 max-h-[60vh] overflow-y-auto space-y-3 border border-blue-200">
+                <div className="flex items-center justify-between mb-2 px-2 pb-2 border-b border-blue-200">
                   <div className="text-sm font-semibold text-blue-700">
                     🔍 Found {filteredResults.length} of {allProducts.length} products
                   </div>
-                  <div className="flex items-center gap-2">
-                    {/* Speed Control */}
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-gray-600">Speed:</span>
-                      <button
-                        onClick={() => setScrollSpeed(s => Math.max(10, s - 5))}
-                        className="bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded"
-                      >
-                        ⚡ Fast
-                      </button>
-                      <button
-                        onClick={() => setScrollSpeed(s => Math.min(60, s + 5))}
-                        className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded"
-                      >
-                        🐌 Slow
-                      </button>
-                    </div>
-                    {searchTerm.trim() && (
-                      <button
-                        onClick={() => setSearchTerm('')}
-                        className="text-xs bg-red-100 hover:bg-red-200 text-red-600 px-2 py-1 rounded transition-colors"
-                      >
-                        Clear ×
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* CSS Keyframes Styles */}
-                <style>{`
-                  @keyframes scrollX {
-                    from {
-                      transform: translateX(0);
-                    }
-                    to {
-                      transform: translateX(-50%);
-                    }
-                  }
-                  
-                  @keyframes bob {
-                    0%, 100% {
-                      transform: translateY(0px) rotate(0deg);
-                    }
-                    25% {
-                      transform: translateY(-8px) rotate(1deg);
-                    }
-                    50% {
-                      transform: translateY(-4px) rotate(0deg);
-                    }
-                    75% {
-                      transform: translateY(-8px) rotate(-1deg);
-                    }
-                  }
-                  
-                  .scroll-track {
-                    animation: scrollX var(--scroll-duration, 30s) linear infinite;
-                  }
-                  
-                  .scroll-track:hover {
-                    animation-play-state: paused;
-                  }
-                  
-                  .bob-item {
-                    animation: bob 3s ease-in-out infinite;
-                  }
-                  
-                  .bob-item:nth-child(2n) {
-                    animation-delay: 0.5s;
-                  }
-                  
-                  .bob-item:nth-child(3n) {
-                    animation-delay: 1s;
-                  }
-                  
-                  .bob-item:nth-child(4n) {
-                    animation-delay: 1.5s;
-                  }
-                `}</style>
-
-                {/* Horizontal Infinite Scroll Container */}
-                <div className="relative group">
-                  {/* Left Gradient Fade */}
-                  <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-blue-50 via-blue-50/50 to-transparent z-10 pointer-events-none"></div>
-                  
-                  {/* Right Gradient Fade */}
-                  <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-blue-50 via-blue-50/50 to-transparent z-10 pointer-events-none"></div>
-                  
-                  {/* Hover Indicator */}
-                  <div className="absolute top-2 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-600 text-white text-xs px-3 py-1 rounded-full z-20 shadow-lg">
-                    ⏸ Hover to pause • ⚡ Adjust speed above
-                  </div>
-                  
-                  {/* Scrolling Track */}
-                  <div className="overflow-hidden py-4">
-                    <div 
-                      className="scroll-track flex gap-6"
-                      style={{ '--scroll-duration': `${scrollSpeed}s` }}
+                  {searchTerm.trim() && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded transition-colors"
                     >
-                      {/* Duplicate items twice for smooth infinite loop */}
-                      {[...filteredResults, ...filteredResults].map((item, index) => {
-                        const targetUrl = item.source === 'deal' 
-                          ? `/deal/${item.id}` 
-                          : `/products/${item.id}`;
-                        
-                        const badgeColor = item.source === 'deal' 
-                          ? 'bg-red-500' 
-                          : item.source === 'prebuild'
-                          ? 'bg-blue-500'
-                          : 'bg-green-500';
-                        
-                        return (
-                          <div
-                            key={`${item.id}-${index}`}
-                            className="bob-item flex-shrink-0 w-[280px] bg-white/95 backdrop-blur-sm rounded-xl shadow-lg hover:shadow-2xl p-4 cursor-pointer transition-all border-2 border-blue-200 hover:border-blue-400 group/card"
-                            onClick={() => {
-                              console.log('🔗 Navigating to:', targetUrl, '| Product:', item.name);
-                              navigate(targetUrl);
-                            }}
-                          >
-                            {/* Image */}
-                            <div className="relative mb-3 overflow-hidden rounded-lg">
-                              <img
-                                src={item.img}
-                                alt={item.name}
-                                className="w-full h-36 object-cover group-hover/card:scale-110 transition-transform duration-500"
-                                onError={(e) => e.currentTarget.src = '/placeholder.svg'}
-                              />
-                              <span className={`absolute top-2 right-2 ${badgeColor} text-white text-xs font-bold px-2 py-1 rounded-full uppercase shadow-lg`}>
-                                {item.source}
-                              </span>
-                              {/* View Details Overlay */}
-                              <div className="absolute inset-0 bg-blue-600/0 group-hover/card:bg-blue-600/20 transition-colors flex items-center justify-center">
-                                <span className="opacity-0 group-hover/card:opacity-100 bg-white text-blue-600 px-3 py-1 rounded-full text-xs font-bold transition-opacity">
-                                  View Details →
-                                </span>
-                              </div>
-                            </div>
-                            
-                            {/* Product Name */}
-                            <h3 className="font-bold text-blue-900 text-sm mb-2 line-clamp-2 min-h-[40px]">
-                              {item.name}
-                            </h3>
-                            
-                            {/* Price and Category */}
-                            <div className="flex items-center justify-between">
-                              <p className="text-blue-600 font-bold text-base">
-                                PKR {item.price.toLocaleString()}
-                              </p>
-                              {item.category && (
-                                <span className="text-gray-500 text-[10px] bg-gray-100 px-2 py-0.5 rounded-full">
-                                  {item.category}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                      Clear ×
+                    </button>
+                  )}
                 </div>
+                {filteredResults.map((item) => {
+                  const targetUrl = item.source === 'deal' 
+                    ? `/deal/${item.id}` 
+                    : `/products/${item.id}`;
+                  
+                  const badgeColor = item.source === 'deal' 
+                    ? 'bg-red-500' 
+                    : item.source === 'prebuild'
+                    ? 'bg-blue-500'
+                    : 'bg-green-500';
+                  
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex items-center space-x-4 border-b border-blue-100 pb-3 last:border-b-0 hover:bg-blue-50 hover:shadow-md transition-all rounded-md p-3 cursor-pointer group"
+                      onClick={() => {
+                        console.log('🔗 Navigating to:', targetUrl, '| Product:', item.name);
+                        navigate(targetUrl);
+                      }}
+                    >
+                      <div className="relative">
+                        <img
+                          src={item.img}
+                          alt={item.name}
+                          className="w-16 h-16 object-cover rounded-md shadow-sm"
+                          onError={(e) => e.currentTarget.src = '/placeholder.svg'}
+                        />
+                        <span className={`absolute -top-1 -right-1 ${badgeColor} text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase`}>
+                          {item.source}
+                        </span>
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-blue-900 text-sm sm:text-base group-hover:text-blue-600 transition-colors">
+                          {item.name}
+                        </h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-blue-600 font-medium text-sm">
+                            PKR {item.price.toLocaleString()}
+                          </p>
+                          {item.category && (
+                            <span className="text-gray-400 text-xs">• {item.category}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div 
+                        className="text-blue-400 group-hover:text-blue-600 transition-colors text-xl font-bold"
+                        title="View details"
+                      >
+                        →
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </FM.div>
