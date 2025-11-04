@@ -1,25 +1,12 @@
-# Production-Ready CRUD Admin Dashboard Setup
-
-## Quick Start
-
-### 1. Install Dependencies
-```bash
-npm install
-```
-
-### 2. Set Up Environment Variables
 Create a `.env` file in the root directory:
 
 ```env
-MONGO_URI=mongodb://127.0.0.1:27017/Aalacomputer
-# or for production MongoDB Atlas:
-# MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/Aalacomputer
-
+MONGO_URI=mongodb+srv://uni804043_db_user:2124377as@cluster0.0cy1usa.mongodb.net/aalacomputer?retryWrites=true&w=majority
 ADMIN_EMAIL=aalacomputerstore@gmail.com
 ADMIN_PASSWORD=karachi123
 JWT_SECRET=your_strong_random_secret_key_here
 PORT=10000
-NODE_ENV=development
+NODE_ENV=production
 ```
 
 ### 3. Seed the Database
@@ -31,7 +18,7 @@ This will:
 - ✅ Delete ALL existing admins (only one admin allowed)
 - ✅ Create admin user (aalacomputerstore@gmail.com)
 - ✅ Seed 8 sample products with real data
-- ✅ Connect to MongoDB
+- ✅ Connect to MongoDB Atlas
 
 ### 4. Start the Backend
 ```bash
@@ -123,7 +110,7 @@ Frontend runs on `http://localhost:5173`
 
 ```env
 NODE_ENV=production
-MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/Aalacomputer
+MONGO_URI=mongodb+srv://uni804043_db_user:2124377as@cluster0.0cy1usa.mongodb.net/aalacomputer?retryWrites=true&w=majority
 ADMIN_EMAIL=aalacomputerstore@gmail.com
 ADMIN_PASSWORD=your_secure_password_here
 JWT_SECRET=your_strong_random_secret_minimum_32_characters
@@ -168,7 +155,7 @@ node backend/seed.js
 ### Products Not Showing
 
 1. Check backend is running: `npm start`
-2. Check database: `mongosh` → `use Aalacomputer` → `db.products.find()`
+2. Check database: `mongosh` → `use aalacomputer` → `db.products.find()`
 3. Check API: `curl http://localhost:10000/api/products`
 4. Run seed again: `npm run seed`
 
@@ -208,36 +195,4 @@ node backend/seed.js
 ```
 
 ### Admin Schema
-```javascript
-{
-  email: String,           // Admin email
-  passwordHash: String,    // Bcrypt hash
-  name: String,           // Admin name
-  role: String,           // User role (admin)
-  createdAt: Date,
-  updatedAt: Date
-}
 ```
-
-## Success Indicators
-
-✅ Seed script runs without errors
-✅ Backend starts on port 10000
-✅ Frontend runs on port 5173
-✅ Can login to admin dashboard
-✅ Can see products in admin dashboard
-✅ Can create/edit/delete products
-✅ Products appear on products page
-✅ Changes persist in database
-
-## Support
-
-For issues:
-1. Check server logs
-2. Check browser console
-3. Verify `.env` file exists
-4. Run `npm run seed` again
-5. Check MongoDB connection
-
-
-

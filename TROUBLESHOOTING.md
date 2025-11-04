@@ -203,3 +203,30 @@ If none of these work, check:
 - Browser console for React errors
 - Network tab for failed requests
 
+### MongoDB Connection Issues
+
+**Problem**: Application cannot connect to MongoDB database.
+
+**Solution**:
+1. Check if MongoDB is running:
+   ```bash
+   # For MongoDB Atlas (cloud - recommended)
+   # Ensure MONGO_URI is set in .env file:
+   MONGO_URI=mongodb+srv://uni804043_db_user:2124377as@cluster0.0cy1usa.mongodb.net/aalacomputer?retryWrites=true&w=majority
+   ```
+
+2. Test connection:
+   ```bash
+   # Start server and check logs for:
+   [db] Connecting to MongoDB... mongodb+srv://****:****@cluster0.0cy1usa.mongodb.net/aalacomputer
+   [db] Connection verified - found 5056 products
+   ```
+
+3. If using local MongoDB (not recommended):
+   ```bash
+   # Start MongoDB service
+   sudo systemctl start mongod
+   
+   # Set connection string in .env:
+   MONGO_URI=mongodb://127.0.0.1:27017/Aalacomputer
+   ```

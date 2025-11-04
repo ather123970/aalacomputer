@@ -1545,8 +1545,8 @@ async function startServer() {
     // Load environment variables
     require('dotenv').config();
     
-    // Get MongoDB URI from environment or use default
-    const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/Aalacomputer';
+    // Get MongoDB URI from environment or use MongoDB Atlas as fallback (no local URI)
+    const MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://uni804043_db_user:2124377as@cluster0.0cy1usa.mongodb.net/aalacomputer?retryWrites=true&w=majority';
     
     if (MONGO_URI) {
       // Log connection attempt (safely hiding credentials)

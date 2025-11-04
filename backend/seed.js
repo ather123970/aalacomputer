@@ -6,8 +6,8 @@ const bcrypt = require('bcrypt');
 const path = require('path');
 const fs = require('fs');
 
-// Get MongoDB URI from environment
-const MONGO_URI = process.env.MONGO_URI || process.env.MONGO || 'mongodb://127.0.0.1:27017/Aalacomputer';
+// Get MongoDB URI from environment or use MongoDB Atlas as fallback (no local URI)
+const MONGO_URI = process.env.MONGO_URI || process.env.MONGO || 'mongodb+srv://uni804043_db_user:2124377as@cluster0.0cy1usa.mongodb.net/aalacomputer?retryWrites=true&w=majority';
 
 // Load models
 const AdminSchema = new mongoose.Schema({

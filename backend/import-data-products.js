@@ -5,8 +5,11 @@ const path = require('path');
 
 async function importProducts() {
   try {
+    // Get MongoDB URI from environment or use MongoDB Atlas as fallback (no local URI)
+    const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://uni804043_db_user:2124377as@cluster0.0cy1usa.mongodb.net/aalacomputer?retryWrites=true&w=majority';
+    
     console.log('Connecting to MongoDB...');
-    await mongoose.connect('mongodb://127.0.0.1:27017/Aalacomputer', {
+    await mongoose.connect(MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true
     });

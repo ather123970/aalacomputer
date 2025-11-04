@@ -32,17 +32,13 @@ The admin dashboard is a fully responsive REST API-based system where only one a
 - MongoDB (running locally or Atlas cloud)
 
 ### 2. Environment Variables
-Create a `.env` file in the project root:
+Create a `.env` file in the root directory:
 
 ```env
-MONGO_URI=mongodb://127.0.0.1:27017/Aalacomputer
-# or for MongoDB Atlas:
-# MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/Aalacomputer
-
+MONGO_URI=mongodb+srv://uni804043_db_user:2124377as@cluster0.0cy1usa.mongodb.net/aalacomputer?retryWrites=true&w=majority
 ADMIN_EMAIL=aalacomputerstore@gmail.com
 ADMIN_PASSWORD=karachi123
-JWT_SECRET=your_jwt_secret_key_here
-PORT=10000
+JWT_SECRET=your_strong_random_secret_key_here
 ```
 
 ### 3. Seed the Database

@@ -3,7 +3,8 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 dotenv.config();
 
-const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB || 'mongodb://127.0.0.1:27017/appdata';
+// Get MongoDB URI from environment or use MongoDB Atlas as fallback (no local URI)
+const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB || 'mongodb+srv://uni804043_db_user:2124377as@cluster0.0cy1usa.mongodb.net/aalacomputer?retryWrites=true&w=majority';
 
 let inited = false;
 
