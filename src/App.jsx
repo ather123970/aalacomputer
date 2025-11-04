@@ -28,10 +28,20 @@ const App = () => {
       setLoading(true);
       try {
         const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
-        const response = await fetch(`${base}/api/products?limit=1000`); // Load first 1000 for search
+        // Load first 1000 products for search (first few pages)
+        const response = await fetch(`${base}/api/products?limit=1000&page=1`);
         if (response.ok) {
           const data = await response.json();
-          const formatted = Array.isArray(data) ? data.map(p => ({
+          let products = [];
+          
+          // Handle both array and paginated response formats
+          if (Array.isArray(data)) {
+            products = data;
+          } else if (data && Array.isArray(data.products)) {
+            products = data.products;
+          }
+          
+          const formatted = products.map(p => ({
             id: p._id || p.id,
             name: p.title || p.name || p.Name || 'Unnamed Product',
             title: p.title || p.name || p.Name || 'Unnamed Product',
@@ -42,7 +52,7 @@ const App = () => {
             brand: p.brand || '',
             description: p.description || (Array.isArray(p.specs) ? p.specs.join(' ') : ''),
             specs: p.specs || []
-          })) : [];
+          }));
           
           // Normalize all products for search
           const normalized = formatted.map(p => normalizeProduct(p));
@@ -198,22 +208,17 @@ const App = () => {
                       }}
                     />
                     <div className="flex-1">
-                      <h3 className="font-semibold text-blue-900 text-sm sm:text-base group-hover:text-blue-700">
+                      <h4 className="font-semibold text-blue-900 text-sm group-hover:text-blue-700 truncate">
                         {item.displayName || item.name}
-                      </h3>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <p className="text-blue-600 font-medium text-sm">
-                          Rs {item.price?.toLocaleString() || item._original?.price?.toLocaleString() || 0}
-                        </p>
-                        <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full capitalize">
-                          {item.categoryNormalized || item.category || item._original?.category || 'Product'}
+                      </h4>
+                      <p className="text-blue-600 text-xs font-medium">
+                        PKR {typeof item.price === 'number' ? item.price.toLocaleString() : 'N/A'}
+                      </p>
+                      {item.category && (
+                        <span className="inline-block mt-1 px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full truncate">
+                          {item.category}
                         </span>
-                        {item.brandNormalized && (
-                          <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full capitalize">
-                            {item.brandNormalized}
-                          </span>
-                        )}
-                      </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -222,41 +227,80 @@ const App = () => {
           </div>
         </div>
 
-        {/* RIGHT SIDE — IMAGE SECTION */}
-        <div className="flex-1 flex justify-center items-center mt-8 lg:mt-0 relative w-full lg:w-1/2">
-          {/* Glow behind image - responsive sizing */}
-          <div className="absolute bottom-[-30px] left-1/2 -translate-x-1/2 w-[200px] sm:w-[260px] md:w-[320px] lg:w-[360px] xl:w-[400px] h-[80px] sm:h-[100px] md:h-[120px] lg:h-[130px] bg-blue-400/50 blur-3xl rounded-full opacity-70 pointer-events-none"></div>
-
-          <img
-            src="/images/pcglow.jpg"
-            alt="PC build"
-            className="relative w-full max-w-[200px] sm:max-w-[260px] md:max-w-[320px] lg:max-w-[360px] xl:max-w-[400px] 2xl:max-w-[480px] h-auto object-contain drop-shadow-[0_0_25px_rgba(37,99,235,0.6)]"
-            loading="lazy"
-          />
+        {/* RIGHT SIDE — GRAPHIC */}
+        <div className="hidden lg:flex lg:w-1/2 justify-center items-center relative z-10">
+          <div className="relative w-full max-w-lg">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-cyan-300 rounded-2xl transform rotate-6 shadow-2xl"></div>
+            <div className="relative bg-gradient-to-r from-blue-600 to-cyan-500 rounded-2xl p-8 shadow-2xl transform -rotate-3 border-4 border-white/20">
+              <div className="bg-black/20 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-black/30 rounded-lg p-4 flex flex-col items-center justify-center border border-white/10">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-cyan-300 rounded-lg mb-2 flex items-center justify-center">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <span className="text-white text-xs font-semibold">CPU</span>
+                  </div>
+                  <div className="bg-black/30 rounded-lg p-4 flex flex-col items-center justify-center border border-white/10">
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-300 rounded-lg mb-2 flex items-center justify-center">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                      </svg>
+                    </div>
+                    <span className="text-white text-xs font-semibold">GPU</span>
+                  </div>
+                  <div className="bg-black/30 rounded-lg p-4 flex flex-col items-center justify-center border border-white/10">
+                    <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-teal-300 rounded-lg mb-2 flex items-center justify-center">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      </svg>
+                    </div>
+                    <span className="text-white text-xs font-semibold">RAM</span>
+                  </div>
+                  <div className="bg-black/30 rounded-lg p-4 flex flex-col items-center justify-center border border-white/10">
+                    <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-300 rounded-lg mb-2 flex items-center justify-center">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                      </svg>
+                    </div>
+                    <span className="text-white text-xs font-semibold">SSD</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Tailwind Custom Animations */}
-      <style>{`
-        @keyframes floatGlow {
-          0%, 100% { transform: translateY(0); text-shadow: 0 0 10px rgba(59,130,246,0.5); }
-          50% { transform: translateY(-12px); text-shadow: 0 0 20px rgba(59,130,246,0.8); }
-        }
-        .animate-float-glow {
-          animation: floatGlow 3s ease-in-out infinite;
-        }
+      {/* FEATURED PRODUCTS */}
+      <section className="py-12 px-4 sm:px-6 lg:px-8 bg-panel">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-primary mb-4">Featured Products</h2>
+            <p className="text-muted max-w-2xl mx-auto">
+              Explore our top picks for building the perfect PC setup
+            </p>
+          </div>
 
-        @keyframes flicker {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.7; transform: scale(0.9); }
-        }
-        .animate-flicker {
-          animation: flicker 0.3s infinite;
-        }
-        .animate-flicker-slow {
-          animation: flicker 0.6s infinite;
-        }
-      `}</style>
+          {loading ? (
+            <div className="flex justify-center items-center py-12">
+              <LoadingSpinner />
+            </div>
+          ) : (
+            <ProductGrid products={prebuilds.slice(0, 8)} />
+          )}
+
+          <div className="text-center mt-10">
+            <button
+              onClick={() => navigate("/products")}
+              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
+            >
+              View All Products
+            </button>
+          </div>
+        </div>
+      </section>
     </>
   );
 };

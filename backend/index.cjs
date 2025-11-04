@@ -393,95 +393,36 @@ app.get('/api/deployment-version', (req, res) => {
 
 // Image proxy endpoint to bypass hotlink protection from external sources
 app.get('/api/proxy-image', async (req, res) => {
-  console.log('[proxy-image] Request received for URL:', req.query.url);
-  const imageUrl = req.query.url;
-  
-  if (!imageUrl) {
-    console.log('[proxy-image] ERROR: Missing url parameter');
-    return res.status(400).json({ error: 'Missing url parameter' });
-  }
-  
-  // Validate URL
   try {
-    new URL(imageUrl);
-  } catch (e) {
-    console.log('[proxy-image] ERROR: Invalid URL format:', imageUrl);
-    return res.status(400).json({ error: 'Invalid URL' });
-  }
-  
-  console.log('[proxy-image] Fetching image from:', imageUrl);
-  
-  try {
-    const https = require('https');
-    const http = require('http');
-    const maxRedirects = 5;
-    let redirects = 0;
+    const url = req.query.url;
+    if (!url) return res.status(400).send("Missing URL");
 
-    const inferContentType = (u) => {
-      const l = u.toLowerCase();
-      if (l.endsWith('.png')) return 'image/png';
-      if (l.endsWith('.jpg') || l.endsWith('.jpeg')) return 'image/jpeg';
-      if (l.endsWith('.webp')) return 'image/webp';
-      if (l.endsWith('.gif')) return 'image/gif';
-      if (l.endsWith('.svg')) return 'image/svg+xml';
-      return null;
-    };
+    // Use node-fetch for better compatibility with Render
+    const fetch = (await import('node-fetch')).default;
 
-    const fetchImage = (urlToFetch) => {
-      const u = new URL(urlToFetch);
-      const proto = u.protocol === 'https:' ? https : http;
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36", // prevent site from blocking
+      },
+    });
 
-      const req = proto.get(urlToFetch, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Referer': u.origin,
-          'Host': u.host,
-          'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      }, (imageRes) => {
-        const status = imageRes.statusCode || 200;
-        console.log('[proxy-image] Response status:', status, 'for URL:', urlToFetch);
-        
-        // Follow redirects
-        if ([301, 302, 303, 307, 308].includes(status) && imageRes.headers.location && redirects < maxRedirects) {
-          redirects += 1;
-          const nextUrl = new URL(imageRes.headers.location, urlToFetch).toString();
-          console.log(`[proxy-image] Following redirect ${redirects}/${maxRedirects} to:`, nextUrl);
-          imageRes.resume();
-          return fetchImage(nextUrl);
-        }
-
-        // Content-Type fallback if server omits it
-        const contentType = imageRes.headers['content-type'] || inferContentType(urlToFetch) || 'image/jpeg';
-        console.log('[proxy-image] Sending image with Content-Type:', contentType);
-        
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('Cache-Control', 'public, max-age=86400');
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET');
-        res.setHeader('Timing-Allow-Origin', '*');
-
-        imageRes.pipe(res);
-      });
-
-      req.on('error', (err) => {
-        console.error('[proxy-image] request error:', err.message);
-        if (!res.headersSent) {
-          res.status(502).json({ error: 'Bad gateway fetching image' });
-        }
-      });
-    };
-
-    fetchImage(imageUrl);
-  } catch (error) {
-    console.error('[proxy-image] error:', error);
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'Internal server error' });
+    if (!response.ok) {
+      console.error("Failed to fetch image:", response.status, url);
+      return res.status(502).send("Proxy fetch failed");
     }
+
+    res.set("Content-Type", response.headers.get("content-type"));
+    res.set("Cache-Control", "public, max-age=86400");
+    response.body.pipe(res);
+  } catch (err) {
+    console.error("Proxy error:", err);
+    res.status(502).send("Proxy failed");
   }
+});
+
+// Start the server
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
 });
 
 // ============================================================================
@@ -531,13 +472,13 @@ app.get('/api/v1/cart', (req, res) => {
 });
 
 // /api/v1/products - Alias for /api/products with same optimizations
-app.get('/api/v1/products', (req, res) => {
+app.get('/api/v1/products', async (req, res) => {
   // Add caching headers for better performance
   res.setHeader('Cache-Control', 'public, max-age=300'); // Cache for 5 minutes
   
   // Get query parameters
   const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 100;
+  const limit = parseInt(req.query.limit) || 32;
   const skip = (page - 1) * limit;
   const category = req.query.category;
   const brand = req.query.brand;
@@ -577,18 +518,25 @@ app.get('/api/v1/products', (req, res) => {
         ];
       }
       
-      ProductModel.find(query)
+      // Count total documents for pagination
+      const total = await ProductModel.countDocuments(query);
+      
+      // Fetch products with pagination
+      const docs = await ProductModel.find(query)
         .select('id Name name title price img imageUrl category brand description WARRANTY link Spec type')
         .lean()
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit)
-        .then((docs) => res.json(docs))
-        .catch(err => { 
-          console.error('[v1/products] list failed', err && (err.stack || err.message)); 
-          res.status(500).json({ ok: false, error: 'db error' }); 
-        });
-      return;
+        .limit(limit);
+      
+      // Return paginated response
+      return res.json({
+        products: docs,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
+        hasMore: skip + docs.length < total
+      });
     }
   } catch (e) { 
     console.warn('[v1/products] DB query failed, using file fallback', e && e.message);
@@ -625,8 +573,17 @@ app.get('/api/v1/products', (req, res) => {
     });
   }
   
+  // Implement pagination for file-based data
+  const total = prods.length;
   const paginatedProds = prods.slice(skip, skip + limit);
-  res.json(paginatedProds);
+  
+  res.json({
+    products: paginatedProds,
+    total,
+    page,
+    totalPages: Math.ceil(total / limit),
+    hasMore: skip + paginatedProds.length < total
+  });
 });
 
 // ============================================================================

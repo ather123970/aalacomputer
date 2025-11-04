@@ -4,8 +4,7 @@ import { motion as FM } from "framer-motion";
 import Nav from "../nav";
 import { ArrowLeft, ShoppingCart } from "lucide-react";
 
-import { API_BASE } from '../config'
-const API_URL = API_BASE.replace(/\/+$/, '') + '/api/v1/cart';
+import { API_CONFIG } from '../config/api';
 
 function parsePrice(price) {
   if (typeof price === "number") return price;
@@ -24,6 +23,8 @@ const ProductDetail = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [product, setProduct] = useState(null);
+  const [imageError, setImageError] = useState(false);
+  const [tryingProxy, setTryingProxy] = useState(false);
 
   useEffect(() => {
     try {
@@ -37,6 +38,25 @@ const ProductDetail = () => {
       console.warn("Failed to load product", e);
     }
   }, [id]);
+
+  const handleImageError = (e) => {
+    // If we haven't tried the proxy yet and this is an external URL
+    if (!tryingProxy && product && product.img && (product.img.startsWith('http://') || product.img.startsWith('https://'))) {
+      setTryingProxy(true);
+      // Try loading through proxy
+      const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(product.img)}`;
+      e.target.src = proxyUrl;
+      console.log(`Trying proxy for product ${product.Name}:`, proxyUrl);
+      return;
+    }
+    
+    // If proxy also failed or it's not an external URL, use placeholder
+    if (!imageError) {
+      setImageError(true);
+      e.target.src = "/placeholder.svg";
+      console.warn(`Failed to load image for ${product?.Name} (tried direct and proxy):`, product?.img);
+    }
+  };
 
   const addToCart = async () => {
     if (!product) return;
@@ -52,7 +72,7 @@ const ProductDetail = () => {
         qty: 1,
       };
 
-      const res = await fetch(API_URL, {
+      const res = await fetch(`${API_CONFIG.BASE_URL}/api/v1/cart`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: 'include',
@@ -116,10 +136,8 @@ const ProductDetail = () => {
                 src={product.img || "/placeholder.svg"}
                 alt={product.Name}
                 loading="lazy"
-                onError={(e) => {
-                  e.currentTarget.src = "/placeholder.svg";
-                }}
-                className="max-h-80 sm:max-h-[400px] w-full object-contain rounded-lg transition-transform duration-500 hover:scale-105"
+                onError={handleImageError}
+                className="max-h-80 sm:max-h-[400px] w-full object-contain rounded-lg"
               />
             </div>
 

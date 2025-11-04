@@ -7,6 +7,7 @@ const processProductImages = require('../middleware/imageProcessor');
 router.get('/', async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 32;
         const category = req.query.category;
         const brand = req.query.brand;
         const search = req.query.search;
@@ -39,7 +40,7 @@ router.get('/', async (req, res) => {
             ];
         }
 
-        const result = await Product.paginateProducts(query, page);
+        const result = await Product.paginateProducts(query, page, limit);
         res.json(result);
     } catch (error) {
         res.status(500).json({ error: error.message });
