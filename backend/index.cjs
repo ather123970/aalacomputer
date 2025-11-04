@@ -405,11 +405,19 @@ app.get('/api/proxy-image', async (req, res) => {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
         "Referer": url.includes('zahcomputers.pk') ? "https://zahcomputers.pk" : ""
       },
+      // Add timeout to prevent hanging requests
+      timeout: 10000
     });
 
     if (!response.ok) {
-      console.error("Failed to fetch image:", response.status, url);
-      return res.status(502).send("Proxy fetch failed");
+      console.error("Failed to fetch image:", response.status, response.statusText, url);
+      // Instead of returning 502, try to serve a fallback or redirect
+      return res.status(400).json({ 
+        error: "Failed to fetch image", 
+        status: response.status, 
+        statusText: response.statusText,
+        url: url
+      });
     }
 
     // Set CORS headers to allow cross-origin requests
@@ -423,7 +431,12 @@ app.get('/api/proxy-image', async (req, res) => {
     response.body.pipe(res);
   } catch (err) {
     console.error("Proxy error:", err);
-    res.status(502).send("Proxy failed");
+    // Instead of returning 502, provide a more graceful fallback
+    res.status(400).json({ 
+      error: "Proxy failed", 
+      message: err.message,
+      url: req.query.url
+    });
   }
 });
 
@@ -1500,10 +1513,24 @@ app.use((req, res, next) => {
 
 const PORT = process.env.PORT || 10000;
 
+// Add logging for debugging
+console.log('[server] PORT environment variable:', process.env.PORT);
+console.log('[server] Using PORT:', PORT);
+
 async function startServer() {
   try {
     // Load environment variables
     require('dotenv').config();
+    
+    // Log all environment variables (sensitive ones will be masked)
+    console.log('[server] Environment variables:');
+    Object.keys(process.env).forEach(key => {
+      if (key.includes('KEY') || key.includes('SECRET') || key.includes('PASSWORD') || key.includes('TOKEN')) {
+        console.log(`  ${key}: ****`);
+      } else {
+        console.log(`  ${key}: ${process.env[key]}`);
+      }
+    });
     
     // Get MongoDB URI from environment or use MongoDB Atlas as fallback (no local URI)
     const MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://uni804043_db_user:2124377as@cluster0.0cy1usa.mongodb.net/aalacomputer?retryWrites=true&w=majority';
@@ -1635,13 +1662,33 @@ async function startServer() {
     app.listen(PORT,'0.0.0.0', () => console.log(`Backend server listening on port ${PORT}`));
   } catch (e) {
     console.error('Failed to start server', e && e.message);
+    console.error('Stack trace:', e && e.stack);
     process.exit(1);
   }
 }
 
+// Add unhandled error handlers for better debugging
+process.on('uncaughtException', (err) => {
+  console.error('[global] uncaughtException:', err);
+  console.error('[global] uncaughtException stack:', err.stack);
+  // Don't exit the process for uncaught exceptions to prevent 502 errors
+  // process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[global] unhandledRejection:', reason);
+  console.error('[global] unhandledRejection promise:', promise);
+  // Don't exit the process for unhandled rejections to prevent 502 errors
+  // process.exit(1);
+});
+
 // Start server only when run directly. When imported (e.g. by serverless wrapper), export the app.
 if (require.main === module) {
-  startServer();
+  console.log('[server] Starting server...');
+  startServer().catch(err => {
+    console.error('[server] Failed to start server:', err);
+    process.exit(1);
+  });
 } else {
   try { module.exports = { app, startServer }; } catch (e) { /* ignore export errors */ }
 }
