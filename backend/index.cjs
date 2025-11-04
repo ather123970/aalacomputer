@@ -421,10 +421,6 @@ app.get('/api/proxy-image', async (req, res) => {
 });
 
 // Start the server
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
-
 // ============================================================================
 // /api/v1/* ENDPOINTS (Frontend compatibility)
 // ============================================================================
