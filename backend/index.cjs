@@ -402,7 +402,8 @@ app.get('/api/proxy-image', async (req, res) => {
 
     const response = await fetch(url, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36", // prevent site from blocking
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Referer": url.includes('zahcomputers.pk') ? "https://zahcomputers.pk" : ""
       },
     });
 
@@ -411,7 +412,13 @@ app.get('/api/proxy-image', async (req, res) => {
       return res.status(502).send("Proxy fetch failed");
     }
 
-    res.set("Content-Type", response.headers.get("content-type"));
+    // Set CORS headers to allow cross-origin requests
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+    res.set("Timing-Allow-Origin", "*");
+    
+    res.set("Content-Type", response.headers.get("content-type") || "image/jpeg");
     res.set("Cache-Control", "public, max-age=86400");
     response.body.pipe(res);
   } catch (err) {

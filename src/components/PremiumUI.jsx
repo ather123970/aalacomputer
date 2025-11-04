@@ -10,7 +10,7 @@ export const ProductCard = ({ product, onClick }) => {
       {/* Image Container */}
       <div className="relative aspect-square overflow-hidden bg-neutral-100">
         <img
-          src={product.images[0]?.url || '/placeholder.png'}
+          src={product?.images?.[0]?.url || '/placeholder.png'}
           alt={product.name}
           className="object-cover w-full h-full transition-transform hover:scale-105"
           loading="lazy"

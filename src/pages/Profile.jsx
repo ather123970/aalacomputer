@@ -79,7 +79,7 @@ export default function Profile() {
 
       if (localToken) {
         try {
-          const r = await fetch(`${BACKEND_URL}/v1/auth/me`, {
+          const r = await fetch(`${BACKEND_URL}/api/v1/auth/me`, {
             headers: { Authorization: `Bearer ${localToken}` },
             credentials: 'include',
           });
