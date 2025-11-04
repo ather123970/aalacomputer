@@ -1011,7 +1011,7 @@ app.get('/api/products', (req, res) => {
   
   // Get query parameters
   const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 100; // Default 100 products per page
+  const limit = parseInt(req.query.limit) || 32; // Default 32 products per page
   const skip = (page - 1) * limit;
   const category = req.query.category;
   const brand = req.query.brand;

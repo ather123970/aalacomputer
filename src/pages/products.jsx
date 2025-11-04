@@ -648,8 +648,8 @@ const ProductCard = ({ p, buynow, loadingId, navigate }) => {
       </div>
 
       <h2 className="text-lg font-semibold text-blue-400">{p.Name}</h2>
-      <p className="text-blue-500 font-medium">{p.price.toLocaleString()} PKR</p>
-      <p className="text-muted text-sm mt-2">{p.Spec.join(", ")}</p>
+      <p className="text-blue-500 font-medium">{typeof p.price === 'number' ? p.price.toLocaleString() : 'N/A'} PKR</p>
+      <p className="text-muted text-sm mt-2">{Array.isArray(p.Spec) ? p.Spec.join(", ") : ''}</p>
       
       <button
         onClick={(e) => {

@@ -112,7 +112,7 @@ const App = () => {
     <>
       <section
         ref={sectionRef}
-        className="relative bg-gradient-to-br from-white via-blue-100 to-blue-400 text-blue-900 min-h-[90vh] md:min-h-[80vh] lg:min-h-[70vh] mt-[2vh] mx-4 md:mx-6 lg:mx-8 xl:mx-12 2xl:mx-auto 2xl:max-w-[1800px] px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-16 flex flex-col lg:flex-row items-center justify-between overflow-hidden shadow-[0_0_50px_rgba(59,130,246,0.3)] rounded-2xl sm:rounded-3xl"
+        className="relative bg-gradient-to-br from-white via-blue-100 to-blue-400 text-blue-900 min-h-[70vh] mt-2 w-full px-4 sm:px-8 lg:px-10 py-8 sm:py-12 lg:py-16 flex flex-col lg:flex-row items-center justify-between overflow-hidden"
       >
         {/* TOP-RIGHT BUTTON */}
         <button
@@ -204,7 +204,17 @@ const App = () => {
                       alt={item.displayName || item.name}
                       className="w-16 h-16 object-contain rounded-md shadow-sm bg-white p-1"
                       onError={(e) => {
-                        e.target.src = '/placeholder.svg';
+                        try {
+                          const current = e.currentTarget.src || '';
+                          const original = item.img || item.imageUrl || item._original?.img || item._original?.imageUrl || '';
+                          const isExternal = /^https?:\/\//i.test(original);
+                          const alreadyProxied = current.includes('/api/proxy-image');
+                          if (isExternal && !alreadyProxied) {
+                            e.currentTarget.src = `/api/proxy-image?url=${encodeURIComponent(original)}`;
+                            return;
+                          }
+                        } catch {}
+                        e.currentTarget.src = '/placeholder.svg';
                       }}
                     />
                     <div className="flex-1">
@@ -227,47 +237,30 @@ const App = () => {
           </div>
         </div>
 
-        {/* RIGHT SIDE — GRAPHIC */}
+        {/* Mobile banner image */}
+        <div className="flex lg:hidden w-full justify-center items-center mt-6 z-10">
+          <div className="w-full max-w-2xl rounded-2xl overflow-hidden shadow-xl border border-white/20 bg-white/10 backdrop-blur-sm">
+            <img
+              src="/pcglow.jpg"
+              alt="PC Glow showcase"
+              className="w-full h-40 object-cover"
+              loading="lazy"
+              onError={(e) => { e.currentTarget.src = '/placeholder.svg'; }}
+            />
+          </div>
+        </div>
+
+        {/* RIGHT SIDE — PCGlow Only */}
         <div className="hidden lg:flex lg:w-1/2 justify-center items-center relative z-10">
-          <div className="relative w-full max-w-lg">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-cyan-300 rounded-2xl transform rotate-6 shadow-2xl"></div>
-            <div className="relative bg-gradient-to-r from-blue-600 to-cyan-500 rounded-2xl p-8 shadow-2xl transform -rotate-3 border-4 border-white/20">
-              <div className="bg-black/20 backdrop-blur-sm rounded-xl p-6 border border-white/10">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-black/30 rounded-lg p-4 flex flex-col items-center justify-center border border-white/10">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-cyan-300 rounded-lg mb-2 flex items-center justify-center">
-                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <span className="text-white text-xs font-semibold">CPU</span>
-                  </div>
-                  <div className="bg-black/30 rounded-lg p-4 flex flex-col items-center justify-center border border-white/10">
-                    <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-300 rounded-lg mb-2 flex items-center justify-center">
-                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                      </svg>
-                    </div>
-                    <span className="text-white text-xs font-semibold">GPU</span>
-                  </div>
-                  <div className="bg-black/30 rounded-lg p-4 flex flex-col items-center justify-center border border-white/10">
-                    <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-teal-300 rounded-lg mb-2 flex items-center justify-center">
-                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                      </svg>
-                    </div>
-                    <span className="text-white text-xs font-semibold">RAM</span>
-                  </div>
-                  <div className="bg-black/30 rounded-lg p-4 flex flex-col items-center justify-center border border-white/10">
-                    <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-300 rounded-lg mb-2 flex items-center justify-center">
-                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-                      </svg>
-                    </div>
-                    <span className="text-white text-xs font-semibold">SSD</span>
-                  </div>
-                </div>
-              </div>
+          <div className="relative w-full max-w-3xl">
+            <div className="w-full rounded-2xl overflow-hidden shadow-xl border border-white/20 bg-white/10 backdrop-blur-sm">
+              <img
+                src="/pcglow.jpg"
+                alt="PC Glow showcase"
+                className="w-full h-[380px] object-cover"
+                loading="lazy"
+                onError={(e) => { e.currentTarget.src = '/placeholder.svg'; }}
+              />
             </div>
           </div>
         </div>
