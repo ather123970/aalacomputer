@@ -1,0 +1,26 @@
+[
+  {
+    "_id": "1762366221108",
+    "id": "1762366221108",
+    "name": "monitors",
+    "slug": "monitors",
+    "description": "monitors",
+    "parent": "",
+    "brands": [],
+    "published": true,
+    "sortOrder": 0,
+    "createdAt": "2025-11-05T18:10:21.108Z"
+  },
+  {
+    "_id": "1762423139169",
+    "id": "1762423139169",
+    "name": "processors",
+    "slug": "processors",
+    "description": "all processors such as intel amd will show there",
+    "parent": "",
+    "brands": [],
+    "published": true,
+    "sortOrder": 0,
+    "createdAt": "2025-11-06T09:58:59.169Z"
+  }
+]

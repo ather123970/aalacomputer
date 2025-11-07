@@ -1,0 +1,2565 @@
+// Load environment variables from .env when present (optional)
+try { require('dotenv').config(); } catch (e) { /* ignore if dotenv not installed */ }
+// Global crash handlers to surface issues when the process exits unexpectedly.
+process.on('uncaughtException', (err) => {
+  console.error('[global] uncaughtException', err && (err.stack || err.message || err));
+});
+process.on('unhandledRejection', (reason, p) => {
+  console.error('[global] unhandledRejection', reason && (reason.stack || reason));
+});
+const crypto = require('crypto');
+// Optional verification hash helper - only compute when a valid user id and secret are available.
+let hash = null;
+try {
+  const userId = (typeof process !== 'undefined' && process.env && process.env.STARTUP_USER_ID) ? String(process.env.STARTUP_USER_ID) : null;
+  const secret = (typeof process !== 'undefined' && process.env && process.env.SECRET) ? process.env.SECRET : process.env && process.env.secret;
+  if (userId && secret) {
+    hash = crypto.createHmac('sha256', secret).update(userId).digest('hex');
+    // expose for debugging if needed
+    // console.log('[startup] verification hash computed');
+  }
+} catch (e) {
+  // don't crash server during startup for missing/invalid vars
+  hash = null;
+}
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
+const cors = require('cors');
+const cookieParser = require('cookie-parser');
+const compression = require('compression');
+const app=express()
+// Trust proxy so req.protocol/hostname respect X-Forwarded-* when behind load balancers/proxies
+app.set('trust proxy', true);
+
+// Enable gzip compression for all responses
+app.use(compression({
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+  level: 6 // Compression level (0-9, 6 is default)
+}));
+
+// Flexible CORS: allow any origin for maximum compatibility
+app.use(cors({
+  origin: true, // Allow any origin
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Session-ID'],
+}));
+// Note: preflight OPTIONS are handled by the cors middleware and a lightweight
+// OPTIONS responder in the logging middleware below.
+// Configure mongoose early to avoid command buffering when DB is down (prevents long timeouts)
+let mongoose = null;
+try {
+  mongoose = require('mongoose');
+  try { mongoose.set('bufferCommands', false); } catch (e) { /* ignore */ }
+} catch (e) {
+  mongoose = null;
+}
+
+const DATA_DIR = path.resolve(__dirname, '..', 'data');
+
+function safeLoadJSON(filename) {
+  const p = path.join(DATA_DIR, filename);
+  try {
+    if (!fs.existsSync(p)) return null;
+    return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch (e) {
+    console.warn('safeLoadJSON failed for', filename, e && e.message);
+    return null;
+  }
+}
+
+const partsDB = safeLoadJSON('parts.json') || [];
+const productsCatalog = safeLoadJSON('products.json') || [];
+const pkPrices = safeLoadJSON('pk_prices.json') || [];
+const marketKB = safeLoadJSON('pk_market_kb.json') || { templates: [] };
+
+function normalize(s) {
+  if (!s) return '';
+  return String(s).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function parseBudget(text) {
+  if (!text) return null;
+  const s = String(text || '').toLowerCase();
+  let m = s.match(/(under|below|less than|budget|<=|<)\s*([0-9,.]+)\s*(k|m)?\s*(rs|pkr)?/i);
+  if (!m) {
+    m = s.match(/([0-9,.]+)\s*(k|m)?\s*(rs|pkr)/i);
+  }
+  if (!m) return null;
+  let n = Number(String(m[2]).replace(/[,]/g, '')) || 0;
+  const mult = (m[3] || '').toLowerCase() === 'k' ? 1000 : ( (m[3] || '').toLowerCase() === 'm' ? 1000000 : 1 );
+  return Math.round(n * mult);
+}
+
+function extractOwnedParts(text) {
+  if (!text) return [];
+  let tokens = normalize(text).split(' ').filter(Boolean);
+  if (!Array.isArray(tokens)) tokens = [];
+  const MAX_TOKENS = 200;
+  if (tokens.length > MAX_TOKENS) tokens = tokens.slice(0, MAX_TOKENS);
+  const owned = [];
+  const seenIds = new Set();
+  const ngrams = [];
+  for (let n = 3; n >= 1; n--) {
+    for (let i = 0; i + n <= tokens.length; i++) {
+      ngrams.push(tokens.slice(i, i + n).join(' '));
+    }
+  }
+  const ownershipContext = /\b(i have|i own|my |owned|i'm using|using|i use|i've got|i got)\b/i.test(text);
+  for (const p of partsDB) {
+    const hay = normalize([p.name || p.model || p.id || ''].join(' '));
+    for (const ng of ngrams) {
+      if (ng.length < 2) continue;
+      const isModelLike = /\b(rt x?\s*\d{3,4}|rx\s*\d{3,4}|gtx\s*\d{3,4}|i\d[-\s]?\d{3,4}|ryzen\s*\d)\b/i.test(ng);
+      if (hay.includes(ng) && (ownershipContext || isModelLike)) {
+        if (!seenIds.has(p.id)) {
+          owned.push(p);
+          seenIds.add(p.id);
+        }
+        break;
+      }
+    }
+  }
+  for (const pk of pkPrices) {
+    const hay = normalize(pk.name || pk.model || '');
+    for (const ng of ngrams) {
+      if (ng.length < 2) continue;
+      if (hay.includes(ng)) {
+        const key = `${pk.name}|${pk.model}|pk`;
+        const isModelLike = /\b(rt x?\s*\d{3,4}|rx\s*\d{3,4}|gtx\s*\d{3,4}|i\d[-\s]?\d{3,4}|ryzen\s*\d)\b/i.test(ng);
+        if (!seenIds.has(key) && (ownershipContext || isModelLike)) {
+          let cat = null;
+          if (/rtx|gtx|rx|radeon/.test((pk.model || '') + ' ' + (pk.name || ''))) cat = 'gpu';
+          if (/i\d|ryzen|athlon/.test((pk.model || '') + ' ' + (pk.name || ''))) cat = 'cpu';
+          if (/mb|b660|b760|b650|motherboard/.test((pk.model || '') + ' ' + (pk.name || ''))) cat = 'motherboard';
+          owned.push({ source: 'pk', name: pk.name, model: pk.model, price: pk.price, category: cat });
+          seenIds.add(key);
+        }
+        break;
+      }
+    }
+  }
+  const modelPatterns = [];
+  const regexes = [/(rtx\s*\d{3,4})/i, /(rx\s*\d{3,4})/i, /(ryzen\s*5\b|ryzen\s*7\b|ryzen\s*9\b)/i, /(i\d[-\s]?\d{3,4})/i, /(gtx\s*\d{3,4})/i];
+  for (const re of regexes) {
+    const cre = new RegExp(re.source, (re.flags || '') + 'g');
+    let m;
+    while ((m = cre.exec(text)) !== null) {
+      if (m && m[1]) modelPatterns.push(m[1]);
+    }
+  }
+  for (const mp of modelPatterns) {
+    const name = mp.toUpperCase();
+    if (!owned.find(o => normalize(o.name || o.model || '').includes(normalize(name)))) {
+      const found = pkPrices.find(pk => normalize(pk.model || pk.name || '').includes(normalize(mp)));
+      const price = found ? (found.price || 0) : 0;
+      let cat = null;
+      if (/rtx|gtx|rx|radeon/.test(mp.toLowerCase())) cat = 'gpu';
+      if (/ryzen|i\d/.test(mp.toLowerCase())) cat = 'cpu';
+      if (ownershipContext) owned.push({ source: 'fuzzy', name: name, model: name, price: price, category: cat });
+    }
+  }
+  return owned;
+}
+
+function extractExplicitModels(text) {
+  if (!text) return [];
+  const regexes = [/\b(rtx\s*\d{3,4})\b/i, /\b(rx\s*\d{3,4})\b/i, /\b(gtx\s*\d{3,4})\b/i, /\b(ryzen\s*\d)\b/i, /\b(i\d[-\s]?\d{3,4})\b/i];
+  const out = [];
+  for (const re of regexes) {
+    const cre = new RegExp(re.source, (re.flags || '') + 'g');
+    let m;
+    while ((m = cre.exec(text)) !== null) {
+      if (m && m[1]) {
+        const tok = m[1].toUpperCase().replace(/\s+/g, ' ').trim();
+        if (!out.includes(tok)) out.push(tok);
+      }
+    }
+  }
+  return out;
+}
+
+function pickCheapest(category, excludeIds = new Set()) {
+  const candidates = [];
+  for (const p of partsDB) {
+    const cat = (p.category || '').toLowerCase();
+    if (!cat) continue;
+    if (cat === category) candidates.push(p);
+  }
+  candidates.sort((a, b) => (a.price_pkr || a.price || 0) - (b.price_pkr || b.price || 0));
+  for (const c of candidates) {
+    if (excludeIds.has(c.id)) continue;
+    return c;
+  }
+  return null;
+}
+
+function scoreMatch(q, t) {
+  const a = normalize(q);
+  const b = normalize(t);
+  if (!a || !b) return 0;
+  if (b.includes(a)) return 100;
+  const qt = a.split(' ');
+  let matches = 0;
+  for (const token of qt) if (token && b.includes(token)) matches += 1;
+  return Math.round((matches / Math.max(1, qt.length)) * 100);
+}
+
+function lookupPartsAndPrices(query, limit = 6) {
+  const q = String(query || '');
+  const out = [];
+  for (const item of pkPrices) {
+    const txt = `${item.name || ''} ${item.model || ''} ${item.vendor || ''}`;
+    const s = scoreMatch(q, txt);
+    if (s > 10) {
+      const img = item.img || item.image || item.thumb || null;
+      const imgName = img ? String(img).split('/').pop().split('?')[0] : null;
+      out.push({ source: 'pk', score: s, name: item.name, model: item.model, vendor: item.vendor, price: item.price, url: item.url, catalogId: item.catalogId, img, imgName, buyUrl: item.url || null });
+    }
+  }
+  for (const p of partsDB) {
+    const txt = `${p.name || ''} ${p.id || ''} ${Array.isArray(p.tags) ? p.tags.join(' ') : ''} ${p.model || ''}`;
+    const s = scoreMatch(q, txt);
+    if (s > 20) out.push({ source: 'parts', score: s, id: p.id, name: p.name, price: p.price || null, specs: p.specs || [], type: p.type || 'part' });
+  }
+  for (const c of productsCatalog) {
+    const txt = `${c.name || c.Name || ''} ${c.id || ''} ${Array.isArray(c.tags) ? c.tags.join(' ') : ''}`;
+    const s = scoreMatch(q, txt);
+    if (s > 20) {
+      const img = c.img || c.image || null;
+      const imgName = img ? String(img).split('/').pop().split('?')[0] : null;
+      const buyUrl = `/products/${c.id}`;
+      out.push({ source: 'catalog', score: s, id: c.id, name: c.name || c.Name, price: c.price || null, img, imgName, url: buyUrl, buyUrl });
+    }
+  }
+  out.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (a.source === 'pk' && b.source !== 'pk') return -1;
+    if (b.source === 'pk' && a.source !== 'pk') return 1;
+    return 0;
+  });
+  return out.slice(0, limit);
+}
+
+let fetchFn = (typeof fetch !== 'undefined') ? fetch : null;
+try {
+  if (!fetchFn) fetchFn = require('node-fetch');
+} catch (e) {
+}
+
+async function safeFetch(url, opts = {}, timeoutMs = 6000) {
+  if (!fetchFn) return null;
+  try {
+    const p = fetchFn(url, opts);
+    const t = new Promise((resolve) => setTimeout(() => resolve(null), timeoutMs));
+    const r = await Promise.race([p, t]);
+    return r;
+  } catch (e) {
+    return null;
+  }
+}
+
+// AI integrations removed: callGroqAI and callGroqChat were intentionally deleted.
+
+function searchLocalData(query, limit = 6) {
+  if (!query) return [];
+  const norm = normalize(query);
+  const files = [];
+  try {
+    for (const f of fs.readdirSync(DATA_DIR)) {
+      if (!f.toLowerCase().endsWith('.json')) continue;
+      files.push(path.join(DATA_DIR, f));
+    }
+  } catch (e) {
+    return [];
+  }
+  const results = [];
+  for (const fp of files) {
+    try {
+      const raw = fs.readFileSync(fp, 'utf8');
+      const obj = JSON.parse(raw);
+      const s = JSON.stringify(obj).toLowerCase();
+      if (s.includes(norm)) {
+        results.push({ file: path.basename(fp), snippet: s.slice(0, 1000), data: obj });
+        if (results.length >= limit) break;
+      }
+    } catch (e) {
+    }
+  }
+  return results;
+}
+
+// Web search integration removed (Serper). If you need a web search in future, re-add here.
+
+/* /api/ask handler moved to after Express `app` initialization to avoid referencing `app` before it's created. */// CORS: allow credentials and restrict allowed origins (do NOT use wildcard when credentials are included)
+// Set FRONTEND_ORIGINS env to a comma-separated list of allowed origins, e.g. "http://localhost:5173"
+// By default include common localhost/127.0.0.1 origins used during development
+// and a couple of production hostnames so the server will accept requests
+// from the deployed frontend when FRONTEND_ORIGINS is not set.
+const DEFAULT_ORIGINS = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost',
+  'https://aalacomputerkarachi.vercel.app',
+  'https://aalacomputer.com'
+];
+// Allow either FRONTEND_ORIGINS (comma-separated) or a single FRONTEND_ORIGIN for convenience
+const FRONTEND_ORIGINS = (process.env.FRONTEND_ORIGINS
+  ? process.env.FRONTEND_ORIGINS.split(',')
+  : (process.env.FRONTEND_ORIGIN ? [process.env.FRONTEND_ORIGIN] : DEFAULT_ORIGINS)
+).map(s => s.trim()).filter(Boolean);
+console.log('[server] allowed FRONTEND_ORIGINS =', FRONTEND_ORIGINS);
+// Lightweight logging middleware for diagnostics. The global `cors()` above
+// handles actual CORS headers (echoing incoming Origin when appropriate).
+app.use((req, res, next) => {
+  const origin = req.headers && req.headers.origin;
+  const host = req.headers && req.headers.host;
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  console.log('[server] request', req.method, req.url, 'origin=', origin || '-', 'host=', host || '-', 'proto=', proto || '-');
+  // let the cors() middleware handle preflight; but respond early for non-browser health checks
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+// cookie parser (required for auth middleware that reads req.cookies)
+app.use(cookieParser());
+app.use(express.json({ limit: '1mb' }));
+
+// ===== MOVED STATIC FILE SERVING TO AFTER API ROUTES =====
+// This prevents index.html from being served for /api/* routes
+
+// Serve images directory if it exists (keep before API routes - doesn't interfere)
+// First try zah_images folder, then fall back to images folder
+const zahImagesPath = path.join(__dirname, '..', 'zah_images');
+const imagesPath = path.join(__dirname, '..', 'images');
+
+if (fs.existsSync(zahImagesPath)) {
+  app.use('/images', express.static(zahImagesPath, {
+    maxAge: '7d', // Cache images for 7 days
+    etag: true,
+    lastModified: true,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.png')) {
+        res.setHeader('Content-Type', 'image/png');
+      } else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
+        res.setHeader('Content-Type', 'image/jpeg');
+      } else if (filePath.endsWith('.svg')) {
+        res.setHeader('Content-Type', 'image/svg+xml');
+      } else if (filePath.endsWith('.gif')) {
+        res.setHeader('Content-Type', 'image/gif');
+      } else if (filePath.endsWith('.webp')) {
+        res.setHeader('Content-Type', 'image/webp');
+      }
+    }
+  }));
+  console.log('[server] serving images from zah_images:', zahImagesPath);
+} else if (fs.existsSync(imagesPath)) {
+  app.use('/images', express.static(imagesPath, {
+    maxAge: '7d', // Cache images for 7 days
+    etag: true,
+    lastModified: true,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.png')) {
+        res.setHeader('Content-Type', 'image/png');
+      } else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
+        res.setHeader('Content-Type', 'image/jpeg');
+      } else if (filePath.endsWith('.svg')) {
+        res.setHeader('Content-Type', 'image/svg+xml');
+      } else if (filePath.endsWith('.gif')) {
+        res.setHeader('Content-Type', 'image/gif');
+      } else if (filePath.endsWith('.webp')) {
+        res.setHeader('Content-Type', 'image/webp');
+      }
+    }
+  }));
+  console.log('[server] serving images from:', imagesPath);
+}
+
+// Try to mount the auth router (now CommonJS)
+try {
+  const authPath = path.join(__dirname, 'auth.js');
+  if (fs.existsSync(authPath)) {
+    const authRouter = require('./auth.js');
+    if (authRouter && typeof authRouter === 'function') {
+      app.use('/api/v1/auth', authRouter);
+      console.log('[server] mounted /api/v1/auth from auth.js');
+    }
+  }
+} catch (e) {
+  console.warn('[server] failed to mount auth router', e && e.message);
+}
+
+// Try to mount orders router (now CommonJS)
+try {
+  const ordersPath = path.join(__dirname, 'orders.js');
+  if (fs.existsSync(ordersPath)) {
+    const ordersRouter = require('./orders.js');
+    if (ordersRouter && typeof ordersRouter === 'function') {
+      app.use('/api/v1', ordersRouter);
+      console.log('[server] mounted /api/v1 routes from orders.js');
+    }
+  }
+} catch (e) {
+  console.warn('[server] failed to mount orders router', e && e.message);
+}
+
+// in-memory cart (dev)
+const CART = [];
+
+app.get('/api/ping', (req, res) => res.json({ ok: true, ts: Date.now() }));
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, message: 'Server is running' });
+});
+
+// Image proxy endpoint to handle external images
+app.get('/api/image-proxy', async (req, res) => {
+  const imageUrl = req.query.url;
+  
+  if (!imageUrl) {
+    return res.status(400).json({ error: 'URL parameter is required' });
+  }
+  
+  try {
+    console.log('[image-proxy] Fetching:', imageUrl);
+    
+    const fetch = require('node-fetch');
+    const response = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Referer': 'https://zahcomputers.pk/',
+        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache'
+      }
+    });
+    
+    if (!response.ok) {
+      console.log('[image-proxy] Failed to fetch:', response.status, response.statusText);
+      return res.status(404).json({ error: 'Image not found' });
+    }
+    
+    const contentType = response.headers.get('content-type');
+    const buffer = await response.buffer();
+    
+    // Set appropriate headers
+    res.set({
+      'Content-Type': contentType || 'image/jpeg',
+      'Cache-Control': 'public, max-age=86400', // Cache for 24 hours
+      'Access-Control-Allow-Origin': '*'
+    });
+    
+    console.log('[image-proxy] Successfully proxied image, size:', buffer.length);
+    res.send(buffer);
+    
+  } catch (error) {
+    console.error('[image-proxy] Error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch image' });
+  }
+});
+
+// Diagnostic endpoint to verify deployment version
+app.get('/api/deployment-version', (req, res) => {
+  res.json({
+    version: '2025-01-04-v2',
+    timestamp: new Date().toISOString(),
+    proxyEndpoint: 'fixed',
+    middlewareOrder: 'API routes before static files',
+    commit: '607d862+'
+  });
+});
+
+// Simple image proxy - fetches image from DB URL and serves it
+app.get('/api/product-image/:productId', async (req, res) => {
+  const { productId } = req.params;
+  
+  // CORS + cache headers
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  res.set('Cache-Control', 'public, max-age=86400');
+
+  try {
+    const mongoose = require('mongoose');
+    const ProductModel = getProductModel();
+    
+    // Try to find product in MongoDB
+    if (ProductModel && mongoose.connection.readyState === 1) {
+      const product = await ProductModel.findOne({
+        $or: [
+          { _id: productId },
+          { id: productId }
+        ]
+      }).select('img imageUrl images').lean();
+      
+      if (product) {
+        // Get image URL from product
+        let imageUrl = product.img || product.imageUrl;
+        
+        // Try images array if available
+        if (!imageUrl && Array.isArray(product.images) && product.images.length > 0) {
+          const primaryImg = product.images.find(i => i.primary);
+          imageUrl = primaryImg?.url || product.images[0]?.url;
+        }
+        
+        if (imageUrl && imageUrl.startsWith('http')) {
+          // Proxy the image from zahcomputers or other source
+          const fetch = (await import('node-fetch')).default;
+          const imgRes = await fetch(imageUrl, {
+            timeout: 15000,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Referer': 'https://zahcomputers.pk/'
+            }
+          });
+          
+          if (imgRes && imgRes.ok && imgRes.body) {
+            const ct = imgRes.headers.get('content-type') || 'image/jpeg';
+            res.set('Content-Type', ct);
+            return imgRes.body.pipe(res);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Product image fetch failed:', err.message);
+  }
+
+  // Fallback to placeholder
+  try {
+    res.status(200);
+    const png = path.join(__dirname, '..', 'images', 'placeholder.png');
+    const svg = path.join(__dirname, '..', 'images', 'placeholder.svg');
+    if (fs.existsSync(png)) {
+      res.set('Content-Type', 'image/png');
+      return fs.createReadStream(png).pipe(res);
+    }
+    if (fs.existsSync(svg)) {
+      res.set('Content-Type', 'image/svg+xml');
+      return fs.createReadStream(svg).pipe(res);
+    }
+  } catch (e) {}
+  
+  return res.status(200).end();
+});
+
+// Image proxy endpoint to bypass hotlink protection from external sources
+app.get('/api/proxy-image', async (req, res) => {
+  const originalUrl = req.query.url;
+  if (!originalUrl) return res.status(400).send('Missing URL');
+
+  // Always set permissive CORS so the browser can use the response anywhere
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  res.set('Timing-Allow-Origin', '*');
+  res.set('Cache-Control', 'public, max-age=86400');
+
+  try {
+    const fetch = (await import('node-fetch')).default;
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+      'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+      ...(originalUrl.includes('zahcomputers.pk') ? { 'Referer': 'https://zahcomputers.pk' } : {})
+    };
+
+    // 1) Try direct fetch
+    let response = await fetch(originalUrl, { headers, timeout: 12000 });
+    if (response && response.ok && response.body) {
+      res.set('Content-Type', response.headers.get('content-type') || 'image/jpeg');
+      return response.body.pipe(res);
+    }
+
+    // 2) Fallback to images.weserv.nl (anonymous image proxy CDN)
+    const weservUrl = `https://images.weserv.nl/?url=${encodeURIComponent(originalUrl.replace(/^https?:\/\//, ''))}&output=jpg`;
+    try {
+      const alt = await fetch(weservUrl, { timeout: 12000 });
+      if (alt && alt.ok && alt.body) {
+        res.set('Content-Type', alt.headers.get('content-type') || 'image/jpeg');
+        return alt.body.pipe(res);
+      }
+    } catch (e) {
+      // ignore and try redirect
+    }
+
+    // 3) Try Googleusercontent gadgets proxy (often works for blocked origins)
+    const googleProxy = `https://images1-focus-opensocial.googleusercontent.com/gadgets/proxy?container=focus&refresh=86400&url=${encodeURIComponent(originalUrl)}`;
+    try {
+      const g = await fetch(googleProxy, { timeout: 12000 });
+      if (g && g.ok && g.body) {
+        res.set('Content-Type', g.headers.get('content-type') || 'image/jpeg');
+        return g.body.pipe(res);
+      }
+    } catch (e) {
+      // ignore and try redirect
+    }
+
+    // 4) Redirect the client to weserv URL so the browser fetches it directly
+    return res.redirect(302, weservUrl);
+  } catch (err) {
+    console.error('[proxy-image] error:', err && (err.stack || err.message));
+    // 4) Absolute fallback: serve local placeholder so UI never breaks
+    try {
+      const placeholder = path.join(__dirname, '..', 'images', 'placeholder.png');
+      if (fs.existsSync(placeholder)) {
+        res.set('Content-Type', 'image/png');
+        return fs.createReadStream(placeholder).pipe(res);
+      }
+    } catch (e) {
+      // fall through
+    }
+    return res.status(200).end();
+  }
+});
+
+// Simple buffer-based image fetcher
+app.get('/api/fetch-image', async (req, res) => {
+  const imageUrl = req.query.url;
+  if (!imageUrl) return res.status(400).send('Missing image URL');
+
+  // CORS + cache headers
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  res.set('Timing-Allow-Origin', '*');
+  res.set('Cache-Control', 'public, max-age=86400');
+
+  try {
+    const fetch = (await import('node-fetch')).default;
+    const response = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+        ...(imageUrl.includes('zahcomputers.pk') ? { 'Referer': 'https://zahcomputers.pk' } : {})
+      },
+      timeout: 15000
+    });
+
+    if (!response || !response.ok) {
+      return res.status(502).send('Failed to fetch image');
+    }
+
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    const ab = await response.arrayBuffer();
+    const buffer = Buffer.from(ab);
+
+    res.set('Content-Type', contentType);
+    return res.send(buffer);
+  } catch (err) {
+    console.error('Image fetch error:', err && (err.stack || err.message));
+    return res.status(500).send('Server error fetching image');
+  }
+});
+
+// Start the server
+// ============================================================================
+// /api/v1/* ENDPOINTS (Frontend compatibility)
+// ============================================================================
+
+// /api/v1/config - Return app configuration
+app.get('/api/v1/config', (req, res) => {
+  res.json({
+    ok: true,
+    storeName: 'Aala Computer',
+    storePhone: '+92 300 1234567',
+    storeEmail: 'info@aalacomputer.com',
+    currency: 'PKR',
+    whatsappNumber: '+923001234567'
+  });
+});
+
+// /api/v1/auth/me - Get current user
+app.get('/api/v1/auth/me', (req, res) => {
+  // Check for auth token in cookie or Authorization header
+  const token = req.cookies.token || (req.headers.authorization && req.headers.authorization.replace(/^Bearer\s+/i, ''));
+  
+  if (!token) {
+    return res.status(401).json({ ok: false, error: 'not authenticated' });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    return res.json({ ok: true, user: decoded });
+  } catch (e) {
+    return res.status(401).json({ ok: false, error: 'invalid token' });
+  }
+});
+
+// /api/v1/auth/logout - Logout user
+app.post('/api/v1/auth/logout', (req, res) => {
+  res.clearCookie('token');
+  res.json({ ok: true, message: 'logged out' });
+});
+
+// /api/v1/cart - Get cart (public for now, returns empty array)
+app.get('/api/v1/cart', (req, res) => {
+  // For now, return empty cart since cart is managed client-side
+  // TODO: Implement server-side cart if needed
+  res.json([]);
+});
+
+// /api/v1/products - Alias for /api/products with same optimizations
+app.get('/api/v1/products', async (req, res) => {
+  // Add caching headers for better performance (reduced to 30 seconds for faster updates)
+  res.setHeader('Cache-Control', 'public, max-age=30'); // Cache for 30 seconds
+  
+  // Get query parameters
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 32;
+  const skip = (page - 1) * limit;
+  const category = req.query.category;
+  const brand = req.query.brand;
+  const search = req.query.search;
+  
+  try {
+    const mongoose = require('mongoose');
+    
+    // Ensure MongoDB connection
+    if (!mongoose.connection.readyState) {
+      console.log('[v1/products] Waiting for MongoDB connection...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    const ProductModel = getProductModel();
+    if (ProductModel && mongoose.connection.readyState === 1) {
+      console.log('[v1/products] Using MongoDB database');
+      // Build query based on filters
+      const query = {};
+      
+      // Category filter
+      if (category && category !== 'All') {
+        query.$or = [
+          { category: { $regex: category, $options: 'i' } },
+          { 'category.main': { $regex: category, $options: 'i' } },
+          { Name: { $regex: category, $options: 'i' } },
+          { name: { $regex: category, $options: 'i' } }
+        ];
+      }
+      
+      // Brand filter
+      if (brand) {
+        query.brand = { $regex: brand, $options: 'i' };
+      }
+      
+      // Search filter
+      if (search) {
+        query.$or = [
+          { Name: { $regex: search, $options: 'i' } },
+          { name: { $regex: search, $options: 'i' } },
+          { title: { $regex: search, $options: 'i' } },
+          { category: { $regex: search, $options: 'i' } },
+          { brand: { $regex: search, $options: 'i' } },
+          { Spec: { $regex: search, $options: 'i' } }
+        ];
+      }
+      
+      // Count total documents for pagination
+      const total = await ProductModel.countDocuments(query);
+      
+      // Fetch products with pagination
+      const docs = await ProductModel.find(query)
+        .select('id Name name title price img imageUrl category brand description WARRANTY link Spec type')
+        .lean()
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+      
+      // Return paginated response
+      return res.json({
+        products: docs,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
+        hasMore: skip + docs.length < total
+      });
+    }
+  } catch (e) { 
+    console.warn('[v1/products] DB query failed, using file fallback', e && e.message);
+  }
+  
+  // Fallback to file with filtering
+  let prods = readProductsDatabase();
+  
+  // Apply filters
+  if (category && category !== 'All') {
+    prods = prods.filter(p => {
+      const productCategory = (p.category || '').toLowerCase();
+      const productName = (p.Name || p.name || '').toLowerCase();
+      const selectedCat = category.toLowerCase();
+      return productCategory.includes(selectedCat) || productName.includes(selectedCat);
+    });
+  }
+  
+  if (brand) {
+    const brandLower = brand.toLowerCase();
+    prods = prods.filter(p => {
+      const productBrand = (p.brand || '').toLowerCase();
+      const productName = (p.Name || p.name || '').toLowerCase();
+      return productBrand.includes(brandLower) || productName.includes(brandLower);
+    });
+  }
+  
+  if (search) {
+    const searchLower = search.toLowerCase();
+    prods = prods.filter(p => {
+      const productName = (p.Name || p.name || '').toLowerCase();
+      const productCategory = (p.category || '').toLowerCase();
+      return productName.includes(searchLower) || productCategory.includes(searchLower);
+    });
+  }
+  
+  // Implement pagination for file-based data
+  const total = prods.length;
+  const paginatedProds = prods.slice(skip, skip + limit);
+  
+  res.json({
+    products: paginatedProds,
+    total,
+    page,
+    totalPages: Math.ceil(total / limit),
+    hasMore: skip + paginatedProds.length < total
+  });
+});
+
+// ============================================================================
+// END /api/v1/* ENDPOINTS
+// ============================================================================
+
+// New endpoint implementing Groq-first -> local -> Serper -> Groq-final pipeline
+// AI assistant removed. Return 404 for `/api/ask` to make any frontend calls fail fast.
+app.post('/api/ask', (req, res) => {
+  return res.status(404).json({ error: 'AI assistant removed from this server' });
+});
+
+// Cart POST route moved to orders.js
+
+// Cart GET route moved to orders.js
+
+// Cart DELETE route moved to orders.js
+
+// /api/chat endpoint removed
+
+// --- Admin endpoints (simple password-protected via shared secret) ---
+// Attempt to use mongoose Product model when available
+// Product schema definition (simplified to match actual database format)
+let ProductModel = null;
+const ProductSchemaDef = {
+  id: { type: String, index: true, unique: true },
+  brand: { type: String, default: '' },
+  name: String,
+  title: String,
+  price: { type: Number, default: 0 }, // Simple number field
+  img: String,
+  imageUrl: String,
+  description: String,
+  category: String,
+  WARRANTY: String,
+  link: String,
+  createdAt: { type: Date, default: Date.now }
+};
+
+function getProductModel() {
+  try {
+    const mongoose = require('mongoose');
+    if (!mongoose) return null;
+    // If model already created on mongoose, return it
+    if (mongoose.models && mongoose.models.Product) return mongoose.models.Product;
+    // Build schema with strict:false to allow additional fields from database
+    const schema = new mongoose.Schema(ProductSchemaDef, { 
+      timestamps: false,
+      strict: false // Allow additional fields from database
+    });
+    return mongoose.model('Product', schema);
+  } catch (err) {
+    console.error('[getProductModel] failed to get/create Product model', err && (err.stack || err.message));
+    return null;
+  }
+}
+
+// Get or create Prebuild model (for deals/prebuilds)
+function getPrebuildModel() {
+  try {
+    const mongoose = require('mongoose');
+    if (!mongoose) return null;
+    // If model already created on mongoose, return it
+    if (mongoose.models && mongoose.models.Prebuild) return mongoose.models.Prebuild;
+    // Build schema using same structure as Product
+    const schema = new mongoose.Schema(ProductSchemaDef, { 
+      timestamps: false,
+      strict: false
+    });
+    return mongoose.model('Prebuild', schema);
+  } catch (err) {
+    console.error('[getPrebuildModel] failed to get/create Prebuild model', err && (err.stack || err.message));
+    return null;
+  }
+}
+// Try to load Admin model
+let AdminModel = null;
+try {
+  AdminModel = require(path.join(__dirname, 'models', 'Admin.js'));
+} catch (e) {
+  AdminModel = null;
+}
+
+// Try to load Cart model
+let Cart = null;
+try {
+  Cart = require(path.join(__dirname, 'models', 'Cart.js'));
+} catch (e) {
+  Cart = null;
+}
+
+// Try to load Order model  
+let OrderModel = null;
+try {
+  OrderModel = require(path.join(__dirname, 'models', 'Order.js'));
+  // Handle ESM default export
+  if (OrderModel && OrderModel.default) OrderModel = OrderModel.default;
+} catch (e) {
+  OrderModel = null;
+}
+
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET || 'dev_jwt_secret_change_this';
+
+// helper: read/write admin file fallback
+function readAdminFile() {
+  return readDataFile('admin.json') || null;
+}
+
+function writeAdminFile(obj) {
+  return writeDataFile('admin.json', obj);
+}
+
+async function ensureAdminUser() {
+  const email = process.env.ADMIN_EMAIL || 'aalacomputerstore@gmail.com';
+  const password = process.env.ADMIN_PASSWORD || 'karachi123';
+  try {
+    if (AdminModel && mongoose.connection.readyState === 1) {
+      // Delete ALL existing admins
+      await AdminModel.deleteMany({});
+      console.log('[admin] Removed all existing admin users');
+      
+      // Create only the required admin
+      const hash = await bcrypt.hash(password, 10);
+      await new AdminModel({ email, passwordHash: hash, name: 'Site Admin', role: 'admin' }).save();
+      console.log('[admin] Created single admin user:', email);
+      return;
+    }
+  } catch (e) {
+    console.warn('[admin] ensureAdminUser DB check failed', e && e.message);
+  }
+  // file fallback: create admin.json if missing
+  const adm = readAdminFile();
+  if (!adm || !adm.email) {
+    const hash = await bcrypt.hash(password, 10);
+    writeAdminFile({ email, passwordHash: hash, name: 'Site Admin' });
+    console.log('[admin] default admin created in data/admin.json:', email);
+  }
+}
+function readDataFile(filename) {
+  try {
+    const p = path.join(DATA_DIR, filename);
+    if (!fs.existsSync(p)) return null;
+    return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch (e) {
+    console.warn('readDataFile failed', filename, e && e.message);
+    return null;
+  }
+}
+
+// Special function to read the main products database
+function readProductsDatabase() {
+  try {
+    // First try the main products database file
+    const mainProductsPath = path.resolve(__dirname, '..', 'aalacomputer.productsd.json');
+    if (fs.existsSync(mainProductsPath)) {
+      console.log('[products] Reading from main products database:', mainProductsPath);
+      return JSON.parse(fs.readFileSync(mainProductsPath, 'utf8'));
+    }
+    
+    // Fallback to data/products.json
+    const fallbackPath = path.join(DATA_DIR, 'products.json');
+    if (fs.existsSync(fallbackPath)) {
+      console.log('[products] Reading from fallback products file:', fallbackPath);
+      return JSON.parse(fs.readFileSync(fallbackPath, 'utf8'));
+    }
+    
+    console.warn('[products] No products database found');
+    return [];
+  } catch (e) {
+    console.error('readProductsDatabase failed', e && e.message);
+    return [];
+  }
+}
+
+function writeDataFile(filename, data) {
+  try {
+    const p = path.join(DATA_DIR, filename);
+    fs.writeFileSync(p, JSON.stringify(data, null, 2), 'utf8');
+    return true;
+  } catch (e) {
+    console.error('writeDataFile failed', filename, e && e.message);
+    return false;
+  }
+}
+
+// Admin login: POST /api/admin/login { username, password } or { email, password }
+app.post('/api/admin/login', async (req, res) => {
+  try {
+    const { username, email, password } = req.body || {};
+    const loginEmail = email || username;
+    if (!loginEmail || !password) return res.status(400).json({ ok: false, error: 'email/username and password required' });
+
+    // Try DB first
+    try {
+      if (AdminModel && mongoose.connection.readyState === 1) {
+        const admin = await AdminModel.findOne({ email: String(loginEmail).toLowerCase() }).lean();
+        if (!admin) return res.status(401).json({ ok: false, error: 'invalid credentials' });
+        const ok = await bcrypt.compare(String(password), String(admin.passwordHash || ''));
+        if (!ok) return res.status(401).json({ ok: false, error: 'invalid credentials' });
+        const token = jwt.sign({ sub: admin.email, role: admin.role || 'admin' }, JWT_SECRET, { expiresIn: '7d' });
+        return res.json({ ok: true, token });
+      }
+    } catch (e) {
+      console.warn('[admin] DB login attempt failed', e && e.message);
+    }
+
+    // Fallback to admin.json file
+    const adm = readAdminFile();
+    if (!adm || !adm.email) return res.status(500).json({ ok: false, error: 'admin not configured' });
+    if (String(adm.email).toLowerCase() !== String(loginEmail).toLowerCase()) return res.status(401).json({ ok: false, error: 'invalid credentials' });
+    const ok = await bcrypt.compare(String(password), String(adm.passwordHash || ''));
+    if (!ok) return res.status(401).json({ ok: false, error: 'invalid credentials' });
+    const token = jwt.sign({ sub: adm.email, role: adm.role || 'admin' }, JWT_SECRET, { expiresIn: '7d' });
+    return res.json({ ok: true, token });
+  } catch (e) {
+    console.error('/api/admin/login error', e && e.stack || e);
+    return res.status(500).json({ ok: false, error: 'server error' });
+  }
+});
+
+function requireAdmin(req) {
+  const auth = req.headers.authorization || '';
+  if (!auth) {
+    console.log('[admin] no authorization header');
+    return false;
+  }
+  
+  const parts = String(auth || '').split(' ');
+  const token = parts.length === 2 ? parts[1] : parts[0];
+  if (!token) {
+    console.log('[admin] no token found in authorization header');
+    return false;
+  }
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    console.log('[admin] token verified for:', decoded.sub);
+    return decoded; // truthy admin payload
+  } catch (e) {
+    console.log('[admin] token verification failed:', e.message);
+    return false;
+  }
+}
+
+// Note: Admin products endpoint moved below with full search/pagination support
+
+// Update product by id (replace object) - DATABASE ONLY
+app.put('/api/admin/products/:id', async (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  const id = req.params.id;
+  const payload = req.body || {};
+  console.log(`[products UPDATE] ========================================`);
+  console.log(`[products UPDATE] PUT request for ID: ${id}`);
+  console.log(`[products UPDATE] Payload:`, JSON.stringify(payload, null, 2));
+  
+  try {
+    const mongoose = require('mongoose');
+    const ProductModel = getProductModel();
+    
+    // Check MongoDB connection
+    console.log(`[products UPDATE] MongoDB readyState: ${mongoose.connection.readyState}`);
+    if (mongoose.connection.readyState !== 1) {
+      console.error('[products UPDATE] MongoDB NOT CONNECTED! State:', mongoose.connection.readyState);
+      return res.status(500).json({ ok: false, error: 'Database not connected' });
+    }
+    
+    if (!ProductModel) {
+      console.error('[products UPDATE] ProductModel is NULL!');
+      return res.status(500).json({ ok: false, error: 'Product model not initialized' });
+    }
+    
+    console.log('[products UPDATE] MongoDB Connected - Attempting update...');
+    
+    // Ensure img and imageUrl are synced (use same value for both)
+    const imageValue = payload.img || payload.imageUrl || '';
+    const updatePayload = {
+      ...payload,
+      img: imageValue,
+      imageUrl: imageValue,
+      updatedAt: new Date()
+    };
+    
+    console.log('[products UPDATE] Image fields synced:', imageValue);
+    
+    // Try multiple approaches to find and update
+    let doc = null;
+    let method = '';
+    
+    // Approach 1: Try with _id (MongoDB ObjectId)
+    try {
+      console.log(`[products UPDATE] Trying findByIdAndUpdate with id: ${id}`);
+      doc = await ProductModel.findByIdAndUpdate(
+        id, 
+        { $set: updatePayload }, 
+        { new: true, runValidators: false }
+      );
+      if (doc) {
+        method = 'findByIdAndUpdate';
+        console.log('[products UPDATE] ✓ SUCCESS with findByIdAndUpdate');
+      }
+    } catch (err) {
+      console.log('[products UPDATE] findByIdAndUpdate failed:', err.message);
+    }
+    
+    // Approach 2: Try with custom id field
+    if (!doc) {
+      console.log(`[products UPDATE] Trying findOneAndUpdate with id field`);
+      doc = await ProductModel.findOneAndUpdate(
+        { id: String(id) },
+        { $set: updatePayload },
+        { new: true, runValidators: false }
+      );
+      if (doc) {
+        method = 'findOneAndUpdate (id field)';
+        console.log('[products UPDATE] ✓ SUCCESS with findOneAndUpdate (id field)');
+      }
+    }
+    
+    // Approach 3: Try with _id as string
+    if (!doc) {
+      console.log(`[products UPDATE] Trying findOneAndUpdate with _id field`);
+      doc = await ProductModel.findOneAndUpdate(
+        { _id: id },
+        { $set: updatePayload },
+        { new: true, runValidators: false }
+      );
+      if (doc) {
+        method = 'findOneAndUpdate (_id field)';
+        console.log('[products UPDATE] ✓ SUCCESS with findOneAndUpdate (_id field)');
+      }
+    }
+    
+    if (!doc) {
+      console.error(`[products UPDATE] ✗ PRODUCT NOT FOUND in MongoDB with ID: ${id}`);
+      console.error('[products UPDATE] Database is connected but product does not exist');
+      return res.status(404).json({ ok: false, error: 'Product not found in database' });
+    }
+    
+    console.log(`[products UPDATE] ✓✓✓ SUCCESS! Updated via ${method}`);
+    console.log(`[products UPDATE] Updated product:`, doc._id, doc.title || doc.name);
+    console.log(`[products UPDATE] ========================================`);
+    
+    return res.json({ ok: true, product: doc, message: `Updated via ${method}` });
+    
+  } catch (err) {
+    console.error('[products UPDATE] ✗✗✗ FATAL ERROR:', err);
+    console.error('[products UPDATE] Stack:', err.stack);
+    return res.status(500).json({ ok: false, error: 'Server error: ' + err.message });
+  }
+});
+
+// Create new product
+app.post('/api/admin/products', async (req, res) => {
+  try {
+    // Verify admin authentication
+    if (!requireAdmin(req)) {
+      console.log('[product] Unauthorized create attempt');
+      return res.status(401).json({ ok: false, error: 'unauthorized' });
+    }
+
+    // Validate payload
+    const payload = req.body || {};
+    if (!payload.name && !payload.title) {
+      return res.status(400).json({ ok: false, error: 'Product name or title is required' });
+    }
+
+    if (!payload.price || isNaN(payload.price)) {
+      return res.status(400).json({ ok: false, error: 'Valid price is required' });
+    }
+
+    try {
+      const mongoose = require('mongoose');
+      const ProductModel = getProductModel();
+      // Check MongoDB connection
+      if (!mongoose.connection.readyState) {
+        console.log('[product] MongoDB not connected, attempting reconnection...');
+        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/Aalacomputer', {
+          useNewUrlParser: true,
+          useUnifiedTopology: true,
+          connectTimeoutMS: 5000
+        });
+      }
+
+      if (ProductModel && mongoose.connection.readyState === 1) {
+        // Generate unique ID
+        const id = payload.id || `p_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        
+        // Create product document
+        const doc = new ProductModel({
+          id,
+          name: payload.name || payload.title,
+          title: payload.title || payload.name,
+          price: Number(payload.price),
+          category: payload.category || 'Uncategorized',
+          description: payload.description || '',
+          img: payload.img || payload.imageUrl || '',
+          imageUrl: payload.imageUrl || payload.img || '',
+          specs: Array.isArray(payload.specs) ? payload.specs : [],
+          tags: Array.isArray(payload.tags) ? payload.tags : [],
+          stock: Number(payload.stock) || 0,
+          sold: Number(payload.sold) || 0,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+
+        // Save to database
+        await doc.save();
+        console.log(`[product] Created new product: ${id}`);
+        return res.json({ ok: true, product: doc.toObject() });
+      }
+
+      // Fallback to file storage if DB not available
+      console.log('[product] Falling back to file storage');
+      const prods = readDataFile('products.json') || [];
+      const id = payload.id || `p_${Date.now()}`;
+      const newProd = { 
+        id,
+        ...payload,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      prods.unshift(newProd);
+      const ok = writeDataFile('products.json', prods);
+      if (!ok) {
+        console.error('[product] Failed to save to file');
+        return res.status(500).json({ ok: false, error: 'Failed to save product to file storage' });
+      }
+      return res.json({ ok: true, product: newProd });
+    } catch (dbError) {
+      console.error('[product] Database operation failed:', dbError);
+      return res.status(500).json({ ok: false, error: `Database error: ${dbError.message}` });
+    }
+  } catch (e) {
+    console.error('[product] Create product failed:', e);
+    return res.status(500).json({ ok: false, error: `Server error: ${e.message}` });
+  }
+});
+
+// Delete product
+// Delete product
+app.delete('/api/admin/products/:id', async (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  
+  const id = req.params.id;
+  if (!id) return res.status(400).json({ ok: false, error: 'product id is required' });
+
+  try {
+    // Ensure MongoDB connection
+    const mongoose = require('mongoose');
+    if (!mongoose.connection.readyState) {
+      const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/Aalacomputer';
+      await mongoose.connect(MONGO_URI, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true
+      });
+    }
+
+    const ProductModel = getProductModel();
+    if (!ProductModel) {
+      console.error('[product/delete] Product model not initialized');
+      return res.status(500).json({ ok: false, error: 'database model not initialized' });
+    }
+
+    // Delete from database - try both _id and id field
+    let result = await ProductModel.findByIdAndDelete(id).catch(() => null);
+    if (!result) {
+      result = await ProductModel.findOneAndDelete({ id: String(id) });
+    }
+    
+    if (!result) {
+      console.error(`[product] Product ${id} not found in database`);
+      return res.status(404).json({ ok: false, error: 'product not found' });
+    }
+
+    console.log(`[product] Successfully deleted product ${id} from database`);
+    
+    // Also remove from local file if it exists (for backward compatibility)
+    try {
+      const prods = readDataFile('products.json');
+      if (prods) {
+        const filteredProds = prods.filter(p => String(p.id) !== String(id));
+        writeDataFile('products.json', filteredProds);
+      }
+    } catch (fileError) {
+      // Don't fail if file operations fail
+      console.warn('[product] File cleanup failed:', fileError.message);
+    }
+
+    return res.json({ ok: true, message: 'Product deleted successfully' });
+  } catch (e) {
+    console.error('[product] Delete failed:', e.message);
+    return res.status(500).json({ ok: false, error: 'Failed to delete product: ' + e.message });
+  }
+});
+
+// List all products (PUBLIC - for frontend products page) - Optimized with pagination and caching
+app.get('/api/products', (req, res) => {
+  // Add caching headers for better performance (reduced to 30 seconds for faster updates)
+  res.setHeader('Cache-Control', 'public, max-age=30'); // Cache for 30 seconds
+  
+  // Get query parameters
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 32; // Default 32 products per page
+  const skip = (page - 1) * limit;
+  const category = req.query.category;
+  const brand = req.query.brand;
+  const search = req.query.search;
+  
+  try {
+    const mongoose = require('mongoose');
+    const ProductModel = getProductModel();
+    if (ProductModel && mongoose.connection.readyState === 1) {
+      // Build query based on filters
+      const query = {};
+      
+      // Category filter - support both simple string and nested object
+      if (category && category !== 'All') {
+        query.$or = [
+          { category: { $regex: category, $options: 'i' } },
+          { 'category.main': { $regex: category, $options: 'i' } },
+          { Name: { $regex: category, $options: 'i' } },
+          { name: { $regex: category, $options: 'i' } }
+        ];
+      }
+      
+      // Brand filter
+      if (brand) {
+        query.brand = { $regex: brand, $options: 'i' };
+      }
+      
+      // Search filter - search in Name, title, category, brand, and specs
+      if (search) {
+        query.$or = [
+          { Name: { $regex: search, $options: 'i' } },
+          { name: { $regex: search, $options: 'i' } },
+          { title: { $regex: search, $options: 'i' } },
+          { category: { $regex: search, $options: 'i' } },
+          { 'category.main': { $regex: search, $options: 'i' } },
+          { brand: { $regex: search, $options: 'i' } },
+          { Spec: { $regex: search, $options: 'i' } }
+        ];
+      }
+      
+      // Use lean() for better performance and select only needed fields
+      ProductModel.find(query)
+        .select('id Name name title price img imageUrl category brand description WARRANTY link Spec type')
+        .lean()
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .then((docs) => {
+          res.json(docs);
+        })
+        .catch(err => { 
+          console.error('[products] products list failed', err && (err.stack || err.message)); 
+          res.status(500).json({ ok: false, error: 'db error' }); 
+        });
+      return;
+    }
+  } catch (e) {
+    console.warn('[products] DB query failed, using file fallback', e && e.message);
+  }
+  
+  // Fallback to main products database with filtering
+  let prods = readProductsDatabase();
+  
+  // Apply filters to file-based data
+  if (category && category !== 'All') {
+    prods = prods.filter(p => {
+      const productCategory = (p.category || '').toLowerCase();
+      const productName = (p.Name || p.name || '').toLowerCase();
+      const selectedCat = category.toLowerCase();
+      return productCategory.includes(selectedCat) || 
+             selectedCat.includes(productCategory) ||
+             productName.includes(selectedCat);
+    });
+  }
+  
+  if (brand) {
+    const brandLower = brand.toLowerCase();
+    prods = prods.filter(p => {
+      const productBrand = (p.brand || '').toLowerCase();
+      const productName = (p.Name || p.name || '').toLowerCase();
+      const productSpecs = Array.isArray(p.Spec) ? p.Spec.join(' ').toLowerCase() : '';
+      return productBrand.includes(brandLower) ||
+             productName.includes(brandLower) ||
+             productSpecs.includes(brandLower);
+    });
+  }
+  
+  if (search) {
+    const searchLower = search.toLowerCase();
+    prods = prods.filter(p => {
+      const productName = (p.Name || p.name || '').toLowerCase();
+      const productTitle = (p.title || '').toLowerCase();
+      const productCategory = (p.category || '').toLowerCase();
+      const productBrand = (p.brand || '').toLowerCase();
+      const productSpecs = Array.isArray(p.Spec) ? p.Spec.join(' ').toLowerCase() : '';
+      return productName.includes(searchLower) ||
+             productTitle.includes(searchLower) ||
+             productCategory.includes(searchLower) ||
+             productBrand.includes(searchLower) ||
+             productSpecs.includes(searchLower);
+    });
+  }
+  
+  const paginatedProds = prods.slice(skip, skip + limit);
+  res.json(paginatedProds);
+});
+
+// List all products (PROTECTED - for admin dashboard)
+app.get('/api/admin/products', async (req, res) => {
+  try {
+    console.log('[admin/products] Request received with query:', req.query);
+    
+    // Check authentication first
+    if (!requireAdmin(req)) {
+      console.log('[admin/products] Unauthorized request');
+      return res.status(401).json({ ok: false, error: 'unauthorized' });
+    }
+
+    // Get query parameters for search, pagination, and filtering
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 32;
+    const skip = (page - 1) * limit;
+    const searchQuery = req.query.q || req.query.search || '';
+    const category = req.query.category || '';
+
+    // Try database first
+    try {
+      console.log('[admin/products] Checking database connection');
+      const mongoose = require('mongoose');
+      
+      // Ensure MongoDB connection
+      if (!mongoose.connection.readyState) {
+        console.log('[admin/products] MongoDB not connected, using existing connection setup...');
+        // The main server startup already handles MongoDB connection with retries
+        // If we reach here and still no connection, wait a moment for it to establish
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      const ProductModel = getProductModel();
+      if (ProductModel && mongoose.connection.readyState === 1) {
+        // Build MongoDB query with search and category filters
+        const query = {};
+        
+        // Search filter - search in multiple fields including uncategorized products
+        if (searchQuery) {
+          query.$or = [
+            { Name: { $regex: searchQuery, $options: 'i' } },
+            { name: { $regex: searchQuery, $options: 'i' } },
+            { title: { $regex: searchQuery, $options: 'i' } },
+            { category: { $regex: searchQuery, $options: 'i' } },
+            { brand: { $regex: searchQuery, $options: 'i' } },
+            { description: { $regex: searchQuery, $options: 'i' } },
+            { Spec: { $regex: searchQuery, $options: 'i' } },
+            { id: { $regex: searchQuery, $options: 'i' } }
+          ];
+        }
+        
+        // Category filter - include uncategorized products when no category is selected
+        if (category && category !== 'All' && category !== '') {
+          // If a specific category is selected, filter by it
+          query.$and = query.$and || [];
+          query.$and.push({
+            $or: [
+              { category: { $regex: category, $options: 'i' } },
+              { 'category.main': { $regex: category, $options: 'i' } }
+            ]
+          });
+        }
+        // Note: When no category is specified, we include ALL products (including uncategorized)
+
+        console.log('[admin/products] MongoDB query:', JSON.stringify(query, null, 2));
+
+        // Count total documents for pagination
+        const total = await ProductModel.countDocuments(query);
+        
+        // Fetch products with pagination
+        const docs = await ProductModel.find(query)
+          .lean()
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit);
+
+        console.log(`[admin/products] Successfully retrieved ${docs.length} of ${total} products from database`);
+        
+        return res.json({ 
+          ok: true, 
+          products: docs,
+          totalCount: total,
+          total: total,
+          page: page,
+          totalPages: Math.ceil(total / limit),
+          hasMore: skip + docs.length < total
+        });
+      } else {
+        console.log('[admin/products] ProductModel not available or DB not connected');
+        // Wait a bit more for connection to establish
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Try once more
+        if (ProductModel && mongoose.connection.readyState === 1) {
+          console.log('[admin/products] MongoDB connection established on retry');
+          // Build MongoDB query with search and category filters
+          const query = {};
+          
+          // Search filter - search in multiple fields including uncategorized products
+          if (searchQuery) {
+            query.$or = [
+              { Name: { $regex: searchQuery, $options: 'i' } },
+              { name: { $regex: searchQuery, $options: 'i' } },
+              { title: { $regex: searchQuery, $options: 'i' } },
+              { category: { $regex: searchQuery, $options: 'i' } },
+              { brand: { $regex: searchQuery, $options: 'i' } },
+              { description: { $regex: searchQuery, $options: 'i' } },
+              { Spec: { $regex: searchQuery, $options: 'i' } },
+              { id: { $regex: searchQuery, $options: 'i' } }
+            ];
+          }
+          
+          // Category filter - include uncategorized products when no category is selected
+          if (category && category !== 'All' && category !== '') {
+            // If a specific category is selected, filter by it
+            query.$and = query.$and || [];
+            query.$and.push({
+              $or: [
+                { category: { $regex: category, $options: 'i' } },
+                { 'category.main': { $regex: category, $options: 'i' } }
+              ]
+            });
+          }
+
+          console.log('[admin/products] MongoDB query (retry):', JSON.stringify(query, null, 2));
+
+          // Count total documents for pagination
+          const total = await ProductModel.countDocuments(query);
+          
+          // Fetch products with pagination
+          const docs = await ProductModel.find(query)
+            .lean()
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
+
+          console.log(`[admin/products] Successfully retrieved ${docs.length} of ${total} products from database (retry)`);
+          
+          return res.json({ 
+            ok: true, 
+            products: docs,
+            totalCount: total,
+            total: total,
+            page: page,
+            totalPages: Math.ceil(total / limit),
+            hasMore: skip + docs.length < total
+          });
+        } else {
+          console.error('[admin/products] MongoDB connection failed after retry, falling back to file storage');
+        }
+      }
+    } catch (dbError) {
+      console.error('[admin/products] Database error:', dbError.message);
+      console.error(dbError.stack);
+      // Don't return here - fall back to file storage
+    }
+
+    // Last resort: Fallback to file storage
+    console.log('[admin/products] Using file storage as last resort');
+    const prods = applyFiltersAndPagination(readProductsDatabase(), searchQuery, category, page, limit, skip);
+    return res.json(prods);
+  } catch (e) {
+    console.error('[admin/products] Fatal error:', e.message);
+    console.error(e.stack);
+    return res.status(500).json({ 
+      ok: false, 
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? e.message : undefined
+    });
+  }
+});
+
+// Helper function to apply filters and pagination to file-based data
+function applyFiltersAndPagination(allProducts, searchQuery, category, page, limit, skip) {
+  let filteredProducts = [...allProducts];
+  
+  // Apply search filter - search in multiple fields including uncategorized products
+  if (searchQuery && searchQuery.trim()) {
+    const search = searchQuery.toLowerCase().trim();
+    filteredProducts = filteredProducts.filter(product => {
+      const searchableText = [
+        product.Name || '',
+        product.name || '',
+        product.title || '',
+        product.category || '',
+        product.brand || '',
+        product.description || '',
+        product.Spec || '',
+        product.id || ''
+      ].join(' ').toLowerCase();
+      
+      return searchableText.includes(search);
+    });
+  }
+  
+  // Apply category filter - include uncategorized products when no category is selected
+  if (category && category !== 'All' && category !== '') {
+    const categoryLower = category.toLowerCase();
+    filteredProducts = filteredProducts.filter(product => {
+      const productCategory = (product.category || '').toLowerCase();
+      return productCategory.includes(categoryLower);
+    });
+  }
+  // Note: When no category is specified, we include ALL products (including uncategorized)
+  
+  const total = filteredProducts.length;
+  const paginatedProducts = filteredProducts.slice(skip, skip + limit);
+  
+  console.log(`[admin/products] File storage: filtered ${total} products, returning ${paginatedProducts.length} for page ${page}`);
+  
+  return {
+    ok: true,
+    products: paginatedProducts,
+    totalCount: total,
+    total: total,
+    page: page,
+    totalPages: Math.ceil(total / limit),
+    hasMore: skip + paginatedProducts.length < total
+  };
+}
+
+// Get single product by ID (PUBLIC - anyone can view product details)
+app.get('/api/products/:id', async (req, res) => {
+  const id = req.params.id;
+  console.log(`[products/:id] Fetching product with ID: ${id}`);
+  
+  try {
+    const mongoose = require('mongoose');
+    const ProductModel = getProductModel();
+    
+    if (ProductModel && mongoose.connection.readyState === 1) {
+      // Try to find by _id (MongoDB ObjectId) first, then by custom id field
+      let doc = null;
+      
+      // Try MongoDB ObjectId first
+      try {
+        doc = await ProductModel.findById(id).lean();
+        if (doc) console.log('[products/:id] Found by _id (ObjectId)');
+      } catch (err) {
+        console.log('[products/:id] Not a valid ObjectId, trying custom id field');
+      }
+      
+      // If not found by _id, try custom id field
+      if (!doc) {
+        doc = await ProductModel.findOne({ id: String(id) }).lean();
+        if (doc) console.log('[products/:id] Found by custom id field');
+      }
+      
+      if (!doc) {
+        console.log('[products/:id] Product not found in database');
+        return res.status(404).json({ ok: false, error: 'product not found' });
+      }
+      
+      console.log('[products/:id] Returning product:', doc.name || doc.title);
+      return res.json(doc);
+    }
+    
+    // Fallback to file
+    const prods = readDataFile('products.json') || [];
+    const product = prods.find(p => String(p.id) === String(id) || String(p._id) === String(id));
+    if (!product) return res.status(404).json({ ok: false, error: 'product not found' });
+    res.json(product);
+  } catch (e) {
+    console.error('[products/:id] Error:', e);
+    res.status(500).json({ ok: false, error: 'server error' });
+  }
+});
+
+// Products stats summary endpoint (protected)
+app.get('/api/products/stats/summary', (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  (async function(){
+    try {
+      const mongoose = require('mongoose');
+      let total = 0;
+      let topProducts = [];
+      
+      const ProductModel = getProductModel();
+      if (ProductModel && mongoose.connection.readyState === 1) {
+        total = await ProductModel.countDocuments();
+        // Get top 5 products by sold count
+        const products = await ProductModel.find({}).lean().sort({ sold: -1 }).limit(5);
+        topProducts = products.map(p => ({
+          id: p.id,
+          title: p.title || p.name || 'Unnamed',
+          sold: p.sold || 0,
+          stock: p.stock || 0,
+          price: p.price
+        }));
+      } else {
+        const prods = readDataFile('products.json') || [];
+        total = prods.length;
+        topProducts = prods
+          .map(p => ({
+            id: p.id,
+            title: p.title || p.name || 'Unnamed',
+            sold: p.sold || 0,
+            stock: p.stock || 0,
+            price: p.price
+          }))
+          .sort((a, b) => b.sold - a.sold)
+          .slice(0, 5);
+      }
+      
+      res.json({ total, top: topProducts });
+    } catch (err) {
+      console.error('stats summary error', err && err.message);
+      res.status(500).json({ ok: false, error: 'stats error' });
+    }
+  })();
+});
+
+// Deals and Prebuilds Models
+function getDealModel() {
+  try {
+    const mongoose = require('mongoose');
+    if (!mongoose) return null;
+    if (mongoose.models && mongoose.models.Deal) return mongoose.models.Deal;
+    const schema = new mongoose.Schema(Object.assign({}, ProductSchemaDef, { price: mongoose.Schema.Types.Mixed }), { timestamps: true });
+    return mongoose.model('Deal', schema);
+  } catch (err) {
+    console.error('[getDealModel] failed', err && err.message);
+    return null;
+  }
+}
+
+function getPrebuildModel() {
+  try {
+    const mongoose = require('mongoose');
+    if (!mongoose) return null;
+    if (mongoose.models && mongoose.models.Prebuild) return mongoose.models.Prebuild;
+    const schema = new mongoose.Schema(Object.assign({}, ProductSchemaDef, { price: mongoose.Schema.Types.Mixed }), { timestamps: true });
+    return mongoose.model('Prebuild', schema);
+  } catch (err) {
+    console.error('[getPrebuildModel] failed', err && err.message);
+    return null;
+  }
+}
+
+// PUBLIC: Get all deals
+app.get('/api/deals', (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    const DealModel = getDealModel();
+    if (DealModel && mongoose.connection.readyState === 1) {
+      DealModel.find({}).lean().sort({ createdAt: -1 }).then((docs) => res.json(docs)).catch(err => { 
+        console.error('[deals] list failed', err && (err.stack || err.message)); 
+        res.status(500).json({ ok: false, error: 'db error' }); 
+      });
+      return;
+    }
+  } catch (e) { /* fallback to file */ }
+  const deals = readDataFile('deals.json') || [];
+  res.json(deals);
+});
+
+// PROTECTED: Create deal
+app.post('/api/admin/deals', async (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  
+  const payload = req.body || {};
+  if (!payload.name && !payload.title) {
+    return res.status(400).json({ ok: false, error: 'Product name or title is required' });
+  }
+
+  try {
+    const mongoose = require('mongoose');
+    const DealModel = getDealModel();
+    if (DealModel && mongoose.connection.readyState === 1) {
+      const id = payload.id || `d_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const doc = new DealModel({
+        id,
+        name: payload.name || payload.title,
+        title: payload.title || payload.name,
+        price: Number(payload.price) || 0,
+        category: payload.category || 'Uncategorized',
+        description: payload.description || '',
+        img: payload.img || payload.imageUrl || '',
+        imageUrl: payload.imageUrl || payload.img || '',
+        specs: Array.isArray(payload.specs) ? payload.specs : [],
+        tags: Array.isArray(payload.tags) ? payload.tags : [],
+        stock: Number(payload.stock) || 0,
+        sold: Number(payload.sold) || 0,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      await doc.save();
+      console.log(`[deal] Created new deal: ${id}`);
+      return res.json({ ok: true, product: doc.toObject() });
+    }
+    
+    const deals = readDataFile('deals.json') || [];
+    const id = payload.id || `d_${Date.now()}`;
+    const newDeal = { id, ...payload, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    deals.unshift(newDeal);
+    writeDataFile('deals.json', deals);
+    return res.json({ ok: true, product: newDeal });
+  } catch (e) {
+    console.error('[deal] Create failed:', e);
+    return res.status(500).json({ ok: false, error: `Server error: ${e.message}` });
+  }
+});
+
+// PUBLIC: Get all prebuilds
+app.get('/api/prebuilds', (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    const PrebuildModel = getPrebuildModel();
+    if (PrebuildModel && mongoose.connection.readyState === 1) {
+      PrebuildModel.find({}).lean().sort({ createdAt: -1 }).then((docs) => res.json(docs)).catch(err => { 
+        console.error('[prebuilds] list failed', err && (err.stack || err.message)); 
+        res.status(500).json({ ok: false, error: 'db error' }); 
+      });
+      return;
+    }
+  } catch (e) { /* fallback to file */ }
+  const prebuilds = readDataFile('prebuilds.json') || [];
+  res.json(prebuilds);
+});
+
+// PROTECTED: Create prebuild
+app.post('/api/admin/prebuilds', async (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  
+  const payload = req.body || {};
+  if (!payload.name && !payload.title) {
+    return res.status(400).json({ ok: false, error: 'Product name or title is required' });
+  }
+
+  try {
+    const mongoose = require('mongoose');
+    const PrebuildModel = getPrebuildModel();
+    if (PrebuildModel && mongoose.connection.readyState === 1) {
+      const id = payload.id || `pb_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const doc = new PrebuildModel({
+        id,
+        name: payload.name || payload.title,
+        title: payload.title || payload.name,
+        price: Number(payload.price) || 0,
+        category: payload.category || 'Uncategorized',
+        description: payload.description || '',
+        img: payload.img || payload.imageUrl || '',
+        imageUrl: payload.imageUrl || payload.img || '',
+        specs: Array.isArray(payload.specs) ? payload.specs : [],
+        tags: Array.isArray(payload.tags) ? payload.tags : [],
+        stock: Number(payload.stock) || 0,
+        sold: Number(payload.sold) || 0,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      await doc.save();
+      console.log(`[prebuild] Created new prebuild: ${id}`);
+      return res.json({ ok: true, product: doc.toObject() });
+    }
+    
+    const prebuilds = readDataFile('prebuilds.json') || [];
+    const id = payload.id || `pb_${Date.now()}`;
+    const newPrebuild = { id, ...payload, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    prebuilds.unshift(newPrebuild);
+    writeDataFile('prebuilds.json', prebuilds);
+    return res.json({ ok: true, product: newPrebuild });
+  } catch (e) {
+    console.error('[prebuild] Create failed:', e);
+    return res.status(500).json({ ok: false, error: `Server error: ${e.message}` });
+  }
+});
+
+// PROTECTED: Update prebuild
+app.put('/api/admin/prebuilds/:id', async (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  
+  const { id } = req.params;
+  const payload = req.body || {};
+
+  try {
+    const mongoose = require('mongoose');
+    const PrebuildModel = getPrebuildModel();
+    if (PrebuildModel && mongoose.connection.readyState === 1) {
+      const doc = await PrebuildModel.findById(id);
+      if (!doc) {
+        return res.status(404).json({ ok: false, error: 'Prebuild not found' });
+      }
+      
+      if (payload.name) doc.name = payload.name;
+      if (payload.title) doc.title = payload.title;
+      if (typeof payload.price !== 'undefined') doc.price = Number(payload.price);
+      if (payload.category) doc.category = payload.category;
+      if (payload.description) doc.description = payload.description;
+      if (payload.img) doc.img = payload.img;
+      if (payload.imageUrl) doc.imageUrl = payload.imageUrl;
+      if (Array.isArray(payload.specs)) doc.specs = payload.specs;
+      if (Array.isArray(payload.tags)) doc.tags = payload.tags;
+      if (typeof payload.stock !== 'undefined') doc.stock = Number(payload.stock);
+      doc.updatedAt = new Date();
+      
+      await doc.save();
+      console.log(`[prebuild] Updated prebuild: ${id}`);
+      return res.json({ ok: true, product: doc.toObject() });
+    }
+    
+    const prebuilds = readDataFile('prebuilds.json') || [];
+    const idx = prebuilds.findIndex(p => p._id === id || p.id === id);
+    if (idx === -1) {
+      return res.status(404).json({ ok: false, error: 'Prebuild not found' });
+    }
+    
+    prebuilds[idx] = { ...prebuilds[idx], ...payload, updatedAt: new Date().toISOString() };
+    writeDataFile('prebuilds.json', prebuilds);
+    return res.json({ ok: true, product: prebuilds[idx] });
+  } catch (e) {
+    console.error('[prebuild] Update failed:', e);
+    return res.status(500).json({ ok: false, error: `Server error: ${e.message}` });
+  }
+});
+
+// PROTECTED: Delete prebuild
+app.delete('/api/admin/prebuilds/:id', async (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  
+  const { id } = req.params;
+  console.log(`[prebuild] DELETE request for ID: ${id}`);
+
+  try {
+    const mongoose = require('mongoose');
+    const PrebuildModel = getPrebuildModel();
+    
+    if (PrebuildModel && mongoose.connection.readyState === 1) {
+      console.log('[prebuild] Using MongoDB for deletion');
+      
+      // Try multiple approaches to find and delete
+      let result = null;
+      
+      // Approach 1: Direct findByIdAndDelete
+      try {
+        result = await PrebuildModel.findByIdAndDelete(id);
+      } catch (err) {
+        console.log('[prebuild] findByIdAndDelete failed, trying findOne:', err.message);
+      }
+      
+      // Approach 2: Find by _id string match
+      if (!result) {
+        result = await PrebuildModel.findOneAndDelete({ _id: id });
+      }
+      
+      // Approach 3: Find by id field
+      if (!result) {
+        result = await PrebuildModel.findOneAndDelete({ id: id });
+      }
+      
+      if (!result) {
+        console.log(`[prebuild] Not found in MongoDB, trying JSON file`);
+        // Fall through to JSON file handling
+      } else {
+        console.log(`[prebuild] Successfully deleted from MongoDB: ${id}`);
+        return res.json({ ok: true, message: 'Prebuild deleted' });
+      }
+    }
+    
+    // JSON file fallback
+    console.log('[prebuild] Using JSON file for deletion');
+    const prebuilds = readDataFile('prebuilds.json') || [];
+    console.log(`[prebuild] Found ${prebuilds.length} prebuilds in file`);
+    
+    const idx = prebuilds.findIndex(p => {
+      const match = String(p._id) === String(id) || String(p.id) === String(id);
+      if (match) console.log(`[prebuild] Match found at index ${idx}`);
+      return match;
+    });
+    
+    if (idx === -1) {
+      console.log('[prebuild] Prebuild not found in file either');
+      return res.status(404).json({ ok: false, error: 'Prebuild not found' });
+    }
+    
+    const deleted = prebuilds.splice(idx, 1);
+    writeDataFile('prebuilds.json', prebuilds);
+    console.log(`[prebuild] Deleted from file:`, deleted[0]);
+    return res.json({ ok: true, message: 'Prebuild deleted' });
+  } catch (e) {
+    console.error('[prebuild] Delete failed:', e);
+    return res.status(500).json({ ok: false, error: `Server error: ${e.message}` });
+  }
+});
+
+// PUBLIC: Delete prebuild (fallback for non-admin routes)
+app.delete('/api/prebuilds/:id', async (req, res) => {
+  // Allow deletion from public endpoint for testing/development
+  const { id } = req.params;
+  console.log(`[prebuild] PUBLIC DELETE request for ID: ${id}`);
+
+  try {
+    const mongoose = require('mongoose');
+    const PrebuildModel = getPrebuildModel();
+    
+    if (PrebuildModel && mongoose.connection.readyState === 1) {
+      console.log('[prebuild] Using MongoDB for public deletion');
+      
+      // Try multiple approaches
+      let result = null;
+      
+      try {
+        result = await PrebuildModel.findByIdAndDelete(id);
+      } catch (err) {
+        console.log('[prebuild] findByIdAndDelete failed:', err.message);
+      }
+      
+      if (!result) {
+        result = await PrebuildModel.findOneAndDelete({ _id: id });
+      }
+      
+      if (!result) {
+        result = await PrebuildModel.findOneAndDelete({ id: id });
+      }
+      
+      if (!result) {
+        console.log(`[prebuild] Not found in MongoDB`);
+      } else {
+        console.log(`[prebuild] Successfully deleted from MongoDB (public): ${id}`);
+        return res.json({ ok: true, message: 'Prebuild deleted' });
+      }
+    }
+    
+    // JSON file fallback
+    console.log('[prebuild] Using JSON file for public deletion');
+    const prebuilds = readDataFile('prebuilds.json') || [];
+    const idx = prebuilds.findIndex(p => String(p._id) === String(id) || String(p.id) === String(id));
+    
+    if (idx === -1) {
+      console.log('[prebuild] Prebuild not found in file');
+      return res.status(404).json({ ok: false, error: 'Prebuild not found' });
+    }
+    
+    const deleted = prebuilds.splice(idx, 1);
+    writeDataFile('prebuilds.json', prebuilds);
+    console.log(`[prebuild] Deleted from file (public):`, deleted[0]);
+    return res.json({ ok: true, message: 'Prebuild deleted' });
+  } catch (e) {
+    console.error('[prebuild] Public delete failed:', e);
+    return res.status(500).json({ ok: false, error: `Server error: ${e.message}` });
+  }
+});
+
+// Database status endpoint (for debugging)
+app.get('/api/db-status', (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    const status = {
+      connected: mongoose.connection.readyState === 1,
+      readyState: mongoose.connection.readyState,
+      readyStateText: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState] || 'unknown',
+      host: mongoose.connection.host,
+      name: mongoose.connection.name,
+      models: Object.keys(mongoose.models)
+    };
+    res.json(status);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin stats: total products, total sales (from data/orders.json or fallback), top-selling
+app.get('/api/admin/stats', (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  (async function(){
+    try {
+      const mongoose = require('mongoose');
+      let totalProducts = 0;
+      let totalOrders = 0;
+      let totalSales = 0;
+      let topSelling = [];
+      // Use DB when available
+      const ProductModel = getProductModel();
+      if (ProductModel && mongoose.connection.readyState === 1) {
+        totalProducts = await ProductModel.countDocuments();
+      } else {
+        const prods = readDataFile('products.json') || [];
+        totalProducts = prods.length;
+      }
+
+      // Orders: try DB Order model (backend/models/Order.js) if present
+      try {
+        const OrderModel = require(path.join(__dirname, 'models', 'Order.js'));
+        if (OrderModel && mongoose.connection.readyState === 1) {
+          const orders = await OrderModel.find({}).lean();
+          totalOrders = orders.length;
+          const salesCount = {};
+          for (const o of orders) {
+            const items = o.items || [];
+            for (const it of items) {
+              const pid = it.productId || it.id || it._id || null;
+              if (!pid) continue;
+              salesCount[pid] = (salesCount[pid] || 0) + (it.qty || 1);
+              totalSales += (it.qty || 1);
+            }
+          }
+          topSelling = Object.keys(salesCount).map(k => ({ id: k, sold: salesCount[k] })).sort((a,b) => b.sold - a.sold).slice(0,10);
+        } else {
+          const orders = readDataFile('orders.json') || [];
+          totalOrders = orders.length;
+          const salesCount = {};
+          for (const o of orders) {
+            const items = o.items || [];
+            for (const it of items) {
+              const pid = it.id || it.productId || it._id;
+              if (!pid) continue;
+              salesCount[pid] = (salesCount[pid] || 0) + (it.qty || 1);
+              totalSales += (it.qty || 1);
+            }
+          }
+          topSelling = Object.keys(salesCount).map(k => ({ id: k, sold: salesCount[k] })).sort((a,b) => b.sold - a.sold).slice(0,10);
+        }
+      } catch (e) {
+        const orders = readDataFile('orders.json') || [];
+        totalOrders = orders.length;
+        const salesCount = {};
+        for (const o of orders) {
+          const items = o.items || [];
+          for (const it of items) {
+            const pid = it.id || it.productId || it._id;
+            if (!pid) continue;
+            salesCount[pid] = (salesCount[pid] || 0) + (it.qty || 1);
+            totalSales += (it.qty || 1);
+          }
+        }
+        topSelling = Object.keys(salesCount).map(k => ({ id: k, sold: salesCount[k] })).sort((a,b) => b.sold - a.sold).slice(0,10);
+      }
+
+      res.json({ ok: true, totalProducts, totalOrders, totalSales, topSelling });
+    } catch (err) {
+      console.error('stats error', err && err.message);
+      res.status(500).json({ ok: false, error: 'stats error' });
+    }
+  })();
+});
+
+// ==================== CATEGORIES ENDPOINTS ====================
+
+// Public: Get all categories
+app.get('/api/categories', async (req, res) => {
+  try {
+    const categories = readDataFile('categories.json') || [];
+    res.json(categories);
+  } catch (err) {
+    console.error('[categories] Get failed:', err);
+    res.status(500).json({ ok: false, error: 'Failed to get categories' });
+  }
+});
+
+// Admin: Get all categories
+app.get('/api/admin/categories', (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  try {
+    const categories = readDataFile('categories.json') || [];
+    res.json({ ok: true, categories });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: 'Failed to get categories' });
+  }
+});
+
+// Admin: Create category
+app.post('/api/admin/categories', (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  try {
+    const categories = readDataFile('categories.json') || [];
+    const newCategory = {
+      _id: Date.now().toString(),
+      id: Date.now().toString(),
+      ...req.body,
+      createdAt: new Date()
+    };
+    categories.push(newCategory);
+    writeDataFile('categories.json', categories);
+    res.json({ ok: true, category: newCategory });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: 'Failed to create category' });
+  }
+});
+
+// Admin: Update category
+app.put('/api/admin/categories/:id', (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  try {
+    const categories = readDataFile('categories.json') || [];
+    const idx = categories.findIndex(c => String(c._id) === String(req.params.id) || String(c.id) === String(req.params.id));
+    if (idx === -1) return res.status(404).json({ ok: false, error: 'Category not found' });
+    
+    categories[idx] = { ...categories[idx], ...req.body, updatedAt: new Date() };
+    writeDataFile('categories.json', categories);
+    res.json({ ok: true, category: categories[idx] });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: 'Failed to update category' });
+  }
+});
+
+// Admin: Delete category
+app.delete('/api/admin/categories/:id', (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  try {
+    const categories = readDataFile('categories.json') || [];
+    const idx = categories.findIndex(c => String(c._id) === String(req.params.id) || String(c.id) === String(req.params.id));
+    if (idx === -1) return res.status(404).json({ ok: false, error: 'Category not found' });
+    
+    categories.splice(idx, 1);
+    writeDataFile('categories.json', categories);
+    res.json({ ok: true, message: 'Category deleted' });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: 'Failed to delete category' });
+  }
+});
+
+// ==================== BRANDS ENDPOINTS ====================
+
+// Admin: Get all brands
+app.get('/api/admin/brands', (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  try {
+    const brands = readDataFile('brands.json') || [];
+    res.json({ ok: true, brands });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: 'Failed to get brands' });
+  }
+});
+
+// Admin: Create brand
+app.post('/api/admin/brands', (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  try {
+    const brands = readDataFile('brands.json') || [];
+    const newBrand = {
+      _id: Date.now().toString(),
+      id: Date.now().toString(),
+      ...req.body,
+      createdAt: new Date()
+    };
+    brands.push(newBrand);
+    writeDataFile('brands.json', brands);
+    res.json({ ok: true, brand: newBrand });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: 'Failed to create brand' });
+  }
+});
+
+// Admin: Update brand
+app.put('/api/admin/brands/:id', (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  try {
+    const brands = readDataFile('brands.json') || [];
+    const idx = brands.findIndex(b => String(b._id) === String(req.params.id) || String(b.id) === String(req.params.id));
+    if (idx === -1) return res.status(404).json({ ok: false, error: 'Brand not found' });
+    
+    brands[idx] = { ...brands[idx], ...req.body, updatedAt: new Date() };
+    writeDataFile('brands.json', brands);
+    res.json({ ok: true, brand: brands[idx] });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: 'Failed to update brand' });
+  }
+});
+
+// Admin: Delete brand
+app.delete('/api/admin/brands/:id', (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  try {
+    const brands = readDataFile('brands.json') || [];
+    const idx = brands.findIndex(b => String(b._id) === String(req.params.id) || String(b.id) === String(req.params.id));
+    if (idx === -1) return res.status(404).json({ ok: false, error: 'Brand not found' });
+    
+    brands.splice(idx, 1);
+    writeDataFile('brands.json', brands);
+    res.json({ ok: true, message: 'Brand deleted' });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: 'Failed to delete brand' });
+  }
+});
+
+// ==================== DEALS ENDPOINTS ====================
+
+// Admin: Get all deals
+app.get('/api/admin/deals', (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  try {
+    const deals = readDataFile('deals.json') || [];
+    res.json({ ok: true, deals });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: 'Failed to get deals' });
+  }
+});
+
+// Admin: Create deal
+app.post('/api/admin/deals', (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  try {
+    const deals = readDataFile('deals.json') || [];
+    const newDeal = {
+      _id: Date.now().toString(),
+      id: Date.now().toString(),
+      ...req.body,
+      createdAt: new Date()
+    };
+    deals.push(newDeal);
+    writeDataFile('deals.json', deals);
+    res.json({ ok: true, deal: newDeal });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: 'Failed to create deal' });
+  }
+});
+
+// Admin: Update deal
+app.put('/api/admin/deals/:id', (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  try {
+    const deals = readDataFile('deals.json') || [];
+    const idx = deals.findIndex(d => String(d._id) === String(req.params.id) || String(d.id) === String(req.params.id));
+    if (idx === -1) return res.status(404).json({ ok: false, error: 'Deal not found' });
+    
+    deals[idx] = { ...deals[idx], ...req.body, updatedAt: new Date() };
+    writeDataFile('deals.json', deals);
+    res.json({ ok: true, deal: deals[idx] });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: 'Failed to update deal' });
+  }
+});
+
+// Admin: Delete deal
+app.delete('/api/admin/deals/:id', (req, res) => {
+  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  try {
+    const deals = readDataFile('deals.json') || [];
+    const idx = deals.findIndex(d => String(d._id) === String(req.params.id) || String(d.id) === String(req.params.id));
+    if (idx === -1) return res.status(404).json({ ok: false, error: 'Deal not found' });
+    
+    deals.splice(idx, 1);
+    writeDataFile('deals.json', deals);
+    res.json({ ok: true, message: 'Deal deleted' });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: 'Failed to delete deal' });
+  }
+});
+
+// Endpoint to increment AI-open counter (called by frontend when AI opens product via window.aalaaiOpen)
+// AI open tracking endpoint removed.
+
+// Catch-all handler: send back React's index.html file for client-side routing
+// Use a middleware approach that's more reliable
+app.use((req, res, next) => {
+  // Only handle non-API routes and non-static file requests
+  if (!req.path.startsWith('/api') && !req.path.startsWith('/assets')) {
+    const indexPath = path.join(__dirname, '..', 'dist', 'index.html');
+    if (fs.existsSync(indexPath)) {
+      return res.sendFile(indexPath);
+    } else {
+      return res.status(404).json({ error: 'Frontend not built. Run npm run build first.' });
+    }
+  }
+  next();
+});
+
+const PORT = process.env.PORT || 10000;
+
+// Add logging for debugging
+console.log('[server] PORT environment variable:', process.env.PORT);
+console.log('[server] Using PORT:', PORT);
+
+async function startServer() {
+  try {
+    // Load environment variables
+    require('dotenv').config();
+    
+    // Log all environment variables (sensitive ones will be masked)
+    console.log('[server] Environment variables:');
+    Object.keys(process.env).forEach(key => {
+      if (key.includes('KEY') || key.includes('SECRET') || key.includes('PASSWORD') || key.includes('TOKEN')) {
+        console.log(`  ${key}: ****`);
+      } else {
+        console.log(`  ${key}: ${process.env[key]}`);
+      }
+    });
+    
+    // Get MongoDB URI from environment or use MongoDB Atlas as fallback (no local URI)
+    const MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://uni804043_db_user:2124377as@cluster0.0cy1usa.mongodb.net/aalacomputer?retryWrites=true&w=majority';
+    
+    if (MONGO_URI) {
+      // Log connection attempt (safely hiding credentials)
+      const safeUri = MONGO_URI.replace(/mongodb(\+srv)?:\/\/[^@]+@/, 'mongodb$1://****:****@');
+      console.log('[db] Connecting to MongoDB...', safeUri);
+      
+      // Configure mongoose
+      mongoose.set('bufferCommands', false);
+      mongoose.set('strictQuery', false);
+      
+      // Enhanced connection monitoring
+      mongoose.connection.on('connected', () => {
+        console.log('[db] Mongoose connection established');
+      });
+      
+      mongoose.connection.on('error', (err) => {
+        console.error('[db] Mongoose connection error:', err.message);
+      });
+      
+      mongoose.connection.on('disconnected', () => {
+        console.log('[db] Mongoose connection disconnected');
+      });
+      
+      const connectWithRetry = async (retries = 5) => {
+        try {
+          await mongoose.connect(MONGO_URI, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+            connectTimeoutMS: 30000, // Increased timeout
+            serverSelectionTimeoutMS: 30000, // Increased timeout
+            socketTimeoutMS: 45000, // Added socket timeout
+            heartbeatFrequencyMS: 1000,
+            retryWrites: true,
+            w: 'majority',
+            maxPoolSize: 10,
+          });
+          
+          // Verify connection by attempting a simple operation
+          await mongoose.connection.db.admin().ping();
+          console.log('[db] MongoDB connection verified with ping');
+          return true;
+        } catch (e) {
+          console.error(`[db] MongoDB connection attempt failed (${retries} retries left):`, e.message);
+          console.error('[db] Full error:', e);
+          if (retries > 0) {
+            const delay = (6 - retries) * 5000; // Progressive delay
+            console.log(`[db] Retrying connection in ${delay/1000} seconds...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return connectWithRetry(retries - 1);
+          }
+          throw e;
+        }
+      };
+      
+      try {
+        await connectWithRetry();
+        
+        // Ensure Product model is available on mongoose
+        try {
+          const pm = getProductModel();
+          if (pm && mongoose.models && mongoose.models.Product) {
+            const count = await mongoose.models.Product.countDocuments();
+            console.log(`[db] Connection verified - found ${count} products`);
+          } else {
+            console.log('[db] Product model not available after connection');
+          }
+        } catch (err) {
+          console.error('[db] failed to verify product model/count', err && (err.stack || err.message));
+        }
+      } catch (e) {
+        console.error('[db] MongoDB connection failed after retries:', e.message);
+        console.error('[db] Stack trace:', e.stack);
+        // Don't exit - allow fallback to file-based storage
+      }
+    } else {
+      console.warn('[db] No MONGO_URI configured; using file-based storage');
+    }
+    
+    // ===== STATIC FILE SERVING (AFTER ALL API ROUTES) =====
+    // Serve static files from dist (built frontend) - MUST be after API routes
+    const distPath = path.join(__dirname, '..', 'dist');
+    if (fs.existsSync(distPath)) {
+      // Serve static files with proper headers
+      app.use(express.static(distPath, {
+        maxAge: '1d',
+        etag: true,
+        lastModified: true,
+        setHeaders: (res, filePath) => {
+          // Set proper MIME types
+          if (filePath.endsWith('.css')) {
+            res.setHeader('Content-Type', 'text/css; charset=utf-8');
+          } else if (filePath.endsWith('.js')) {
+            res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+          } else if (filePath.endsWith('.js.map')) {
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          } else if (filePath.endsWith('.png')) {
+            res.setHeader('Content-Type', 'image/png');
+          } else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
+            res.setHeader('Content-Type', 'image/jpeg');
+          } else if (filePath.endsWith('.gif')) {
+            res.setHeader('Content-Type', 'image/gif');
+          } else if (filePath.endsWith('.svg')) {
+            res.setHeader('Content-Type', 'image/svg+xml');
+          }
+        }
+      }));
+      console.log('[server] Serving static files from:', distPath);
+    } else {
+      console.warn('[server] dist directory not found at:', distPath);
+    }
+    
+    // ensure admin exists either in DB or file
+    await ensureAdminUser();
+
+    app.listen(PORT,'0.0.0.0', () => console.log(`Backend server listening on port ${PORT}`));
+  } catch (e) {
+    console.error('Failed to start server', e && e.message);
+    console.error('Stack trace:', e && e.stack);
+    process.exit(1);
+  }
+}
+
+// Add unhandled error handlers for better debugging
+process.on('uncaughtException', (err) => {
+  console.error('[global] uncaughtException:', err);
+  console.error('[global] uncaughtException stack:', err.stack);
+  // Don't exit the process for uncaught exceptions to prevent 502 errors
+  // process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[global] unhandledRejection:', reason);
+  console.error('[global] unhandledRejection promise:', promise);
+  // Don't exit the process for unhandled rejections to prevent 502 errors
+  // process.exit(1);
+});
+
+// Start server only when run directly. When imported (e.g. by serverless wrapper), export the app.
+if (require.main === module) {
+  console.log('[server] Starting server...');
+  startServer().catch(err => {
+    console.error('[server] Failed to start server:', err);
+    process.exit(1);
+  });
+} else {
+  try { module.exports = { app, startServer }; } catch (e) { /* ignore export errors */ }
+}

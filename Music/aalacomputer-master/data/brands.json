@@ -1,0 +1,37 @@
+[
+  {
+    "id": "hp",
+    "name": "HP",
+    "description": "Hewlett-Packard - Leading technology company",
+    "published": true,
+    "createdAt": "2025-11-07T10:53:00.000Z"
+  },
+  {
+    "id": "dell",
+    "name": "Dell",
+    "description": "Dell Technologies",
+    "published": true,
+    "createdAt": "2025-11-07T10:53:00.000Z"
+  },
+  {
+    "id": "lenovo",
+    "name": "Lenovo",
+    "description": "Lenovo Group Limited",
+    "published": true,
+    "createdAt": "2025-11-07T10:53:00.000Z"
+  },
+  {
+    "id": "asus",
+    "name": "ASUS",
+    "description": "ASUSTeK Computer Inc.",
+    "published": true,
+    "createdAt": "2025-11-07T10:53:00.000Z"
+  },
+  {
+    "id": "acer",
+    "name": "Acer",
+    "description": "Acer Inc.",
+    "published": true,
+    "createdAt": "2025-11-07T10:53:00.000Z"
+  }
+]

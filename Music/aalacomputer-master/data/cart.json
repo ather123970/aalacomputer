@@ -1,0 +1,18 @@
+[
+  {
+    "id": "2",
+    "name": "Workhorse",
+    "price": 230000,
+    "img": "/pcglow.jpg",
+    "specs": [
+      "CPU: Ryzen 7 7700X",
+      "GPU: RTX 3070 8GB",
+      "RAM: 32GB DDR5 5200MHz",
+      "Storage: 1TB NVMe SSD",
+      "PSU: 750W 80+ Gold",
+      "Case: Corsair 4000D Airflow"
+    ],
+    "type": "Pre-Build",
+    "qty": 1
+  }
+]
