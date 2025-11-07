@@ -395,48 +395,63 @@ app.get('/api/deployment-version', (req, res) => {
 app.get('/api/proxy-image', async (req, res) => {
   try {
     const url = req.query.url;
-    if (!url) return res.status(400).send("Missing URL");
-
-    // Use node-fetch for better compatibility with Render
-    const fetch = (await import('node-fetch')).default;
-
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-        "Referer": url.includes('zahcomputers.pk') ? "https://zahcomputers.pk" : ""
-      },
-      // Add timeout to prevent hanging requests
-      timeout: 10000
-    });
-
-    if (!response.ok) {
-      console.error("Failed to fetch image:", response.status, response.statusText, url);
-      // Instead of returning 502, try to serve a fallback or redirect
-      return res.status(400).json({ 
-        error: "Failed to fetch image", 
-        status: response.status, 
-        statusText: response.statusText,
-        url: url
-      });
+    if (!url) {
+      console.error("Proxy: Missing URL parameter");
+      return res.status(404).send("Image not found");
     }
 
-    // Set CORS headers to allow cross-origin requests
+    console.log("Proxy: Fetching image from:", url);
+
+    // Set CORS headers early
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
     res.set("Access-Control-Allow-Headers", "Content-Type");
     res.set("Timing-Allow-Origin", "*");
+
+    // Use axios for better compatibility and automatic redirect following
+    const axios = require('axios');
     
-    res.set("Content-Type", response.headers.get("content-type") || "image/jpeg");
-    res.set("Cache-Control", "public, max-age=86400");
-    response.body.pipe(res);
-  } catch (err) {
-    console.error("Proxy error:", err);
-    // Instead of returning 502, provide a more graceful fallback
-    res.status(400).json({ 
-      error: "Proxy failed", 
-      message: err.message,
-      url: req.query.url
+    const response = await axios({
+      method: 'GET',
+      url: url,
+      responseType: 'stream',
+      timeout: 15000,
+      maxRedirects: 5,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Referer": url.includes('zahcomputers.pk') ? "https://zahcomputers.pk/" : new URL(url).origin + "/",
+        "Sec-Fetch-Dest": "image",
+        "Sec-Fetch-Mode": "no-cors",
+        "Sec-Fetch-Site": "cross-site"
+      },
+      validateStatus: function (status) {
+        return status >= 200 && status < 400; // Accept 2xx and 3xx responses
+      }
     });
+
+    console.log("Proxy: Successfully fetched image, status:", response.status);
+    
+    // Set appropriate headers
+    res.set("Content-Type", response.headers['content-type'] || "image/jpeg");
+    res.set("Cache-Control", "public, max-age=86400, immutable");
+    res.set("Cross-Origin-Resource-Policy", "cross-origin");
+    
+    // Pipe the image data to response
+    response.data.pipe(res);
+    
+  } catch (err) {
+    console.error("Proxy error for URL:", req.query.url);
+    console.error("Error details:", err.message);
+    if (err.response) {
+      console.error("Response status:", err.response.status);
+    }
+    
+    // Return a 404 error that will trigger the img onerror handler
+    // Don't return JSON, as that breaks image loading
+    res.status(404).send("Image not found");
   }
 });
 
