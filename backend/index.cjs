@@ -677,12 +677,13 @@ app.get('/api/product-image/:productId', async (req, res) => {
         
         console.log(`[product-image] Product has imageUrl: ${imageUrl}`);
         
-        // STEP 2: If it's an EXTERNAL URL (http/https), use database URL and fetch it
-        // This ensures admin updates with external URLs work immediately
+        // STEP 2: If it's an EXTERNAL URL (http/https), try to fetch it
+        // If fetch fails, fall back to local images by product name
         if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
-          console.log(`[product-image] External URL detected, proxying: ${imageUrl}`);
+          console.log(`[product-image] External URL detected: ${imageUrl}`);
           
           // Try to fetch the external image directly with proper headers and timeout
+          let externalFetchSuccess = false;
           try {
             const fetch = (await import('node-fetch')).default;
             
@@ -709,16 +710,37 @@ app.get('/api/product-image/:productId', async (req, res) => {
             if (imageResponse.ok && imageResponse.body) {
               console.log(`[product-image] ✅ Successfully fetched external image`);
               res.set('Content-Type', imageResponse.headers.get('content-type') || 'image/jpeg');
+              externalFetchSuccess = true;
               return imageResponse.body.pipe(res);
             } else {
-              console.log(`[product-image] ❌ External fetch failed: ${imageResponse.status}, falling back to proxy`);
+              console.log(`[product-image] ❌ External fetch failed: ${imageResponse.status}, trying local fallback`);
             }
           } catch (e) {
-            console.log(`[product-image] ❌ Direct fetch error: ${e.message}, trying proxy`);
+            console.log(`[product-image] ❌ External fetch error: ${e.message}, trying local fallback`);
           }
           
-          // Fallback to proxy endpoint
-          return res.redirect(302, `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`);
+          // If external fetch failed, try local image by product name before using proxy
+          if (!externalFetchSuccess) {
+            console.log(`[product-image] Looking for local image as fallback for: ${productName}`);
+            const localImagePath = findLocalImageForProduct(productName);
+            if (localImagePath && fs.existsSync(localImagePath)) {
+              console.log(`[product-image] ✅ Found local image fallback for failed external URL: ${productName}`);
+              const ext = path.extname(localImagePath).toLowerCase();
+              const contentType = {
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.png': 'image/png',
+                '.webp': 'image/webp'
+              }[ext] || 'image/jpeg';
+              
+              res.set('Content-Type', contentType);
+              return fs.createReadStream(localImagePath).pipe(res);
+            }
+            
+            // Final fallback: Use proxy endpoint for external URL
+            console.log(`[product-image] No local fallback found, using proxy for external URL`);
+            return res.redirect(302, `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`);
+          }
         }
         
         // STEP 3: If it's a local path (starts with /images/ or just filename), serve it
@@ -1637,6 +1659,116 @@ app.delete('/api/admin/products/:id', async (req, res) => {
   } catch (e) {
     console.error('[product] Delete failed:', e.message);
     return res.status(500).json({ ok: false, error: 'Failed to delete product: ' + e.message });
+  }
+});
+
+// ========================================
+// CHATBASE SEARCH ENDPOINT (ISOLATED)
+// This endpoint is exclusively for Chatbase AI integration
+// Does NOT interfere with any existing routes or functionality
+// ========================================
+app.get('/api/chatbase/search', async (req, res) => {
+  try {
+    // Set CORS headers for Chatbase
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Content-Type', 'application/json');
+    
+    // Optional: API key security (uncomment to enable)
+    // const apiKey = req.headers['authorization']?.replace('Bearer ', '');
+    // const CHATBASE_API_KEY = process.env.CHATBASE_API_KEY || 'your-secret-key';
+    // if (apiKey !== CHATBASE_API_KEY) {
+    //   return res.status(401).json({ error: 'Unauthorized' });
+    // }
+    
+    // Get search query
+    const query = req.query.q || '';
+    
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ 
+        error: 'Query parameter "q" is required',
+        example: '/api/chatbase/search?q=RGB+8GB+RAM'
+      });
+    }
+    
+    console.log(`[chatbase-search] Query: "${query}"`);
+    
+    // Get MongoDB connection
+    const mongoose = require('mongoose');
+    const ProductModel = getProductModel();
+    
+    if (!ProductModel || mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ error: 'Database not connected' });
+    }
+    
+    // Build search query - search across multiple fields
+    const searchTerms = query.trim().split(/\s+/).filter(Boolean);
+    
+    // Create regex patterns for each search term (case-insensitive)
+    const regexPatterns = searchTerms.map(term => new RegExp(term, 'i'));
+    
+    // Search in name, title, category, brand, description, specs
+    const searchQuery = {
+      $or: [
+        { name: { $in: regexPatterns } },
+        { title: { $in: regexPatterns } },
+        { category: { $in: regexPatterns } },
+        { brand: { $in: regexPatterns } },
+        { description: { $in: regexPatterns } },
+        { Spec: { $in: regexPatterns } },
+        { specs: { $elemMatch: { $in: regexPatterns } } },
+        // Also match if ALL terms are in the name/title (for better relevance)
+        { $and: searchTerms.map(term => ({ name: new RegExp(term, 'i') })) },
+        { $and: searchTerms.map(term => ({ title: new RegExp(term, 'i') })) }
+      ]
+    };
+    
+    // Execute search with limit of 20 results
+    const results = await ProductModel
+      .find(searchQuery)
+      .select('_id id name title category brand price img imageUrl description')
+      .limit(20)
+      .lean();
+    
+    console.log(`[chatbase-search] Found ${results.length} results for "${query}"`);
+    
+    // Format results for Chatbase
+    const formattedResults = results.map(product => {
+      const productId = product._id || product.id;
+      const productName = product.name || product.title || 'Unnamed Product';
+      const productPrice = product.price ? `PKR ${product.price.toLocaleString()}` : 'Contact for price';
+      const productCategory = product.category || 'General';
+      const productUrl = `https://www.aalacomputer.com/products/${productId}`;
+      const productImage = product.imageUrl || product.img || '';
+      const productBrand = product.brand || '';
+      
+      return {
+        id: String(productId),
+        name: productName,
+        category: productCategory,
+        brand: productBrand,
+        price: productPrice,
+        url: productUrl,
+        image: productImage,
+        description: product.description ? product.description.substring(0, 200) : ''
+      };
+    });
+    
+    // Return results
+    return res.json({
+      success: true,
+      query: query,
+      count: formattedResults.length,
+      results: formattedResults
+    });
+    
+  } catch (error) {
+    console.error('[chatbase-search] Error:', error.message);
+    return res.status(500).json({ 
+      error: 'Search failed',
+      message: error.message 
+    });
   }
 });
 
