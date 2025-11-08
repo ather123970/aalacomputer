@@ -686,6 +686,21 @@ const ProductModal = ({ product, onClose, onSave, categories = [] }) => {
       try { localStorage.setItem('products_last_updated', String(Date.now())); } catch {}
       try { window.dispatchEvent(new Event('products-updated')); } catch {}
 
+      // Clear image cache to force reload of updated images
+      if (result.timestamp) {
+        console.log('🔄 Product updated, clearing image cache...');
+        // Dispatch event to clear image caches
+        try { window.dispatchEvent(new CustomEvent('clear-image-cache', { detail: { timestamp: result.timestamp } })); } catch {}
+        // Also reload the page after a short delay to ensure fresh images
+        setTimeout(() => {
+          if (onSave) onSave();
+          onClose();
+          // Force a hard reload of images
+          window.location.reload();
+        }, 500);
+        return;
+      }
+
       if (onSave) onSave();
       onClose();
     } catch (err) {

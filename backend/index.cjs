@@ -1406,7 +1406,19 @@ app.put('/api/admin/products/:id', async (req, res) => {
     console.log(`[products UPDATE] Updated product:`, doc._id, doc.title || doc.name);
     console.log(`[products UPDATE] ========================================`);
     
-    return res.json({ ok: true, product: doc, message: `Updated via ${method}` });
+    // Clear cache headers to force image refresh on client
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+    
+    return res.json({ 
+      ok: true, 
+      product: doc, 
+      message: `Updated via ${method}`,
+      timestamp: Date.now() // Help client bust image cache
+    });
     
   } catch (err) {
     console.error('[products UPDATE] ✗✗✗ FATAL ERROR:', err);

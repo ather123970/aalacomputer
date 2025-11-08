@@ -171,11 +171,26 @@ const SmartImage = ({
       setLoadingState(false);
     }
     
-    // Cleanup function
-    return () => {
-      // Cleanup if needed
+    // Reset error state when src changes
+    setError(false);
+  }, [src, loadImage, fallback]);
+
+  // Listen for cache clearing events from admin updates
+  useEffect(() => {
+    const handleClearCache = (event) => {
+      console.log('[SmartImage] Cache clear event received, clearing image cache');
+      // Clear the in-memory cache
+      imageCache.clear();
+      // Force reload of this image
+      if (src) {
+        setRetryCount(0);
+        loadImage(src);
+      }
     };
-  }, [src, fallback, loadImage]);
+    
+    window.addEventListener('clear-image-cache', handleClearCache);
+    return () => window.removeEventListener('clear-image-cache', handleClearCache);
+  }, [src, loadImage]);
 
   // Handle image error
   const handleError = useCallback((e) => {
