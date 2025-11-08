@@ -697,29 +697,39 @@ app.get('/api/product-image/:productId', async (req, res) => {
         if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
           console.log(`[product-image] External URL detected, proxying: ${imageUrl}`);
           
-          // Try to fetch the external image directly with proper headers
+          // Try to fetch the external image directly with proper headers and timeout
           try {
             const fetch = (await import('node-fetch')).default;
+            
+            // Use built-in AbortController (Node.js 15+)
+            const controller = new AbortController();
+            const timeout = setTimeout(() => {
+              controller.abort();
+            }, 30000); // 30 seconds for production environments
+            
+            console.log(`[product-image] Fetching external URL with 30s timeout...`);
             const imageResponse = await fetch(imageUrl, {
+              signal: controller.signal,
               headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                 'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
                 'Referer': imageUrl.includes('acom.pk') || imageUrl.includes('zahcomputers.pk') 
                   ? new URL(imageUrl).origin + '/' 
                   : undefined
-              },
-              timeout: 30000 // 30 seconds for production environments (Render is slower)
+              }
             });
             
+            clearTimeout(timeout);
+            
             if (imageResponse.ok && imageResponse.body) {
-              console.log(`[product-image] Successfully fetched external image`);
+              console.log(`[product-image] ✅ Successfully fetched external image`);
               res.set('Content-Type', imageResponse.headers.get('content-type') || 'image/jpeg');
               return imageResponse.body.pipe(res);
             } else {
-              console.log(`[product-image] External fetch failed: ${imageResponse.status}, falling back to proxy`);
+              console.log(`[product-image] ❌ External fetch failed: ${imageResponse.status}, falling back to proxy`);
             }
           } catch (e) {
-            console.log(`[product-image] Direct fetch error: ${e.message}, trying proxy`);
+            console.log(`[product-image] ❌ Direct fetch error: ${e.message}, trying proxy`);
           }
           
           // Fallback to proxy endpoint
@@ -806,9 +816,12 @@ app.get('/api/proxy-image', async (req, res) => {
       } : {})
     };
 
-    // 1) Try direct fetch with proper headers
+    // 1) Try direct fetch with proper headers and timeout
     console.log('[proxy-image] Trying direct fetch...');
-    let response = await fetch(originalUrl, { headers, timeout: 15000 });
+    const controller1 = new AbortController();
+    const timeout1 = setTimeout(() => controller1.abort(), 15000);
+    let response = await fetch(originalUrl, { headers, signal: controller1.signal });
+    clearTimeout(timeout1);
     if (response && response.ok && response.body) {
       console.log('[proxy-image] ✅ Direct fetch successful');
       res.set('Content-Type', response.headers.get('content-type') || 'image/jpeg');
@@ -820,7 +833,10 @@ app.get('/api/proxy-image', async (req, res) => {
     console.log('[proxy-image] Trying weserv.nl proxy...');
     const weservUrl = `https://images.weserv.nl/?url=${encodeURIComponent(originalUrl.replace(/^https?:\/\//, ''))}&output=jpg&q=85`;
     try {
-      const alt = await fetch(weservUrl, { timeout: 15000 });
+      const controller2 = new AbortController();
+      const timeout2 = setTimeout(() => controller2.abort(), 15000);
+      const alt = await fetch(weservUrl, { signal: controller2.signal });
+      clearTimeout(timeout2);
       if (alt && alt.ok && alt.body) {
         console.log('[proxy-image] ✅ Weserv proxy successful');
         res.set('Content-Type', alt.headers.get('content-type') || 'image/jpeg');
@@ -834,7 +850,10 @@ app.get('/api/proxy-image', async (req, res) => {
     console.log('[proxy-image] Trying Google proxy...');
     const googleProxy = `https://images1-focus-opensocial.googleusercontent.com/gadgets/proxy?container=focus&refresh=86400&url=${encodeURIComponent(originalUrl)}`;
     try {
-      const g = await fetch(googleProxy, { timeout: 15000 });
+      const controller3 = new AbortController();
+      const timeout3 = setTimeout(() => controller3.abort(), 15000);
+      const g = await fetch(googleProxy, { signal: controller3.signal });
+      clearTimeout(timeout3);
       if (g && g.ok && g.body) {
         console.log('[proxy-image] ✅ Google proxy successful');
         res.set('Content-Type', g.headers.get('content-type') || 'image/jpeg');
@@ -848,7 +867,10 @@ app.get('/api/proxy-image', async (req, res) => {
     console.log('[proxy-image] Trying imgproxy.net...');
     const imgproxyUrl = `https://imgproxy.net/${encodeURIComponent(originalUrl)}`;
     try {
-      const imgproxy = await fetch(imgproxyUrl, { timeout: 15000 });
+      const controller4 = new AbortController();
+      const timeout4 = setTimeout(() => controller4.abort(), 15000);
+      const imgproxy = await fetch(imgproxyUrl, { signal: controller4.signal });
+      clearTimeout(timeout4);
       if (imgproxy && imgproxy.ok && imgproxy.body) {
         console.log('[proxy-image] ✅ Imgproxy successful');
         res.set('Content-Type', imgproxy.headers.get('content-type') || 'image/jpeg');
