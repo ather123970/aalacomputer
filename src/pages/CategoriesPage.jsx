@@ -168,7 +168,7 @@ const CategoriesPage = () => {
               >
                 {/* Gradient Header */}
                 <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-6 text-white">
-          -        <div className="flex itemscenter justify-between mb-3">
+                  <div className="flex items-center justify-between mb-3">
                     <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
                       <IconComponent className="w-6 h-6" />
                     </div>
@@ -177,7 +177,7 @@ const CategoriesPage = () => {
                       <div className="text-xs text-blue-100">Products</div>
                     </div>
                   </div>
-                  <h3 className="text-xl font-bold">{category.name}</h3>
+                  <h3 className="text-xl font-bold text-white">{category.name}</h3>
                 </div>
 
                 {/* Content */}

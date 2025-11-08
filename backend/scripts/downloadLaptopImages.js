@@ -84,7 +84,7 @@ async function downloadLaptopImages() {
       ]
     })
     .select('id name Name title img imageUrl')
-    .limit(50) // Download first 50 to test
+    // .limit(50) // Download ALL laptop images
     .lean();
 
     console.log(`Found ${laptops.length} laptops with external URLs\n`);
