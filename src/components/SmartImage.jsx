@@ -47,9 +47,19 @@ const SmartImage = ({
       imageUrl = `/${url}`;
     }
     
+    // In production, convert local paths to absolute URLs
+    // This is needed because the frontend is static and can't access backend paths directly
+    const isProduction = import.meta.env.PROD;
+    if (isProduction && imageUrl.startsWith('/') && !imageUrl.startsWith('//')) {
+      // Get the current origin (e.g., https://aalacomputer.onrender.com)
+      const baseUrl = window.location.origin;
+      imageUrl = `${baseUrl}${imageUrl}`;
+    }
+    
     // If proxy is requested for external images, use it
     if (useProxy && (url.startsWith('http://') || url.startsWith('https://'))) {
-      imageUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
+      const baseUrl = isProduction ? window.location.origin : '';
+      imageUrl = `${baseUrl}/api/proxy-image?url=${encodeURIComponent(url)}`;
     }
 
     // Check cache first for successful loads
@@ -103,7 +113,8 @@ const SmartImage = ({
         // Try with /images/ prefix if not already there
         if (!url.includes('/images/')) {
           const fileName = url.split('/').pop();
-          loadImage(`/images/${fileName}`, true);
+          const altPath = `/images/${fileName}`;
+          loadImage(altPath, true);
           return;
         }
       }
