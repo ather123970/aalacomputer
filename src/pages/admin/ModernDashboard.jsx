@@ -6,12 +6,14 @@ import {
 } from 'lucide-react';
 import { apiCall } from '../../config/api';
 import { useNavigate } from 'react-router-dom';
+import SmartImage from '../../components/SmartImage';
 
 const ModernDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [stats, setStats] = useState({
     totalProducts: 0,
+    totalCount: 0,
     lowStock: 0,
     topSellers: 0
   });
@@ -23,6 +25,8 @@ const ModernDashboard = () => {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('');
   const itemsPerPage = 32;
+  const [totalPages, setTotalPages] = useState(1);
+  const [searchDebounce, setSearchDebounce] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [formData, setFormData] = useState({
@@ -35,23 +39,55 @@ const ModernDashboard = () => {
   const [message, setMessage] = useState({ type: '', text: '' });
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(currentPage, searchTerm, selectedCategory, selectedBrand);
+  }, [currentPage, selectedCategory, selectedBrand]);
 
-  const loadData = async () => {
+  // Debounced search effect
+  useEffect(() => {
+    if (searchDebounce) clearTimeout(searchDebounce);
+    
+    const timeout = setTimeout(() => {
+      setCurrentPage(1);
+      loadData(1, searchTerm, selectedCategory, selectedBrand);
+    }, 500);
+    
+    setSearchDebounce(timeout);
+    
+    return () => clearTimeout(timeout);
+  }, [searchTerm]);
+
+  const loadData = async (page = 1, search = '', category = '', brand = '') => {
     setLoading(true);
     try {
-      // Fetch all products with limit
-      const productsData = await apiCall('/api/products?limit=100').catch(() => []);
-      const productsList = Array.isArray(productsData) ? productsData : [];
+      // Build query params for pagination and filters
+      const params = new URLSearchParams({
+        page: page,
+        limit: itemsPerPage,
+        ...(search && { search }),
+        ...(category && { category }),
+        ...(brand && { brand })
+      });
+      
+      // Fetch products with pagination from database
+      const response = await apiCall(`/api/v1/products?${params}`).catch(() => ({ products: [], total: 0 }));
+      const productsList = response.products || [];
+      const totalCount = response.total || 0;
       
       setProducts(productsList);
-      setTopProducts(productsList.slice(0, 5));
+      setTotalPages(response.totalPages || 1);
+      
+      // Fetch top products for dashboard
+      const topData = await apiCall('/api/v1/products?limit=5&sort=popular').catch(() => ({ products: [] }));
+      setTopProducts(topData.products || []);
+      
+      // Fetch actual stats from database
+      const statsResponse = await apiCall('/api/admin/stats').catch(() => null);
       
       setStats({
         totalProducts: productsList.length,
-        lowStock: productsList.filter(p => (p.stock || 0) < 10).length,
-        topSellers: 5
+        totalCount: totalCount,
+        lowStock: statsResponse?.lowStock || 0,
+        topSellers: topData.products?.length || 0
       });
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -190,17 +226,17 @@ const ModernDashboard = () => {
           <StatCard
             icon={Package}
             label="Total Products"
-            value={stats.totalProducts}
-            subtext="5056 low in stock"
+            value={stats.totalCount}
+            subtext={`${stats.lowStock} low in stock`}
             color="bg-gradient-to-br from-blue-500 to-blue-600"
           />
           <StatCard
             icon={TrendingUp}
             label="Low Stock Alert"
-            value={stats.totalProducts}
+            value={stats.lowStock}
             subtext="Products needing restock"
             color="bg-gradient-to-br from-orange-500 to-orange-600"
-            alert={true}
+            alert={stats.lowStock > 0}
           />
           <StatCard
             icon={ShoppingBag}
@@ -269,7 +305,7 @@ const ModernDashboard = () => {
                 {brands.map(brand => <option key={brand} value={brand}>{brand}</option>)}
               </select>
             </div>
-            <p className="text-sm text-gray-600">Total Products: <span className="font-bold text-gray-900">{products.filter(p => !searchTerm || (p.name || p.Name || '').toLowerCase().includes(searchTerm.toLowerCase())).filter(p => !selectedCategory || p.category === selectedCategory).filter(p => !selectedBrand || p.brand === selectedBrand).length}</span></p>
+            <p className="text-sm text-gray-600">Showing: <span className="font-bold text-gray-900">{products.length}</span> of <span className="font-bold text-gray-900">{stats.totalCount}</span> products</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -283,26 +319,17 @@ const ModernDashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {products
-                  .filter(p => 
-                    !searchTerm || 
-                    (p.name || p.Name || '').toLowerCase().includes(searchTerm.toLowerCase())
-                  )
-                  .filter(p => !selectedCategory || p.category === selectedCategory)
-                  .filter(p => !selectedBrand || p.brand === selectedBrand)
-                  .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                  .map(product => (
+                {products.map(product => (
                     <tr key={product._id || product.id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-                            <img 
-                              src={product.imageUrl || product.img || 'https://via.placeholder.com/48x48?text=No+Image'} 
+                          <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                            <SmartImage 
+                              src={product.imageUrl || product.img} 
                               alt={product.name || product.Name}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                e.target.src = 'https://via.placeholder.com/48x48/e5e7eb/9ca3af?text=No+Image';
-                              }}
+                              product={product}
+                              className="w-full h-full"
+                              loading="lazy"
                             />
                           </div>
                           <div className="min-w-0">
@@ -347,9 +374,9 @@ const ModernDashboard = () => {
             </table>
           </div>
           <div className="mt-6 flex items-center justify-between">
-            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-6 py-2 border border-gray-200 rounded-xl font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
-            <span className="text-sm text-gray-600">Page {currentPage} of {Math.ceil(products.filter(p => !searchTerm || (p.name || p.Name || '').toLowerCase().includes(searchTerm.toLowerCase())).filter(p => !selectedCategory || p.category === selectedCategory).filter(p => !selectedBrand || p.brand === selectedBrand).length / itemsPerPage)}</span>
-            <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage >= Math.ceil(products.filter(p => !searchTerm || (p.name || p.Name || '').toLowerCase().includes(searchTerm.toLowerCase())).filter(p => !selectedCategory || p.category === selectedCategory).filter(p => !selectedBrand || p.brand === selectedBrand).length / itemsPerPage)} className="px-6 py-2 border border-gray-200 rounded-xl font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1 || loading} className="px-6 py-2 border border-gray-200 rounded-xl font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Previous</button>
+            <span className="text-sm text-gray-600">Page {currentPage} of {totalPages}</span>
+            <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage >= totalPages || loading} className="px-6 py-2 border border-gray-200 rounded-xl font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Next</button>
           </div>
         </div>
       </div>

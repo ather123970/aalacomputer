@@ -71,7 +71,7 @@ const SmartImage = ({
         setLoadingState(false);
         setError(true);
       }
-    }, 10000); // 10 second timeout
+    }, 5000); // 5 second timeout (faster failover)
     
     img.onload = () => {
       clearTimeout(timeout);
@@ -85,17 +85,21 @@ const SmartImage = ({
     img.onerror = () => {
       clearTimeout(timeout);
       
-      // For external images, try with proxy first
+      // For external images, skip proxy in production and go straight to fallback
+      // Proxy is too slow/unreliable for production use
       if (!isRetry && (url.startsWith('http://') || url.startsWith('https://'))) {
-        console.log(`[SmartImage] External image failed, trying proxy: ${url}`);
-        const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
-        loadImage(proxyUrl, true);
+        console.log(`[SmartImage] External image failed: ${url}`);
+        // Skip proxy and use fallback immediately for better UX
+        const smartFallback = getSmartFallback(product);
+        setImageSrc(smartFallback);
+        setLoadingState(false);
+        setError(true);
         return;
       }
       
       // Try category-specific fallback
       const smartFallback = getSmartFallback(product);
-      console.log(`[SmartImage] All attempts failed, using smart fallback`);
+      console.log(`[SmartImage] Using smart fallback`);
       setImageSrc(smartFallback);
       setLoadingState(false);
       setError(true);

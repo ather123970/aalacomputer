@@ -405,25 +405,46 @@ app.get('/api/test-images', (req, res) => {
   
   if (fs.existsSync(zahImagesPath)) {
     const files = fs.readdirSync(zahImagesPath).slice(0, 10);
+    const totalCount = fs.readdirSync(zahImagesPath).length;
     imageDirectories.push({
       path: '/images (from zah_images)',
+      absolutePath: zahImagesPath,
       exists: true,
+      totalFiles: totalCount,
       sampleFiles: files.map(f => `/images/${f}`)
+    });
+  } else {
+    imageDirectories.push({
+      path: '/images (from zah_images)',
+      absolutePath: zahImagesPath,
+      exists: false,
+      error: 'Directory not found'
     });
   }
   
   if (fs.existsSync(imagesPath)) {
     const files = fs.readdirSync(imagesPath).slice(0, 10);
+    const totalCount = fs.readdirSync(imagesPath).length;
     imageDirectories.push({
       path: '/images (from images folder)',
+      absolutePath: imagesPath,
       exists: true,
+      totalFiles: totalCount,
       sampleFiles: files.map(f => `/images/${f}`)
+    });
+  } else {
+    imageDirectories.push({
+      path: '/images (from images folder)',
+      absolutePath: imagesPath,
+      exists: false,
+      error: 'Directory not found'
     });
   }
   
   if (fs.existsSync(publicPath)) {
     imageDirectories.push({
       path: '/public',
+      absolutePath: publicPath,
       exists: true,
       note: 'Static assets served from public/'
     });
@@ -431,21 +452,33 @@ app.get('/api/test-images', (req, res) => {
   
   if (fs.existsSync(uploadsPath)) {
     const files = fs.readdirSync(uploadsPath).slice(0, 10);
+    const totalCount = fs.readdirSync(uploadsPath).length;
     imageDirectories.push({
       path: '/uploads',
+      absolutePath: uploadsPath,
       exists: true,
+      totalFiles: totalCount,
       sampleFiles: files.map(f => `/uploads/${f}`)
     });
   }
   
+  // Check if dist directory exists
+  const distPath = path.join(__dirname, '..', 'dist');
+  const distExists = fs.existsSync(distPath);
+  
   res.json({
     ok: true,
-    message: 'Image serving status',
+    message: 'Image serving status in production',
+    environment: process.env.NODE_ENV || 'development',
     directories: imageDirectories,
+    distDirectory: {
+      path: distPath,
+      exists: distExists
+    },
     testUrls: [
-      'http://localhost:10000/images/placeholder.png',
-      'http://localhost:10000/placeholder.svg',
-      'http://localhost:5173/images/placeholder.png (via Vite proxy)'
+      '/images/placeholder.png',
+      '/placeholder.svg',
+      '/fallback/cpu.svg'
     ]
   });
 });
@@ -881,6 +914,44 @@ app.get('/api/v1/products', async (req, res) => {
     totalPages: Math.ceil(total / limit),
     hasMore: skip + paginatedProds.length < total
   });
+});
+
+// /api/admin/stats - Get admin dashboard statistics
+app.get('/api/admin/stats', async (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    const ProductModel = getProductModel();
+    
+    if (ProductModel && mongoose.connection.readyState === 1) {
+      // Get actual stats from database
+      const totalProducts = await ProductModel.countDocuments();
+      const lowStockProducts = await ProductModel.countDocuments({ 
+        $or: [
+          { stock: { $exists: true, $lt: 10 } },
+          { stock: { $exists: false } }
+        ]
+      });
+      
+      return res.json({
+        ok: true,
+        totalProducts,
+        lowStock: lowStockProducts,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // Fallback to file-based data
+    const products = readDataFile('products.json') || [];
+    return res.json({
+      ok: true,
+      totalProducts: products.length,
+      lowStock: products.filter(p => !p.stock || p.stock < 10).length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[admin/stats] Error:', error);
+    res.status(500).json({ ok: false, error: 'Failed to fetch stats' });
+  }
 });
 
 // ============================================================================
