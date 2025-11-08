@@ -708,7 +708,7 @@ app.get('/api/product-image/:productId', async (req, res) => {
                   ? new URL(imageUrl).origin + '/' 
                   : undefined
               },
-              timeout: 10000
+              timeout: 30000 // 30 seconds for production environments (Render is slower)
             });
             
             if (imageResponse.ok && imageResponse.body) {

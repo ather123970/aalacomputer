@@ -74,8 +74,12 @@ const SmartImage = ({
     const img = new Image();
     
     // Set timeout for slow-loading images
+    // Use longer timeout for product-image API (backend needs time to fetch), shorter for direct loads
+    const isApiCall = imageUrl.includes('/api/product-image/');
+    const timeoutDuration = isApiCall ? 35000 : 3000; // 35s for API (allows backend 30s fetch), 3s for direct
+    
     const timeout = setTimeout(() => {
-      console.warn(`[SmartImage] ⏱️ Image load timeout for ${imageUrl}`);
+      console.warn(`[SmartImage] ⏱️ Image load timeout after ${timeoutDuration}ms for ${imageUrl.substring(0, 80)}...`);
       img.src = ''; // Cancel loading
       
       // Try product-image API if not already tried
@@ -92,7 +96,7 @@ const SmartImage = ({
       setImageSrc(smartFallback);
       setLoadingState(false);
       setError(true);
-    }, 3000); // 3 second timeout (faster failover)
+    }, timeoutDuration);
     
     img.onload = () => {
       clearTimeout(timeout);
