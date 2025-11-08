@@ -1906,7 +1906,8 @@ app.get('/api/admin/products', async (req, res) => {
 
 // Get single product by ID (PUBLIC - OPTIMIZED for fast loading)
 app.get('/api/product/:id', (req, res) => {
-  res.setHeader('Cache-Control', 'public, max-age=600'); // Cache for 10 minutes
+  // Short cache to show admin updates quickly
+  res.setHeader('Cache-Control', 'public, max-age=30, must-revalidate'); // Cache for 30 seconds only
   
   const id = req.params.id;
   try {

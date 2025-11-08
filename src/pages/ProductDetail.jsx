@@ -45,6 +45,9 @@ const ProductDetail = () => {
           const foundProduct = await response.json();
           
           if (foundProduct) {
+            // CRITICAL: Prioritize imageUrl (what admin updates) over img field
+            const imageToUse = foundProduct.imageUrl || foundProduct.image || foundProduct.img;
+            
             const productData = {
               id: foundProduct._id || foundProduct.id,
               _id: foundProduct._id || foundProduct.id,
@@ -52,8 +55,8 @@ const ProductDetail = () => {
               name: foundProduct.name || foundProduct.title || foundProduct.Name,
               title: foundProduct.name || foundProduct.title,
               price: foundProduct.price,
-              img: foundProduct.imageUrl || foundProduct.img || foundProduct.image,
-              imageUrl: foundProduct.imageUrl || foundProduct.img || foundProduct.image,
+              img: imageToUse,
+              imageUrl: imageToUse,
               Spec: foundProduct.Spec || foundProduct.specs || [],
               description: foundProduct.description,
               category: foundProduct.category,
@@ -187,7 +190,7 @@ const ProductDetail = () => {
             <div className="flex items-center justify-center bg-card rounded-xl p-6 sm:p-8">
               {product ? (
                 <SmartImage
-                  src={product.img || product.imageUrl || product.image}
+                  src={product.imageUrl || product.img}
                   alt={product?.name || product?.Name || product?.title || 'Product image'}
                   product={product}
                   className="max-h-80 sm:max-h-[400px] w-full object-contain rounded-lg"
