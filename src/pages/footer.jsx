@@ -1,0 +1,172 @@
+import React, { useState, useEffect } from "react";
+import { Facebook, Instagram, Twitter, Youtube, ArrowUp } from "lucide-react";
+
+// TikTok icon component since it's not in lucide-react
+const TikTokIcon = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-.88-.05A6.33 6.33 0 0 0 5.16 20.5a6.33 6.33 0 0 0 10.86-4.43V7.83a8.24 8.24 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1.2-.26z"/>
+  </svg>
+);
+
+const Footer = () => {
+  const [showTopBtn, setShowTopBtn] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 300) setShowTopBtn(true);
+      else setShowTopBtn(false);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  return (
+    <>
+      {/* Footer */}
+      <footer className="bg-gradient-to-b from-black via-gray-900 to-black text-white py-14 px-6 md:px-20 relative">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between gap-12">
+          {/* Brand Section */}
+          <div className="md:w-1/3 space-y-4">
+            <div className="flex items-center gap-3">
+              <img
+                src="https://seeklogo.com/images/A/Ala-logo-9A7F5A0E9F-seeklogo.com.png"
+                alt="Aala Computers Logo"
+                className="w-10 h-10 rounded-full bg-white p-1"
+              />
+              <h1 className="text-2xl font-extrabold text-blue-500">
+                Aala Computers
+              </h1>
+            </div>
+
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Building your dream PCs with precision. From budget builds to
+              extreme setups — we deliver performance, reliability, and design
+              that stands out.
+            </p>
+
+            {/* Social Icons */}
+            <div className="flex gap-4 mt-3">
+              {[
+                { 
+                  Icon: TikTokIcon, 
+                  color: "hover:text-pink-400", 
+                  href: "https://www.tiktok.com/@aalacomputers",
+                  label: "TikTok"
+                },
+                { 
+                  Icon: Instagram, 
+                  color: "hover:text-pink-500", 
+                  href: "https://www.instagram.com/aalacomputers",
+                  label: "Instagram"
+                },
+                { 
+                  Icon: Facebook, 
+                  color: "hover:text-blue-500", 
+                  href: "https://www.facebook.com/aalacomputers",
+                  label: "Facebook"
+                },
+                { 
+                  Icon: Youtube, 
+                  color: "hover:text-red-500", 
+                  href: "https://www.youtube.com/@aalacomputers",
+                  label: "YouTube"
+                },
+              ].map(({ Icon, color, href, label }, i) => (
+                <a
+                  key={i}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`p-2 rounded-full bg-gray-800 hover:bg-gray-700 transition-colors ${color} group relative`}
+                  aria-label={label}
+                >
+                  <Icon size={18} />
+                  {/* Tooltip */}
+                  <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                    @aalacomputers
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick Links */}
+          <div className="md:w-1/3">
+            <h2 className="text-xl font-semibold mb-4 text-blue-500 relative inline-block">
+              Quick Links
+              <span className="absolute left-0 -bottom-1 w-16 h-[2px] bg-blue-500"></span>
+            </h2>
+            <ul className="space-y-2 text-gray-400">
+              {[
+                { name: "Home", href: "#home" },
+                { name: "About", href: "#about" },
+                { name: "Contact", href: "#contact" },
+                { name: "Category", href: "#category" },
+              ].map((link) => (
+                <li key={link.name}>
+                  <a
+                    href={link.href}
+                    className="hover:text-blue-400 transition-colors"
+                  >
+                    {link.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Contact Info */}
+          <div className="md:w-1/3 space-y-3">
+            <h2 className="text-xl font-semibold mb-2 text-blue-500 relative inline-block">
+              Contact
+              <span className="absolute left-0 -bottom-1 w-16 h-[2px] bg-blue-500"></span>
+            </h2>
+            <p className="text-gray-400 text-sm">
+              123 Tech Street, Karachi, Pakistan
+            </p>
+            <p className="text-gray-400 text-sm">
+              Email:{" "}
+              <a
+                href="mailto:info@aalacomputers.com"
+                className="hover:text-blue-400"
+              >
+                info@aalacomputers.com
+              </a>
+            </p>
+            <p className="text-gray-400 text-sm">
+              Phone:{" "}
+              <a href="tel:+923001234567" className="hover:text-blue-400">
+                +92 300 1234567
+              </a>
+            </p>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="border-t border-gray-700 mt-10 pt-5 text-center text-gray-500 text-sm">
+          &copy; {new Date().getFullYear()}{" "}
+          <span className="text-blue-400 font-semibold">Aala Computers</span>.
+          All rights reserved.
+        </div>
+      </footer>
+
+      {/* Back to Top Button */}
+      {showTopBtn && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-full shadow-lg animate-bounce transition-transform duration-300 hover:scale-110"
+          aria-label="Back to Top"
+        >
+          <ArrowUp size={20} />
+        </button>
+      )}
+    </>
+  );
+};
+
+export default Footer;

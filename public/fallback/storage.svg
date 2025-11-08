@@ -1,0 +1,28 @@
+<svg width="400" height="400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="storageGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ca8a04;stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:#fbbf24;stop-opacity:0.7" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#storageGrad)"/>
+  <!-- SSD/HDD Body -->
+  <rect x="90" y="120" width="220" height="160" fill="#854d0e" stroke="#ffffff" stroke-width="4" rx="8"/>
+  <!-- Circuit Board Pattern -->
+  <rect x="110" y="140" width="180" height="120" fill="#fbbf24" opacity="0.3"/>
+  <!-- Components -->
+  <rect x="130" y="160" width="40" height="30" fill="#ffffff" opacity="0.6"/>
+  <rect x="190" y="160" width="40" height="30" fill="#ffffff" opacity="0.6"/>
+  <rect x="250" y="160" width="40" height="30" fill="#ffffff" opacity="0.6"/>
+  <rect x="130" y="210" width="40" height="30" fill="#ffffff" opacity="0.6"/>
+  <rect x="190" y="210" width="40" height="30" fill="#ffffff" opacity="0.6"/>
+  <rect x="250" y="210" width="40" height="30" fill="#ffffff" opacity="0.6"/>
+  <!-- Connector -->
+  <rect x="310" y="180" width="20" height="40" fill="#ffffff" opacity="0.7"/>
+  <!-- LED Indicator -->
+  <circle cx="120" cy="150" r="5" fill="#22c55e"/>
+  <!-- Label -->
+  <text x="200" y="330" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle">
+    STORAGE
+  </text>
+</svg>
