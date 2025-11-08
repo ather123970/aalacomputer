@@ -643,6 +643,9 @@ const ProductModal = ({ product, onClose, onSave, categories = [] }) => {
     }
 
     try {
+      // Get the image URL - use whichever field has a value
+      const imageValue = formData.imageUrl || formData.img || '';
+      
       const payload = {
         ...formData,
         title,
@@ -650,8 +653,10 @@ const ProductModal = ({ product, onClose, onSave, categories = [] }) => {
         price,
         stock,
         sold,
-        imageUrl: formData.imageUrl || formData.img,
-        img: formData.img || formData.imageUrl,
+        // CRITICAL: Set BOTH img and imageUrl to the same value to ensure consistency
+        imageUrl: imageValue,
+        img: imageValue,
+        image: imageValue, // Some products might use 'image' field too
         specs: typeof formData.specs === 'string' ? formData.specs.split(',').map(s => s.trim()).filter(Boolean) : formData.specs || [],
         tags: typeof formData.tags === 'string' ? formData.tags.split(',').map(s => s.trim()).filter(Boolean) : formData.tags || []
       };
@@ -754,7 +759,19 @@ const ProductModal = ({ product, onClose, onSave, categories = [] }) => {
             </div>
             <div>
               <label className="text-sm text-gray-600">Image URL</label>
-              <input type="url" value={formData.img} onChange={e => setFormData({...formData, img: e.target.value})} className="w-full px-3 py-2 border rounded" placeholder="https://..." />
+              <input 
+                type="url" 
+                value={formData.img || formData.imageUrl || ''} 
+                onChange={e => setFormData({
+                  ...formData, 
+                  img: e.target.value,
+                  imageUrl: e.target.value,
+                  image: e.target.value
+                })} 
+                className="w-full px-3 py-2 border rounded" 
+                placeholder="https://zahcomputers.pk/..." 
+              />
+              <p className="text-xs text-gray-500 mt-1">Updates img, imageUrl, and image fields</p>
             </div>
           </div>
 

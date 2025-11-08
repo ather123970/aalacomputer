@@ -1364,7 +1364,11 @@ app.put('/api/admin/products/:id', async (req, res) => {
   const payload = req.body || {};
   console.log(`[products UPDATE] ========================================`);
   console.log(`[products UPDATE] PUT request for ID: ${id}`);
-  console.log(`[products UPDATE] Payload:`, JSON.stringify(payload, null, 2));
+  console.log(`[products UPDATE] Image fields in payload:`);
+  console.log(`  - img: ${payload.img || 'N/A'}`);
+  console.log(`  - imageUrl: ${payload.imageUrl || 'N/A'}`);
+  console.log(`  - image: ${payload.image || 'N/A'}`);
+  console.log(`[products UPDATE] Other fields: name=${payload.name || payload.title}, price=${payload.price}`);
   
   try {
     const mongoose = require('mongoose');
@@ -1445,8 +1449,16 @@ app.put('/api/admin/products/:id', async (req, res) => {
     const verifyDoc = await ProductModel.findById(doc._id).lean();
     if (verifyDoc) {
       console.log(`[products UPDATE] ✓ Verified - changes persisted to database`);
-      console.log(`[products UPDATE] Image URL in DB: ${verifyDoc.imageUrl || verifyDoc.img || 'N/A'}`);
+      console.log(`[products UPDATE] Image fields in DB after update:`);
+      console.log(`  - img: ${verifyDoc.img || 'N/A'}`);
+      console.log(`  - imageUrl: ${verifyDoc.imageUrl || 'N/A'}`);
+      console.log(`  - image: ${verifyDoc.image || 'N/A'}`);
       console.log(`[products UPDATE] Name in DB: ${verifyDoc.Name || verifyDoc.name || verifyDoc.title}`);
+      
+      // Check if all image fields are synced
+      const imgFields = [verifyDoc.img, verifyDoc.imageUrl, verifyDoc.image].filter(Boolean);
+      const allSynced = imgFields.length > 0 && imgFields.every(f => f === imgFields[0]);
+      console.log(`[products UPDATE] ${allSynced ? '✓' : '⚠️'} Image fields ${allSynced ? 'ARE' : 'ARE NOT'} synced`);
     } else {
       console.log(`[products UPDATE] ⚠️ WARNING: Could not verify update`);
     }
