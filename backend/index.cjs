@@ -755,6 +755,8 @@ app.get('/api/proxy-image', async (req, res) => {
   const originalUrl = req.query.url;
   if (!originalUrl) return res.status(400).send('Missing URL');
 
+  console.log(`[proxy-image] Request for: ${originalUrl}`);
+
   // Always set permissive CORS so the browser can use the response anywhere
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -767,48 +769,75 @@ app.get('/api/proxy-image', async (req, res) => {
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
       'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-      ...(originalUrl.includes('zahcomputers.pk') ? { 'Referer': 'https://zahcomputers.pk' } : {})
+      'Accept-Language': 'en-US,en;q=0.9',
+      ...(originalUrl.includes('zahcomputers.pk') ? { 
+        'Referer': 'https://zahcomputers.pk/',
+        'Origin': 'https://zahcomputers.pk'
+      } : {})
     };
 
-    // 1) Try direct fetch
-    let response = await fetch(originalUrl, { headers, timeout: 12000 });
+    // 1) Try direct fetch with proper headers
+    console.log('[proxy-image] Trying direct fetch...');
+    let response = await fetch(originalUrl, { headers, timeout: 15000 });
     if (response && response.ok && response.body) {
+      console.log('[proxy-image] ✅ Direct fetch successful');
       res.set('Content-Type', response.headers.get('content-type') || 'image/jpeg');
       return response.body.pipe(res);
     }
+    console.log('[proxy-image] ⚠️ Direct fetch failed');
 
     // 2) Fallback to images.weserv.nl (anonymous image proxy CDN)
-    const weservUrl = `https://images.weserv.nl/?url=${encodeURIComponent(originalUrl.replace(/^https?:\/\//, ''))}&output=jpg`;
+    console.log('[proxy-image] Trying weserv.nl proxy...');
+    const weservUrl = `https://images.weserv.nl/?url=${encodeURIComponent(originalUrl.replace(/^https?:\/\//, ''))}&output=jpg&q=85`;
     try {
-      const alt = await fetch(weservUrl, { timeout: 12000 });
+      const alt = await fetch(weservUrl, { timeout: 15000 });
       if (alt && alt.ok && alt.body) {
+        console.log('[proxy-image] ✅ Weserv proxy successful');
         res.set('Content-Type', alt.headers.get('content-type') || 'image/jpeg');
         return alt.body.pipe(res);
       }
     } catch (e) {
-      // ignore and try redirect
+      console.log('[proxy-image] ⚠️ Weserv proxy failed:', e.message);
     }
 
-    // 3) Try Googleusercontent gadgets proxy (often works for blocked origins)
+    // 3) Try Googleusercontent gadgets proxy
+    console.log('[proxy-image] Trying Google proxy...');
     const googleProxy = `https://images1-focus-opensocial.googleusercontent.com/gadgets/proxy?container=focus&refresh=86400&url=${encodeURIComponent(originalUrl)}`;
     try {
-      const g = await fetch(googleProxy, { timeout: 12000 });
+      const g = await fetch(googleProxy, { timeout: 15000 });
       if (g && g.ok && g.body) {
+        console.log('[proxy-image] ✅ Google proxy successful');
         res.set('Content-Type', g.headers.get('content-type') || 'image/jpeg');
         return g.body.pipe(res);
       }
     } catch (e) {
-      // ignore and try redirect
+      console.log('[proxy-image] ⚠️ Google proxy failed:', e.message);
     }
 
-    // 4) Redirect the client to weserv URL so the browser fetches it directly
+    // 4) Try imgproxy.net as last resort
+    console.log('[proxy-image] Trying imgproxy.net...');
+    const imgproxyUrl = `https://imgproxy.net/${encodeURIComponent(originalUrl)}`;
+    try {
+      const imgproxy = await fetch(imgproxyUrl, { timeout: 15000 });
+      if (imgproxy && imgproxy.ok && imgproxy.body) {
+        console.log('[proxy-image] ✅ Imgproxy successful');
+        res.set('Content-Type', imgproxy.headers.get('content-type') || 'image/jpeg');
+        return imgproxy.body.pipe(res);
+      }
+    } catch (e) {
+      console.log('[proxy-image] ⚠️ Imgproxy failed:', e.message);
+    }
+
+    // 5) Redirect the client to weserv URL as last attempt
+    console.log('[proxy-image] ⚠️ All proxies failed, redirecting to weserv');
     return res.redirect(302, weservUrl);
   } catch (err) {
-    console.error('[proxy-image] error:', err && (err.stack || err.message));
-    // 4) Absolute fallback: serve local placeholder so UI never breaks
+    console.error('[proxy-image] ❌ All methods failed:', err && (err.stack || err.message));
+    // Absolute fallback: serve local placeholder so UI never breaks
     try {
       const placeholder = path.join(__dirname, '..', 'images', 'placeholder.png');
       if (fs.existsSync(placeholder)) {
+        console.log('[proxy-image] Using local placeholder');
         res.set('Content-Type', 'image/png');
         return fs.createReadStream(placeholder).pipe(res);
       }

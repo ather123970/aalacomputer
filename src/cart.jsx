@@ -358,6 +358,7 @@ export default function Cart() {
                           <SmartImage 
                             src={item.img || item.imageUrl || item.image || '/placeholder.png'} 
                             alt={item.name || item.title || 'Product'} 
+                            product={item}
                             className="w-32 h-32 object-contain rounded-lg bg-gray-50 p-2"
                             fallback="/placeholder.png"
                           />
@@ -450,6 +451,7 @@ export default function Cart() {
                               <SmartImage 
                                 src={product.img || product.imageUrl || product.image || '/placeholder.png'} 
                                 alt={product.name || product.title || 'Bundle Product'} 
+                                product={product}
                                 className="w-full h-full object-contain rounded-lg bg-gray-50 p-2"
                                 fallback="/placeholder.png"
                               />

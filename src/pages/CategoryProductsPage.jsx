@@ -28,7 +28,7 @@ const ProductSkeleton = () => (
 const CategoryProductsPage = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const ITEMS_PER_PAGE = 24;
+  const ITEMS_PER_PAGE = 32;
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -71,16 +71,20 @@ const CategoryProductsPage = () => {
       
       setCategory(categoryInfo);
       
-      // Fetch products
+      // Fetch products - always start with page 1
       const result = await fetchCategoryProducts(slug, { 
         limit: ITEMS_PER_PAGE, 
         page: 1
       });
       
+      console.log(`[CategoryProducts] Loaded ${result.products?.length || 0} products for ${slug}`);
+      
       const newProducts = result.products || [];
       setProducts(newProducts);
       setTotalPages(Math.ceil((result.total || 0) / ITEMS_PER_PAGE));
-      setHasMore(result.hasMore || false);
+      setHasMore((result.products?.length || 0) >= ITEMS_PER_PAGE);
+      
+      console.log(`[CategoryProducts] Total: ${result.total}, Pages: ${Math.ceil((result.total || 0) / ITEMS_PER_PAGE)}, HasMore: ${(result.products?.length || 0) >= ITEMS_PER_PAGE}`);
       
       // Extract unique brands
       const brands = [...new Set(newProducts.map(p => p.brand).filter(Boolean))];
@@ -222,8 +226,9 @@ const CategoryProductsPage = () => {
     
     const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
     
-    // Load more when user scrolls to 80% of the page
-    if (scrollTop + clientHeight >= scrollHeight * 0.8) {
+    // Load more when user scrolls to 90% of the page (closer to bottom)
+    if (scrollTop + clientHeight >= scrollHeight * 0.9) {
+      console.log(`[CategoryProducts] Loading page ${currentPage + 1}...`);
       loadMoreProducts(currentPage + 1, true);
     }
   }, [loading, hasMore, currentPage, loadMoreProducts]);

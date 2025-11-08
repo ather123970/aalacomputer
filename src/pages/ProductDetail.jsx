@@ -185,38 +185,15 @@ const ProductDetail = () => {
           >
             {/* Image Section */}
             <div className="flex items-center justify-center bg-card rounded-xl p-6 sm:p-8">
-              {product && (() => {
-                // Smart image URL handling - supports both local and external
-                const rawImageUrl = product.img || product.imageUrl || product.image;
-                const finalImageUrl = getSmartImageUrl(rawImageUrl, '/placeholder.svg');
-                
-                return (
-                  <img
-                    src={finalImageUrl}
-                    alt={product?.name || product?.Name || product?.title || 'Product image'}
-                    className="max-h-80 sm:max-h-[400px] w-full object-contain rounded-lg"
-                    onError={(e) => {
-                      console.log('❌ Image failed to load:', e.target.src);
-                      // Try proxy for external images only
-                      if (isExternalImage(rawImageUrl)) {
-                        if (!e.target.src.includes('image-proxy')) {
-                          console.log('🔄 Trying backend proxy...');
-                          e.target.src = getProxyImageUrl(rawImageUrl, API_CONFIG.BASE_URL);
-                        } else {
-                          console.log('🖼️ Using placeholder');
-                          e.target.src = '/placeholder.svg';
-                        }
-                      } else {
-                        e.target.src = '/placeholder.svg';
-                      }
-                    }}
-                    onLoad={() => {
-                      console.log('✅ Image loaded successfully!');
-                    }}
-                  />
-                );
-              })()}
-              {!product && (
+              {product ? (
+                <SmartImage
+                  src={product.img || product.imageUrl || product.image}
+                  alt={product?.name || product?.Name || product?.title || 'Product image'}
+                  product={product}
+                  className="max-h-80 sm:max-h-[400px] w-full object-contain rounded-lg"
+                  fallback="/placeholder.svg"
+                />
+              ) : (
                 <div className="w-full h-80 bg-gray-200 rounded-lg flex items-center justify-center">
                   <span className="text-gray-500">Loading product...</span>
                 </div>
