@@ -47,13 +47,15 @@ const SmartImage = ({
       imageUrl = `/${url}`;
     }
     
-    // In production, convert local paths to absolute URLs
-    // This is needed because the frontend is static and can't access backend paths directly
-    const isProduction = import.meta.env.PROD;
+    // In production, always convert local paths to absolute URLs
+    // Check if we're in production by checking if hostname is not localhost
+    const isProduction = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
+    
     if (isProduction && imageUrl.startsWith('/') && !imageUrl.startsWith('//')) {
-      // Get the current origin (e.g., https://aalacomputer.onrender.com)
+      // Get the current origin (e.g., https://www.aalacomputer.com)
       const baseUrl = window.location.origin;
       imageUrl = `${baseUrl}${imageUrl}`;
+      console.log(`[SmartImage] Production mode - converted ${url} to ${imageUrl}`);
     }
     
     // If proxy is requested for external images, use it
