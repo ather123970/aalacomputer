@@ -41,15 +41,31 @@ const SmartImage = ({
       return;
     }
 
+    // ⚡ FAST FIX: For external URLs, skip direct load and use product-image API immediately
+    if (!isRetry && (url.startsWith('http://') || url.startsWith('https://'))) {
+      if (product?._id || product?.id) {
+        const productId = product._id || product.id;
+        const apiUrl = `/api/product-image/${productId}?t=${Date.now()}`;
+        console.log(`[SmartImage] 🚀 External URL detected, using product-image API: ${productId}`);
+        loadImage(apiUrl, true);
+        return;
+      }
+    }
+
     // If it's a relative path, ensure it starts with /
     let imageUrl = url;
     if (!url.startsWith('http') && !url.startsWith('/') && !url.startsWith('data:')) {
       imageUrl = `/${url}`;
     }
     
+    // Add cache-busting for non-cached requests to allow updates
+    if (!imageUrl.includes('?')) {
+      imageUrl = `${imageUrl}?t=${Date.now()}`;
+    }
+    
     // If proxy is requested for external images, use it
     if (useProxy && (url.startsWith('http://') || url.startsWith('https://'))) {
-      imageUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
+      imageUrl = `/api/proxy-image?url=${encodeURIComponent(url)}&t=${Date.now()}`;
     }
 
     // Check cache first for successful loads
@@ -66,17 +82,24 @@ const SmartImage = ({
     
     // Set timeout for slow-loading images
     const timeout = setTimeout(() => {
-      console.warn(`[SmartImage] Image load timeout for ${imageUrl}`);
+      console.warn(`[SmartImage] ⏱️ Image load timeout for ${imageUrl}`);
       img.src = ''; // Cancel loading
       
-      // Try fallback
-      if (!isRetry) {
-        const smartFallback = getSmartFallback(product);
-        setImageSrc(smartFallback);
-        setLoadingState(false);
-        setError(true);
+      // Try product-image API if not already tried
+      if (!isRetry && !imageUrl.includes('/api/product-image/') && (product?._id || product?.id)) {
+        const productId = product._id || product.id;
+        const apiUrl = `/api/product-image/${productId}?t=${Date.now()}`;
+        console.log(`[SmartImage] Timeout, trying product-image API: ${productId}`);
+        loadImage(apiUrl, true);
+        return;
       }
-    }, 5000); // 5 second timeout (faster failover)
+      
+      // Try fallback
+      const smartFallback = getSmartFallback(product);
+      setImageSrc(smartFallback);
+      setLoadingState(false);
+      setError(true);
+    }, 3000); // 3 second timeout (faster failover)
     
     img.onload = () => {
       clearTimeout(timeout);
@@ -88,21 +111,21 @@ const SmartImage = ({
     };
     
     img.onerror = () => {
-      console.log(`[SmartImage] Image failed to load: ${imageUrl}`);
+      clearTimeout(timeout);
+      console.log(`[SmartImage] ❌ Image failed to load: ${imageUrl}`);
       
-      // For external images (especially from zahcomputers.pk), use product-image API first
+      // Try product-image API if not already tried
+      if (!imageUrl.includes('/api/product-image/') && (product?._id || product?.id)) {
+        const productId = product._id || product.id;
+        const apiUrl = `/api/product-image/${productId}?t=${Date.now()}`;
+        console.log(`[SmartImage] 🔄 Trying product-image API: ${productId}`);
+        loadImage(apiUrl, true);
+        return;
+      }
+      
+      // For external images, try proxy as last resort
       if (!useProxy && (url.startsWith('http://') || url.startsWith('https://'))) {
-        // If we have a product ID, try the product-image API endpoint
-        if (product?._id || product?.id) {
-          const productId = product._id || product.id;
-          const apiUrl = `/api/product-image/${productId}`;
-          console.log(`[SmartImage] External image failed, trying product-image API: ${productId}`);
-          loadImage(apiUrl, true);
-          return;
-        }
-        
-        // Otherwise try proxy (but this usually fails too)
-        console.log(`[SmartImage] External image failed, trying proxy: ${url}`);
+        console.log(`[SmartImage] 🌐 Trying proxy for external URL`);
         loadImage(url, true, true);
         return;
       }

@@ -344,14 +344,14 @@ const publicImagesPath = path.join(publicPath, 'images');
 
 // Image serving configuration with proper CORS and headers
 const imageServeOptions = {
-  maxAge: '7d', // Cache images for 7 days
+  maxAge: '1h', // Cache images for 1 hour (allow faster updates)
   etag: true,
   lastModified: true,
   setHeaders: (res, filePath) => {
     // Set CORS headers for images
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 hour cache
     // Set proper content types
     if (filePath.endsWith('.png')) {
       res.setHeader('Content-Type', 'image/png');
@@ -564,7 +564,7 @@ app.get('/api/image-proxy', async (req, res) => {
     // Set appropriate headers
     res.set({
       'Content-Type': contentType || 'image/jpeg',
-      'Cache-Control': 'public, max-age=86400', // Cache for 24 hours
+      'Cache-Control': 'public, max-age=3600', // Cache for 1 hour (faster updates)
       'Access-Control-Allow-Origin': '*'
     });
     
@@ -645,11 +645,11 @@ function findLocalImageForProduct(productName) {
 app.get('/api/product-image/:productId', async (req, res) => {
   const { productId } = req.params;
   
-  // CORS + cache headers
+  // CORS + cache headers (1 hour for faster updates)
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type');
-  res.set('Cache-Control', 'public, max-age=86400');
+  res.set('Cache-Control', 'public, max-age=3600');
 
   try {
     const mongoose = require('mongoose');
@@ -762,7 +762,7 @@ app.get('/api/proxy-image', async (req, res) => {
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type');
   res.set('Timing-Allow-Origin', '*');
-  res.set('Cache-Control', 'public, max-age=86400');
+  res.set('Cache-Control', 'public, max-age=3600'); // 1 hour for faster updates
 
   try {
     const fetch = (await import('node-fetch')).default;
