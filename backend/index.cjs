@@ -683,18 +683,55 @@ app.get('/api/product-image/:productId', async (req, res) => {
           return fs.createReadStream(localImagePath).pipe(res);
         }
         
-        // SECOND: Check if product has a local path already
+        // SECOND: Check if product has a URL (local or external)
         let imageUrl = product.img || product.imageUrl;
         
         // Try images array if available
         if (!imageUrl && Array.isArray(product.images) && product.images.length > 0) {
-          const primaryImg = product.images.find(i => i.primary);
-          imageUrl = primaryImg?.url || product.images[0]?.url;
+          imageUrl = product.images[0].url || product.images[0];
         }
         
-        // If it's a local path (starts with /images/), serve it
-        if (imageUrl && imageUrl.startsWith('/images/')) {
-          const fileName = imageUrl.replace('/images/', '');
+        console.log(`[product-image] Product has imageUrl: ${imageUrl}`);
+        
+        // IMPORTANT: Check for external URLs FIRST (before local paths)
+        if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+          console.log(`[product-image] External URL detected, proxying: ${imageUrl}`);
+          
+          // Try to fetch the external image directly with proper headers
+          try {
+            const fetch = (await import('node-fetch')).default;
+            const imageResponse = await fetch(imageUrl, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+                'Referer': imageUrl.includes('acom.pk') || imageUrl.includes('zahcomputers.pk') 
+                  ? new URL(imageUrl).origin + '/' 
+                  : undefined
+              },
+              timeout: 10000
+            });
+            
+            if (imageResponse.ok && imageResponse.body) {
+              console.log(`[product-image] Successfully fetched external image`);
+              res.set('Content-Type', imageResponse.headers.get('content-type') || 'image/jpeg');
+              return imageResponse.body.pipe(res);
+            } else {
+              console.log(`[product-image] External fetch failed: ${imageResponse.status}, falling back to proxy`);
+            }
+          } catch (e) {
+            console.log(`[product-image] Direct fetch error: ${e.message}, trying proxy`);
+          }
+          
+          // Fallback to proxy endpoint
+          return res.redirect(302, `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`);
+        }
+        
+        // THIRD: If it's a local path (starts with /images/ or just filename), serve it
+        if (imageUrl && !imageUrl.startsWith('http')) {
+          const fileName = imageUrl.startsWith('/images/') 
+            ? imageUrl.replace('/images/', '') 
+            : imageUrl.replace(/^\//, '');
+            
           const localPaths = [
             path.join(__dirname, '..', 'dist', 'images', fileName),
             path.join(__dirname, '..', 'zah_images', fileName),
@@ -703,7 +740,7 @@ app.get('/api/product-image/:productId', async (req, res) => {
           
           for (const localPath of localPaths) {
             if (fs.existsSync(localPath)) {
-              console.log(`[product-image] ✅ Serving local file: ${fileName}`);
+              console.log(`[product-image] Serving local file: ${fileName}`);
               const ext = path.extname(localPath).toLowerCase();
               const contentType = {
                 '.jpg': 'image/jpeg',
@@ -717,13 +754,6 @@ app.get('/api/product-image/:productId', async (req, res) => {
               return fs.createReadStream(localPath).pipe(res);
             }
           }
-        }
-        
-        // THIRD: Try external URL as last resort (but this usually fails)
-        if (imageUrl && imageUrl.startsWith('http')) {
-          console.log(`[product-image] ⚠️ Trying external URL (may fail): ${imageUrl}`);
-          // Don't bother with external URLs that are known to fail
-          // Just go straight to fallback
         }
       }
     }
