@@ -1439,7 +1439,17 @@ app.put('/api/admin/products/:id', async (req, res) => {
     }
     
     console.log(`[products UPDATE] ✓✓✓ SUCCESS! Updated via ${method}`);
-    console.log(`[products UPDATE] Updated product:`, doc._id, doc.title || doc.name);
+    console.log(`[products UPDATE] Updated product:`, doc._id, doc.title || doc.name || doc.Name);
+    
+    // Verify the update by re-fetching from database
+    const verifyDoc = await ProductModel.findById(doc._id).lean();
+    if (verifyDoc) {
+      console.log(`[products UPDATE] ✓ Verified - changes persisted to database`);
+      console.log(`[products UPDATE] Image URL in DB: ${verifyDoc.imageUrl || verifyDoc.img || 'N/A'}`);
+      console.log(`[products UPDATE] Name in DB: ${verifyDoc.Name || verifyDoc.name || verifyDoc.title}`);
+    } else {
+      console.log(`[products UPDATE] ⚠️ WARNING: Could not verify update`);
+    }
     console.log(`[products UPDATE] ========================================`);
     
     // Clear cache headers to force image refresh on client
@@ -1453,7 +1463,8 @@ app.put('/api/admin/products/:id', async (req, res) => {
       ok: true, 
       product: doc, 
       message: `Updated via ${method}`,
-      timestamp: Date.now() // Help client bust image cache
+      timestamp: Date.now(), // Help client bust image cache
+      verified: !!verifyDoc
     });
     
   } catch (err) {
@@ -1798,18 +1809,31 @@ app.get('/api/admin/products', async (req, res) => {
         // Build query
         let query = {};
         
-        // Search across multiple fields
+        // Search across multiple fields including product ID
         if (search) {
-          query = {
-            $or: [
-              { name: { $regex: search, $options: 'i' } },
-              { title: { $regex: search, $options: 'i' } },
-              { Name: { $regex: search, $options: 'i' } },
-              { description: { $regex: search, $options: 'i' } },
-              { brand: { $regex: search, $options: 'i' } },
-              { category: { $regex: search, $options: 'i' } }
-            ]
-          };
+          const searchConditions = [
+            { name: { $regex: search, $options: 'i' } },
+            { title: { $regex: search, $options: 'i' } },
+            { Name: { $regex: search, $options: 'i' } },
+            { description: { $regex: search, $options: 'i' } },
+            { brand: { $regex: search, $options: 'i' } },
+            { category: { $regex: search, $options: 'i' } }
+          ];
+          
+          // Also search by product ID if search looks like an ID (contains letters/numbers)
+          if (search.length > 3) {
+            searchConditions.push({ id: { $regex: search, $options: 'i' } });
+            // Try exact _id match if it looks like a MongoDB ObjectId (24 hex chars)
+            if (/^[0-9a-fA-F]{24}$/.test(search)) {
+              try {
+                searchConditions.push({ _id: search });
+              } catch (e) {
+                // Invalid ObjectId format, skip
+              }
+            }
+          }
+          
+          query = { $or: searchConditions };
         }
         
         // Get total count
