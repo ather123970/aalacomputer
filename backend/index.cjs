@@ -1335,22 +1335,6 @@ function requireAdmin(req) {
   }
 }
 
-// List products
-app.get('/api/admin/products', (req, res) => {
-  if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
-  // If mongoose available, use DB
-  try {
-    const mongoose = require('mongoose');
-    const ProductModel = getProductModel();
-    if (ProductModel && mongoose.connection.readyState === 1) {
-      ProductModel.find({}).lean().sort({ createdAt: -1 }).then((docs) => res.json({ ok: true, products: docs })).catch(err => { console.error('[admin/products] product find failed', err && (err.stack || err.message)); res.status(500).json({ ok: false, error: 'db error' }); });
-      return;
-    }
-  } catch (e) { console.error('[admin/products] error', e && (e.stack || e.message)); }
-  const prods = readDataFile('products.json') || [];
-  res.json({ ok: true, products: prods });
-});
-
 // Update product by id (replace object) - DATABASE ONLY
 app.put('/api/admin/products/:id', async (req, res) => {
   if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
@@ -1656,21 +1640,19 @@ app.get('/api/products', (req, res) => {
       ProductModel.countDocuments(query).then(total => {
         // Use lean() for better performance and select only needed fields
         return ProductModel.find(query)
-          .select('id Name name title price img imageUrl category brand description WARRANTY link Spec type stock')
+          .select('id Name name title price img imageUrl image category brand description WARRANTY link Spec type stock')
           .lean()
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(limit)
-          .then((docs) => {
-            res.json({
-              products: docs,
-              total,
-              page,
-              limit,
-              totalPages: Math.ceil(total / limit),
-              hasMore: skip + docs.length < total
-            });
-          });
+          .then((docs) => res.json({
+            products: docs,
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+            hasMore: skip + docs.length < total
+          }));
       }).catch(err => { 
         console.error('[products] products list failed', err && (err.stack || err.message)); 
         res.status(500).json({ ok: false, error: 'db error' }); 
@@ -1751,7 +1733,7 @@ app.get('/api/admin/products', async (req, res) => {
     // Parse query parameters
     const limit = parseInt(req.query.limit) || 50; // Load 50 by default
     const page = parseInt(req.query.page) || 1;
-    const search = req.query.search || '';
+    const search = req.query.search || req.query.q || ''; // Support both 'search' and 'q' parameters
     const fetchAll = req.query.fetchAll === 'true'; // Fetch all products flag
     
     console.log(`[admin/products] limit=${limit}, page=${page}, search="${search}", fetchAll=${fetchAll}`);
