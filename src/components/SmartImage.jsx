@@ -47,21 +47,9 @@ const SmartImage = ({
       imageUrl = `/${url}`;
     }
     
-    // In production, always convert local paths to absolute URLs
-    // Check if we're in production by checking if hostname is not localhost
-    const isProduction = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
-    
-    if (isProduction && imageUrl.startsWith('/') && !imageUrl.startsWith('//')) {
-      // Get the current origin (e.g., https://www.aalacomputer.com)
-      const baseUrl = window.location.origin;
-      imageUrl = `${baseUrl}${imageUrl}`;
-      console.log(`[SmartImage] Production mode - converted ${url} to ${imageUrl}`);
-    }
-    
     // If proxy is requested for external images, use it
     if (useProxy && (url.startsWith('http://') || url.startsWith('https://'))) {
-      const baseUrl = isProduction ? window.location.origin : '';
-      imageUrl = `${baseUrl}/api/proxy-image?url=${encodeURIComponent(url)}`;
+      imageUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
     }
 
     // Check cache first for successful loads

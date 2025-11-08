@@ -367,7 +367,14 @@ const imageServeOptions = {
   }
 };
 
-// Serve from zah_images first (highest priority)
+// Serve from dist/images first (from build output)
+const distImagesPath = path.join(__dirname, '..', 'dist', 'images');
+if (fs.existsSync(distImagesPath)) {
+  app.use('/images', express.static(distImagesPath, imageServeOptions));
+  console.log('[server] ✅ serving /images from:', distImagesPath);
+}
+
+// Serve from zah_images (source folder)
 if (fs.existsSync(zahImagesPath)) {
   app.use('/images', express.static(zahImagesPath, imageServeOptions));
   console.log('[server] ✅ serving /images from:', zahImagesPath);
@@ -3129,7 +3136,11 @@ app.delete('/api/admin/deals/:id', (req, res) => {
 // Use a middleware approach that's more reliable
 app.use((req, res, next) => {
   // Only handle non-API routes and non-static file requests
-  if (!req.path.startsWith('/api') && !req.path.startsWith('/assets')) {
+  // Exclude: /api, /assets, /images, /uploads
+  if (!req.path.startsWith('/api') && 
+      !req.path.startsWith('/assets') && 
+      !req.path.startsWith('/images') && 
+      !req.path.startsWith('/uploads')) {
     const indexPath = path.join(__dirname, '..', 'dist', 'index.html');
     if (fs.existsSync(indexPath)) {
       return res.sendFile(indexPath);
