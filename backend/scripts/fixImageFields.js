@@ -22,12 +22,22 @@ const ProductSchemaDef = {
 
 async function fixImageFields() {
   try {
+    const mongoUri = process.env.MONGODB_URI;
+    
+    if (!mongoUri) {
+      console.error('❌ MONGODB_URI not found in environment variables!');
+      console.error('Please set MONGODB_URI in your .env file');
+      process.exit(1);
+    }
+    
     console.log('Connecting to MongoDB...');
-    await mongoose.connect(process.env.MONGODB_URI, {
+    console.log(`URI: ${mongoUri.substring(0, 30)}...`);
+    
+    await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true
     });
-    console.log('Connected!');
+    console.log('✅ Connected!');
 
     const schema = new mongoose.Schema(ProductSchemaDef, {
       timestamps: false,

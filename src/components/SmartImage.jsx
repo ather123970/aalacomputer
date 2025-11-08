@@ -77,12 +77,20 @@ const SmartImage = ({
     }
 
     // Check cache first for successful loads
+    // CRITICAL: Only use cache if the URL hasn't changed (admin might have updated it)
     const cachedUrl = imageCache.get(cacheKey);
-    if (cachedUrl && cachedUrl !== url) {
+    if (cachedUrl && cachedUrl === url) {
+      // URL matches cache - use cached version
       setImageSrc(cachedUrl);
       setLoadingState(false);
       setError(false);
       return;
+    } else if (cachedUrl && cachedUrl !== url) {
+      // URL changed - invalidate old cache entry
+      console.log(`[SmartImage] URL changed for ${cacheKey}, invalidating cache`);
+      console.log(`  Old: ${cachedUrl.substring(0, 60)}...`);
+      console.log(`  New: ${url.substring(0, 60)}...`);
+      imageCache.delete(cacheKey);
     }
 
     // Try to load the image
