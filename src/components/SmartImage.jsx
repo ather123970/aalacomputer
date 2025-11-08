@@ -41,10 +41,25 @@ const SmartImage = ({
       return;
     }
 
+    console.log(`[SmartImage] Loading image: ${url.substring(0, 80)}...`);
+    
+    // For laptop category products with external URLs, use API immediately (no direct load attempt)
+    // This avoids 3-second timeout delays for slow external sources
+    const isLaptopCategory = product?.category?.toLowerCase().includes('laptop') || 
+                             product?.name?.toLowerCase().includes('laptop') ||
+                             product?.Name?.toLowerCase().includes('laptop');
+    const isExternalUrl = url.startsWith('http://') || url.startsWith('https://');
+    
+    if (!isRetry && isLaptopCategory && isExternalUrl && (product?._id || product?.id)) {
+      const productId = product._id || product.id;
+      const apiUrl = `/api/product-image/${productId}?t=${Date.now()}`;
+      console.log(`[SmartImage] 🚀 Laptop product detected, using API directly: ${productId}`);
+      loadImage(apiUrl, true); // Use API with extended timeout
+      return;
+    }
+    
     // For external URLs from admin-added links, try direct load first
     // Only skip to API if it fails in onerror handler
-    console.log(`[SmartImage] Loading image: ${url.substring(0, 80)}...`);
-
     // If it's a relative path, ensure it starts with /
     let imageUrl = url;
     if (!url.startsWith('http') && !url.startsWith('/') && !url.startsWith('data:')) {
