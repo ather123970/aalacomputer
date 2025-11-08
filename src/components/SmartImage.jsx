@@ -41,16 +41,9 @@ const SmartImage = ({
       return;
     }
 
-    // ⚡ FAST FIX: For external URLs, skip direct load and use product-image API immediately
-    if (!isRetry && (url.startsWith('http://') || url.startsWith('https://'))) {
-      if (product?._id || product?.id) {
-        const productId = product._id || product.id;
-        const apiUrl = `/api/product-image/${productId}?t=${Date.now()}`;
-        console.log(`[SmartImage] 🚀 External URL detected, using product-image API: ${productId}`);
-        loadImage(apiUrl, true);
-        return;
-      }
-    }
+    // For external URLs from admin-added links, try direct load first
+    // Only skip to API if it fails in onerror handler
+    console.log(`[SmartImage] Loading image: ${url.substring(0, 80)}...`);
 
     // If it's a relative path, ensure it starts with /
     let imageUrl = url;
