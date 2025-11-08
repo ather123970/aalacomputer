@@ -100,28 +100,8 @@ const CategoryProductsPage = () => {
 
   const applyFilters = useCallback(() => {
     // Start with a fresh copy of products
+    // Note: API already returns category-specific products, so no need to filter by category again
     let filtered = [...products];
-
-    // Ensure we only show products from the correct category
-    if (category) {
-      const categoryName = category.name.toLowerCase();
-      filtered = filtered.filter(p => {
-        if (!p.category) return false;
-        
-        const productCategory = p.category.toLowerCase();
-        return (
-          productCategory === categoryName ||
-          productCategory.includes(categoryName) ||
-          productCategory.includes(slug.toLowerCase()) ||
-          (p.categories && 
-            Array.isArray(p.categories) && 
-            p.categories.some(cat => 
-              cat && cat.toLowerCase() === categoryName
-            )
-          )
-        );
-      });
-    }
 
     // Apply brand filter
     if (selectedBrand) {

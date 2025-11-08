@@ -14,7 +14,12 @@
       "2x 140mm Front, 1x 120mm Rear, 1x 120mm Top Fan Mounts",
       "USB 3.1 Gen 2 Type-C Port"
     ],
-    "tags": ["pc-case", "mid-tower", "rgb", "atx"],
+    "tags": [
+      "pc-case",
+      "mid-tower",
+      "rgb",
+      "atx"
+    ],
     "brand": "NZXT",
     "stock": 15,
     "sold": 8
@@ -34,7 +39,13 @@
       "1ms (GTG) response time",
       "G-SYNC compatible"
     ],
-    "tags": ["gaming", "monitor", "1440p", "165hz", "ips"],
+    "tags": [
+      "gaming",
+      "monitor",
+      "1440p",
+      "165hz",
+      "ips"
+    ],
     "brand": "ASUS",
     "stock": 12,
     "sold": 5
@@ -54,7 +65,12 @@
       "16GB DDR5-4800MHz RAM",
       "1TB PCIe 4.0 NVMe SSD"
     ],
-    "tags": ["gaming", "laptop", "ryzen", "rtx-4060"],
+    "tags": [
+      "gaming",
+      "laptop",
+      "ryzen",
+      "rtx-4060"
+    ],
     "brand": "ASUS",
     "stock": 8,
     "sold": 3
@@ -74,7 +90,12 @@
       "Dual stereo microphones with noise reduction",
       "Universal clip fits laptops, monitors, or tripods"
     ],
-    "tags": ["webcam", "1080p", "video-call", "logitech"],
+    "tags": [
+      "webcam",
+      "1080p",
+      "video-call",
+      "logitech"
+    ],
     "brand": "Logitech",
     "stock": 20,
     "sold": 12
@@ -94,7 +115,13 @@
       "Supports up to E-ATX motherboards",
       "3x 120mm RGB fans included"
     ],
-    "tags": ["pc-case", "mid-tower", "razer", "rgb", "atx"],
+    "tags": [
+      "pc-case",
+      "mid-tower",
+      "razer",
+      "rgb",
+      "atx"
+    ],
     "brand": "Lian Li",
     "stock": 10,
     "sold": 5
@@ -114,7 +141,13 @@
       "AMD FreeSync technology",
       "99% sRGB color coverage"
     ],
-    "tags": ["4k", "monitor", "uhd", "dell", "ips"],
+    "tags": [
+      "4k",
+      "monitor",
+      "uhd",
+      "dell",
+      "ips"
+    ],
     "brand": "Dell",
     "stock": 18,
     "sold": 7

@@ -32,7 +32,7 @@ const SmartImage = ({
   }, [src, product]);
   
   // Handle image loading with retry logic
-  const loadImage = useCallback((url, isRetry = false) => {
+  const loadImage = useCallback((url, isRetry = false, useProxy = false) => {
     // Validate URL
     if (!url || url === 'undefined' || url === 'null' || url === '' || url === ' ') {
       const smartFallback = getSmartFallback(product);
@@ -45,6 +45,11 @@ const SmartImage = ({
     let imageUrl = url;
     if (!url.startsWith('http') && !url.startsWith('/') && !url.startsWith('data:')) {
       imageUrl = `/${url}`;
+    }
+    
+    // If proxy is requested for external images, use it
+    if (useProxy && (url.startsWith('http://') || url.startsWith('https://'))) {
+      imageUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
     }
 
     // Check cache first for successful loads
@@ -85,21 +90,27 @@ const SmartImage = ({
     img.onerror = () => {
       clearTimeout(timeout);
       
-      // For external images, skip proxy in production and go straight to fallback
-      // Proxy is too slow/unreliable for production use
-      if (!isRetry && (url.startsWith('http://') || url.startsWith('https://'))) {
-        console.log(`[SmartImage] External image failed: ${url}`);
-        // Skip proxy and use fallback immediately for better UX
-        const smartFallback = getSmartFallback(product);
-        setImageSrc(smartFallback);
-        setLoadingState(false);
-        setError(true);
+      // For external images, try proxy if not already using it
+      if (!useProxy && !isRetry && (url.startsWith('http://') || url.startsWith('https://'))) {
+        console.log(`[SmartImage] External image failed, trying proxy: ${url}`);
+        loadImage(url, true, true);
         return;
       }
       
-      // Try category-specific fallback
+      // For local images that failed, try different paths
+      if (!isRetry && !url.startsWith('http')) {
+        console.log(`[SmartImage] Local image failed, trying alternative: ${url}`);
+        // Try with /images/ prefix if not already there
+        if (!url.includes('/images/')) {
+          const fileName = url.split('/').pop();
+          loadImage(`/images/${fileName}`, true);
+          return;
+        }
+      }
+      
+      // All attempts failed - use smart fallback
       const smartFallback = getSmartFallback(product);
-      console.log(`[SmartImage] Using smart fallback`);
+      console.log(`[SmartImage] All attempts failed, using smart fallback`);
       setImageSrc(smartFallback);
       setLoadingState(false);
       setError(true);

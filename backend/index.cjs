@@ -1322,6 +1322,7 @@ app.post('/api/admin/products', async (req, res) => {
         // Create product document
         const doc = new ProductModel({
           id,
+          brand: payload.brand || '',
           name: payload.name || payload.title,
           title: payload.title || payload.name,
           price: Number(payload.price),
@@ -1329,6 +1330,8 @@ app.post('/api/admin/products', async (req, res) => {
           description: payload.description || '',
           img: payload.img || payload.imageUrl || '',
           imageUrl: payload.imageUrl || payload.img || '',
+          WARRANTY: payload.WARRANTY || '1 Year',
+          link: payload.link || '',
           specs: Array.isArray(payload.specs) ? payload.specs : [],
           tags: Array.isArray(payload.tags) ? payload.tags : [],
           stock: Number(payload.stock) || 0,
@@ -1475,20 +1478,29 @@ app.get('/api/products', (req, res) => {
         ];
       }
       
-      // Use lean() for better performance and select only needed fields
-      ProductModel.find(query)
-        .select('id Name name title price img imageUrl category brand description WARRANTY link Spec type')
-        .lean()
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .then((docs) => {
-          res.json(docs);
-        })
-        .catch(err => { 
-          console.error('[products] products list failed', err && (err.stack || err.message)); 
-          res.status(500).json({ ok: false, error: 'db error' }); 
-        });
+      // Count total documents for pagination
+      ProductModel.countDocuments(query).then(total => {
+        // Use lean() for better performance and select only needed fields
+        return ProductModel.find(query)
+          .select('id Name name title price img imageUrl category brand description WARRANTY link Spec type stock')
+          .lean()
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .then((docs) => {
+            res.json({
+              products: docs,
+              total,
+              page,
+              limit,
+              totalPages: Math.ceil(total / limit),
+              hasMore: skip + docs.length < total
+            });
+          });
+      }).catch(err => { 
+        console.error('[products] products list failed', err && (err.stack || err.message)); 
+        res.status(500).json({ ok: false, error: 'db error' }); 
+      });
       return;
     }
   } catch (e) { 
@@ -1538,8 +1550,17 @@ app.get('/api/products', (req, res) => {
     });
   }
   
+  const total = prods.length;
   const paginatedProds = prods.slice(skip, skip + limit);
-  res.json(paginatedProds);
+  
+  res.json({
+    products: paginatedProds,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+    hasMore: skip + paginatedProds.length < total
+  });
 });
 
 // List all products (PROTECTED - for admin dashboard)

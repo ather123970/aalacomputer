@@ -164,7 +164,7 @@ const Products = () => {
           });
           
           // Add filters if they exist
-          if (selectedCategory && selectedCategory !== "All") {
+          if (selectedCategory && selectedCategory !== "All" && selectedCategory !== "All Products") {
             queryParams.append('category', selectedCategory);
           }
           if (selectedBrand) {
