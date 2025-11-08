@@ -367,17 +367,25 @@ const imageServeOptions = {
   }
 };
 
-// Serve from dist/images first (from build output)
+// Serve from dist/images first (from build output) - HIGHEST PRIORITY for production
 const distImagesPath = path.join(__dirname, '..', 'dist', 'images');
+console.log('[server] Checking for dist/images at:', distImagesPath);
 if (fs.existsSync(distImagesPath)) {
+  const imageCount = fs.readdirSync(distImagesPath).length;
   app.use('/images', express.static(distImagesPath, imageServeOptions));
-  console.log('[server] ✅ serving /images from:', distImagesPath);
+  console.log(`[server] ✅ serving /images from dist/images (${imageCount} files)`);
+} else {
+  console.log('[server] ⚠️ dist/images not found - will try other sources');
 }
 
-// Serve from zah_images (source folder)
+// Serve from zah_images (source folder) - FALLBACK
+console.log('[server] Checking for zah_images at:', zahImagesPath);
 if (fs.existsSync(zahImagesPath)) {
+  const imageCount = fs.readdirSync(zahImagesPath).length;
   app.use('/images', express.static(zahImagesPath, imageServeOptions));
-  console.log('[server] ✅ serving /images from:', zahImagesPath);
+  console.log(`[server] ✅ serving /images from zah_images (${imageCount} files)`);
+} else {
+  console.log('[server] ⚠️ zah_images not found');
 }
 
 // Serve from images folder
