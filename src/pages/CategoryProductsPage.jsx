@@ -81,6 +81,7 @@ const CategoryProductsPage = () => {
       
       const newProducts = result.products || [];
       setProducts(newProducts);
+      setFilteredProducts(newProducts); // Set immediately so products show on initial load
       setTotalPages(Math.ceil((result.total || 0) / ITEMS_PER_PAGE));
       setHasMore((result.products?.length || 0) >= ITEMS_PER_PAGE);
       
@@ -258,7 +259,7 @@ const CategoryProductsPage = () => {
         
         <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-            {[...Array(8)].map((_, i) => (
+            {[...Array(32)].map((_, i) => (
               <ProductSkeleton key={i} />
             ))}
           </div>
