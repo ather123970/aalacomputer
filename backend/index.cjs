@@ -588,6 +588,59 @@ app.get('/api/deployment-version', (req, res) => {
   });
 });
 
+// Helper function to find local image by product name
+function findLocalImageForProduct(productName) {
+  if (!productName) return null;
+  
+  const zahImagesPath = path.join(__dirname, '..', 'zah_images');
+  const distImagesPath = path.join(__dirname, '..', 'dist', 'images');
+  
+  const normalizeText = (text) => text.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const normalizedProductName = normalizeText(productName);
+  
+  // Check both directories
+  const searchDirs = [distImagesPath, zahImagesPath].filter(dir => fs.existsSync(dir));
+  
+  for (const dir of searchDirs) {
+    try {
+      const files = fs.readdirSync(dir).filter(f => 
+        f.endsWith('.jpg') || f.endsWith('.jpeg') || f.endsWith('.png') || f.endsWith('.webp')
+      );
+      
+      // Try exact match first
+      for (const file of files) {
+        const fileNameWithoutExt = file.replace(/\.(jpg|jpeg|png|webp)$/i, '');
+        const normalizedFileName = normalizeText(fileNameWithoutExt);
+        
+        if (normalizedFileName === normalizedProductName) {
+          return path.join(dir, file);
+        }
+      }
+      
+      // Try partial match (60% of words match)
+      for (const file of files) {
+        const fileNameWithoutExt = file.replace(/\.(jpg|jpeg|png|webp)$/i, '');
+        const normalizedFileName = normalizeText(fileNameWithoutExt);
+        
+        const fileWords = normalizedFileName.split(' ').filter(w => w.length > 3);
+        const productWords = normalizedProductName.split(' ').filter(w => w.length > 3);
+        
+        const matchingWords = fileWords.filter(word => 
+          productWords.some(pw => pw.includes(word) || word.includes(pw))
+        );
+        
+        if (matchingWords.length >= Math.floor(fileWords.length * 0.6) && matchingWords.length >= 2) {
+          return path.join(dir, file);
+        }
+      }
+    } catch (e) {
+      continue;
+    }
+  }
+  
+  return null;
+}
+
 // Simple image proxy - fetches image from DB URL and serves it
 app.get('/api/product-image/:productId', async (req, res) => {
   const { productId } = req.params;
@@ -609,10 +662,28 @@ app.get('/api/product-image/:productId', async (req, res) => {
           { _id: productId },
           { id: productId }
         ]
-      }).select('img imageUrl images').lean();
+      }).select('img imageUrl images Name name title').lean();
       
       if (product) {
-        // Get image URL from product
+        const productName = product.Name || product.name || product.title;
+        
+        // FIRST: Try to find local image by product name
+        const localImagePath = findLocalImageForProduct(productName);
+        if (localImagePath && fs.existsSync(localImagePath)) {
+          console.log(`[product-image] ✅ Serving local image for: ${productName}`);
+          const ext = path.extname(localImagePath).toLowerCase();
+          const contentType = {
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.webp': 'image/webp'
+          }[ext] || 'image/jpeg';
+          
+          res.set('Content-Type', contentType);
+          return fs.createReadStream(localImagePath).pipe(res);
+        }
+        
+        // SECOND: Check if product has a local path already
         let imageUrl = product.img || product.imageUrl;
         
         // Try images array if available
@@ -621,31 +692,48 @@ app.get('/api/product-image/:productId', async (req, res) => {
           imageUrl = primaryImg?.url || product.images[0]?.url;
         }
         
-        if (imageUrl && imageUrl.startsWith('http')) {
-          // Proxy the image from zahcomputers or other source
-          const fetch = (await import('node-fetch')).default;
-          const imgRes = await fetch(imageUrl, {
-            timeout: 15000,
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-              'Referer': 'https://zahcomputers.pk/'
-            }
-          });
+        // If it's a local path (starts with /images/), serve it
+        if (imageUrl && imageUrl.startsWith('/images/')) {
+          const fileName = imageUrl.replace('/images/', '');
+          const localPaths = [
+            path.join(__dirname, '..', 'dist', 'images', fileName),
+            path.join(__dirname, '..', 'zah_images', fileName),
+            path.join(__dirname, '..', 'images', fileName)
+          ];
           
-          if (imgRes && imgRes.ok && imgRes.body) {
-            const ct = imgRes.headers.get('content-type') || 'image/jpeg';
-            res.set('Content-Type', ct);
-            return imgRes.body.pipe(res);
+          for (const localPath of localPaths) {
+            if (fs.existsSync(localPath)) {
+              console.log(`[product-image] ✅ Serving local file: ${fileName}`);
+              const ext = path.extname(localPath).toLowerCase();
+              const contentType = {
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.png': 'image/png',
+                '.webp': 'image/webp',
+                '.svg': 'image/svg+xml'
+              }[ext] || 'image/jpeg';
+              
+              res.set('Content-Type', contentType);
+              return fs.createReadStream(localPath).pipe(res);
+            }
           }
+        }
+        
+        // THIRD: Try external URL as last resort (but this usually fails)
+        if (imageUrl && imageUrl.startsWith('http')) {
+          console.log(`[product-image] ⚠️ Trying external URL (may fail): ${imageUrl}`);
+          // Don't bother with external URLs that are known to fail
+          // Just go straight to fallback
         }
       }
     }
   } catch (err) {
-    console.warn('Product image fetch failed:', err.message);
+    console.warn('[product-image] Error:', err.message);
   }
 
   // Fallback to placeholder
   try {
+    console.log(`[product-image] ⚠️ Using placeholder for product: ${req.params.productId}`);
     res.status(200);
     const png = path.join(__dirname, '..', 'images', 'placeholder.png');
     const svg = path.join(__dirname, '..', 'images', 'placeholder.svg');

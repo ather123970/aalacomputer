@@ -88,23 +88,42 @@ const SmartImage = ({
     };
     
     img.onerror = () => {
-      clearTimeout(timeout);
+      console.log(`[SmartImage] Image failed to load: ${imageUrl}`);
       
-      // For external images, try proxy if not already using it
-      if (!useProxy && !isRetry && (url.startsWith('http://') || url.startsWith('https://'))) {
+      // For external images (especially from zahcomputers.pk), use product-image API first
+      if (!useProxy && (url.startsWith('http://') || url.startsWith('https://'))) {
+        // If we have a product ID, try the product-image API endpoint
+        if (product?._id || product?.id) {
+          const productId = product._id || product.id;
+          const apiUrl = `/api/product-image/${productId}`;
+          console.log(`[SmartImage] External image failed, trying product-image API: ${productId}`);
+          loadImage(apiUrl, true);
+          return;
+        }
+        
+        // Otherwise try proxy (but this usually fails too)
         console.log(`[SmartImage] External image failed, trying proxy: ${url}`);
         loadImage(url, true, true);
         return;
       }
       
       // For local images that failed, try different paths
-      if (!isRetry && !url.startsWith('http')) {
+      if (!isRetry && !url.startsWith('http') && !url.includes('/api/product-image/')) {
         console.log(`[SmartImage] Local image failed, trying alternative: ${url}`);
         // Try with /images/ prefix if not already there
         if (!url.includes('/images/')) {
           const fileName = url.split('/').pop();
           const altPath = `/images/${fileName}`;
           loadImage(altPath, true);
+          return;
+        }
+        
+        // If /images/ path failed and we have a product, try product-image API
+        if (product?._id || product?.id) {
+          const productId = product._id || product.id;
+          const apiUrl = `/api/product-image/${productId}`;
+          console.log(`[SmartImage] Local path failed, trying product-image API: ${productId}`);
+          loadImage(apiUrl, true);
           return;
         }
       }
