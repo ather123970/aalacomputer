@@ -645,6 +645,9 @@ function findLocalImageForProduct(productName) {
 app.get('/api/product-image/:productId', async (req, res) => {
   const { productId } = req.params;
   
+  console.log(`[product-image] 🔍 Request for product ID: ${productId.substring(0, 80)}${productId.length > 80 ? '...' : ''}`);
+  console.log(`[product-image] ID length: ${productId.length} characters`);
+  
   // CORS + cache headers (1 hour for faster updates)
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -666,8 +669,10 @@ app.get('/api/product-image/:productId', async (req, res) => {
       
       if (product) {
         const productName = product.Name || product.name || product.title;
+        console.log(`[product-image] ✅ Found product: ${productName}`);
         
         // FIRST: Try to find local image by product name
+        console.log(`[product-image] Attempting local image match for: ${productName}`);
         const localImagePath = findLocalImageForProduct(productName);
         if (localImagePath && fs.existsSync(localImagePath)) {
           console.log(`[product-image] ✅ Serving local image for: ${productName}`);
@@ -691,15 +696,17 @@ app.get('/api/product-image/:productId', async (req, res) => {
           imageUrl = product.images[0].url || product.images[0];
         }
         
-        console.log(`[product-image] Product has imageUrl: ${imageUrl}`);
+        console.log(`[product-image] Product imageUrl: ${imageUrl ? imageUrl.substring(0, 100) + (imageUrl.length > 100 ? '...' : '') : 'NONE'}`);
         
         // IMPORTANT: Check for external URLs FIRST (before local paths)
         if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
-          console.log(`[product-image] External URL detected, proxying: ${imageUrl}`);
+          console.log(`[product-image] 🌐 External URL detected, attempting direct fetch...`);
+          console.log(`[product-image] URL: ${imageUrl.substring(0, 150)}...`);
           
           // Try to fetch the external image directly with proper headers
           try {
             const fetch = (await import('node-fetch')).default;
+            const startTime = Date.now();
             const imageResponse = await fetch(imageUrl, {
               headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -708,18 +715,23 @@ app.get('/api/product-image/:productId', async (req, res) => {
                   ? new URL(imageUrl).origin + '/' 
                   : undefined
               },
-              timeout: 10000
+              timeout: 20000 // Increased to 20 seconds for slow connections
             });
+            const fetchTime = Date.now() - startTime;
             
             if (imageResponse.ok && imageResponse.body) {
-              console.log(`[product-image] Successfully fetched external image`);
+              console.log(`[product-image] ✅ Successfully fetched external image in ${fetchTime}ms`);
+              console.log(`[product-image] Content-Type: ${imageResponse.headers.get('content-type')}`);
               res.set('Content-Type', imageResponse.headers.get('content-type') || 'image/jpeg');
               return imageResponse.body.pipe(res);
             } else {
-              console.log(`[product-image] External fetch failed: ${imageResponse.status}, falling back to proxy`);
+              console.log(`[product-image] ⚠️ External fetch failed: ${imageResponse.status} ${imageResponse.statusText}`);
+              console.log(`[product-image] Falling back to proxy endpoint...`);
             }
           } catch (e) {
-            console.log(`[product-image] Direct fetch error: ${e.message}, trying proxy`);
+            console.log(`[product-image] ❌ Direct fetch error: ${e.message}`);
+            console.log(`[product-image] Error type: ${e.name}`);
+            console.log(`[product-image] Trying proxy endpoint...`);
           }
           
           // Fallback to proxy endpoint
@@ -754,11 +766,18 @@ app.get('/api/product-image/:productId', async (req, res) => {
               return fs.createReadStream(localPath).pipe(res);
             }
           }
+        } else {
+          console.log(`[product-image] ⚠️ No valid image URL found for product`);
         }
+      } else {
+        console.log(`[product-image] ❌ Product not found in database with ID: ${productId.substring(0, 80)}...`);
       }
+    } else {
+      console.log(`[product-image] ⚠️ Database not available, using placeholder`);
     }
   } catch (err) {
-    console.warn('[product-image] Error:', err.message);
+    console.error('[product-image] ❌ Error:', err.message);
+    console.error('[product-image] Stack:', err.stack);
   }
 
   // Fallback to placeholder
