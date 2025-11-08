@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Test</title>
+</head>
+<body>
+    <h1>Direct Image Test</h1>
+    
+    <h2>Test 1: Direct Backend URL</h2>
+    <img src="http://localhost:10000/images/LIAN LI Uni Fan TL LCD 120mm ARGB 3 Pack Black.jpg" 
+         alt="Test 1" 
+         style="max-width: 300px; border: 2px solid green;"
+         onload="console.log('Test 1: Loaded from backend')"
+         onerror="console.error('Test 1: Failed from backend')">
+    
+    <h2>Test 2: Proxy URL (relative)</h2>
+    <img src="/images/LIAN LI Uni Fan TL LCD 120mm ARGB 3 Pack Black.jpg" 
+         alt="Test 2" 
+         style="max-width: 300px; border: 2px solid blue;"
+         onload="console.log('Test 2: Loaded via proxy')"
+         onerror="console.error('Test 2: Failed via proxy')">
+    
+    <h2>Test 3: URL Encoded</h2>
+    <img src="/images/LIAN%20LI%20Uni%20Fan%20TL%20LCD%20120mm%20ARGB%203%20Pack%20Black.jpg" 
+         alt="Test 3" 
+         style="max-width: 300px; border: 2px solid red;"
+         onload="console.log('Test 3: Loaded encoded')"
+         onerror="console.error('Test 3: Failed encoded')">
+    
+    <script>
+        console.log('Test page loaded');
+        console.log('Current URL:', window.location.href);
+    </script>
+</body>
+</html>

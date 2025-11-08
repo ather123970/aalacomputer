@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f5f5f5; }
+        .test { background: white; padding: 15px; margin: 10px 0; border-radius: 8px; }
+        .success { border-left: 4px solid #22c55e; }
+        .error { border-left: 4px solid #ef4444; }
+        pre { background: #f8f8f8; padding: 10px; overflow: auto; }
+    </style>
+</head>
+<body>
+    <h1>🧪 API Endpoint Tests</h1>
+    <div id="results"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:10000';
+        const results = document.getElementById('results');
+
+        async function testEndpoint(name, url) {
+            const div = document.createElement('div');
+            div.className = 'test';
+            div.innerHTML = `<h3>Testing: ${name}</h3><p>Loading...</p>`;
+            results.appendChild(div);
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                div.className = 'test success';
+                div.innerHTML = `
+                    <h3>✅ ${name}</h3>
+                    <p><strong>Status:</strong> ${response.status} ${response.statusText}</p>
+                    <p><strong>URL:</strong> ${url}</p>
+                    <pre>${JSON.stringify(data, null, 2).substring(0, 500)}...</pre>
+                `;
+            } catch (error) {
+                div.className = 'test error';
+                div.innerHTML = `
+                    <h3>❌ ${name}</h3>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <p><strong>URL:</strong> ${url}</p>
+                `;
+            }
+        }
+
+        // Run tests
+        (async () => {
+            await testEndpoint('Categories API', `${API_BASE}/api/categories`);
+            await testEndpoint('Dynamic Categories', `${API_BASE}/api/categories/dynamic`);
+            await testEndpoint('Laptops Category', `${API_BASE}/api/categories/laptops/products?limit=5`);
+            await testEndpoint('Graphics Cards', `${API_BASE}/api/categories/graphics-cards/products?limit=5`);
+            await testEndpoint('All Products', `${API_BASE}/api/products?limit=10`);
+        })();
+    </script>
+</body>
+</html>
