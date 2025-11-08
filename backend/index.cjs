@@ -667,7 +667,7 @@ app.get('/api/product-image/:productId', async (req, res) => {
       if (product) {
         const productName = product.Name || product.name || product.title;
         
-        // CRITICAL: Check database URL FIRST (admin might have updated it)
+        // STEP 1: Check database URL (imageUrl takes priority over img field)
         let imageUrl = product.imageUrl || product.img;
         
         // Try images array if available
@@ -677,7 +677,8 @@ app.get('/api/product-image/:productId', async (req, res) => {
         
         console.log(`[product-image] Product has imageUrl: ${imageUrl}`);
         
-        // IMPORTANT: Check for external URLs FIRST (before local paths)
+        // STEP 2: If it's an EXTERNAL URL (http/https), use database URL and fetch it
+        // This ensures admin updates with external URLs work immediately
         if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
           console.log(`[product-image] External URL detected, proxying: ${imageUrl}`);
           
@@ -720,7 +721,7 @@ app.get('/api/product-image/:productId', async (req, res) => {
           return res.redirect(302, `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`);
         }
         
-        // THIRD: If it's a local path (starts with /images/ or just filename), serve it
+        // STEP 3: If it's a local path (starts with /images/ or just filename), serve it
         if (imageUrl && !imageUrl.startsWith('http')) {
           const fileName = imageUrl.startsWith('/images/') 
             ? imageUrl.replace('/images/', '') 
@@ -734,7 +735,7 @@ app.get('/api/product-image/:productId', async (req, res) => {
           
           for (const localPath of localPaths) {
             if (fs.existsSync(localPath)) {
-              console.log(`[product-image] Serving local file: ${fileName}`);
+              console.log(`[product-image] ✅ Serving local file from path: ${fileName}`);
               const ext = path.extname(localPath).toLowerCase();
               const contentType = {
                 '.jpg': 'image/jpeg',
@@ -748,10 +749,13 @@ app.get('/api/product-image/:productId', async (req, res) => {
               return fs.createReadStream(localPath).pipe(res);
             }
           }
+          
+          // If local path doesn't exist, try finding by product name
+          console.log(`[product-image] Local path not found, trying by product name: ${productName}`);
         }
         
-        // FOURTH: If no URL in database, try to find local image by product name as last resort
-        if (!imageUrl) {
+        // STEP 4: Try to find local image by product name (for products with no URL or path not found)
+        if (!imageUrl || (imageUrl && !imageUrl.startsWith('http'))) {
           console.log(`[product-image] No URL in database, checking for local image by name: ${productName}`);
           const localImagePath = findLocalImageForProduct(productName);
           if (localImagePath && fs.existsSync(localImagePath)) {
