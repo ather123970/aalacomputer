@@ -14,9 +14,25 @@ const copyImagesPlugin = () => ({
     const zahImagesPath = path.resolve(__dirname, 'zah_images')
     const distImagesPath = path.resolve(__dirname, 'dist/images')
     
+    console.log('[copy-images] Starting image copy process...')
+    console.log('[copy-images] Source:', zahImagesPath)
+    console.log('[copy-images] Destination:', distImagesPath)
+    
     if (fs.existsSync(zahImagesPath)) {
-      await fs.copy(zahImagesPath, distImagesPath, { overwrite: true })
-      console.log('✅ Copied zah_images to dist/images')
+      try {
+        const sourceFiles = fs.readdirSync(zahImagesPath)
+        console.log(`[copy-images] Found ${sourceFiles.length} files in zah_images`)
+        
+        await fs.copy(zahImagesPath, distImagesPath, { overwrite: true })
+        
+        const copiedFiles = fs.readdirSync(distImagesPath)
+        console.log(`[copy-images] ✅ Successfully copied ${copiedFiles.length} images to dist/images`)
+      } catch (error) {
+        console.error('[copy-images] ❌ Error copying images:', error)
+        throw error
+      }
+    } else {
+      console.warn('[copy-images] ⚠️ Warning: zah_images folder not found at', zahImagesPath)
     }
   }
 })

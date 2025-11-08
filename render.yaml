@@ -3,7 +3,15 @@ services:
     name: aalacomputer
     env: node
     plan: free
-    buildCommand: npm install && npm run build
+    buildCommand: |
+      echo "Installing dependencies..."
+      npm install
+      echo "Building frontend and copying images..."
+      npm run build
+      echo "Verifying dist/images folder..."
+      ls -la dist/images | head -20 || echo "dist/images not found"
+      echo "Verifying zah_images folder..."
+      ls -la zah_images | head -20 || echo "zah_images not found"
     startCommand: node backend/index.cjs
     envVars:
       - key: NODE_ENV
