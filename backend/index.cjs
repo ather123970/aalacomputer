@@ -1960,31 +1960,42 @@ app.get('/api/admin/products', async (req, res) => {
         // Build query
         let query = {};
         
-        // Search across multiple fields including product ID
+        // Search across multiple fields - split search into words for better matching
         if (search) {
-          const searchConditions = [
-            { name: { $regex: search, $options: 'i' } },
-            { title: { $regex: search, $options: 'i' } },
-            { Name: { $regex: search, $options: 'i' } },
-            { description: { $regex: search, $options: 'i' } },
-            { brand: { $regex: search, $options: 'i' } },
-            { category: { $regex: search, $options: 'i' } }
-          ];
+          // Split search into individual words (minimum 1 character)
+          const searchWords = search.trim().split(/\s+/).filter(word => word.length > 0);
           
-          // Also search by product ID if search looks like an ID (contains letters/numbers)
-          if (search.length > 3) {
-            searchConditions.push({ id: { $regex: search, $options: 'i' } });
-            // Try exact _id match if it looks like a MongoDB ObjectId (24 hex chars)
-            if (/^[0-9a-fA-F]{24}$/.test(search)) {
-              try {
-                searchConditions.push({ _id: search });
-              } catch (e) {
-                // Invalid ObjectId format, skip
-              }
+          console.log(`[admin/products] Searching for words: ${JSON.stringify(searchWords)}`);
+          
+          // Create an array of conditions where ANY word matches ANY field
+          const searchConditions = [];
+          
+          // For each word, create conditions across all fields
+          searchWords.forEach(word => {
+            searchConditions.push(
+              { name: { $regex: word, $options: 'i' } },
+              { title: { $regex: word, $options: 'i' } },
+              { Name: { $regex: word, $options: 'i' } },
+              { description: { $regex: word, $options: 'i' } },
+              { brand: { $regex: word, $options: 'i' } },
+              { category: { $regex: word, $options: 'i' } },
+              { id: { $regex: word, $options: 'i' } }
+            );
+          });
+          
+          // Also try exact _id match if it looks like a MongoDB ObjectId (24 hex chars)
+          if (search.length === 24 && /^[0-9a-fA-F]{24}$/.test(search)) {
+            try {
+              searchConditions.push({ _id: search });
+            } catch (e) {
+              // Invalid ObjectId format, skip
             }
           }
           
+          // Match if ANY word matches ANY field
           query = { $or: searchConditions };
+          
+          console.log(`[admin/products] Search query created with ${searchConditions.length} conditions`);
         }
         
         // Get total count
