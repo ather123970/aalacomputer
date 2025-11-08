@@ -667,24 +667,8 @@ app.get('/api/product-image/:productId', async (req, res) => {
       if (product) {
         const productName = product.Name || product.name || product.title;
         
-        // FIRST: Try to find local image by product name
-        const localImagePath = findLocalImageForProduct(productName);
-        if (localImagePath && fs.existsSync(localImagePath)) {
-          console.log(`[product-image] ✅ Serving local image for: ${productName}`);
-          const ext = path.extname(localImagePath).toLowerCase();
-          const contentType = {
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-            '.png': 'image/png',
-            '.webp': 'image/webp'
-          }[ext] || 'image/jpeg';
-          
-          res.set('Content-Type', contentType);
-          return fs.createReadStream(localImagePath).pipe(res);
-        }
-        
-        // SECOND: Check if product has a URL (local or external)
-        let imageUrl = product.img || product.imageUrl;
+        // CRITICAL: Check database URL FIRST (admin might have updated it)
+        let imageUrl = product.imageUrl || product.img;
         
         // Try images array if available
         if (!imageUrl && Array.isArray(product.images) && product.images.length > 0) {
@@ -763,6 +747,25 @@ app.get('/api/product-image/:productId', async (req, res) => {
               res.set('Content-Type', contentType);
               return fs.createReadStream(localPath).pipe(res);
             }
+          }
+        }
+        
+        // FOURTH: If no URL in database, try to find local image by product name as last resort
+        if (!imageUrl) {
+          console.log(`[product-image] No URL in database, checking for local image by name: ${productName}`);
+          const localImagePath = findLocalImageForProduct(productName);
+          if (localImagePath && fs.existsSync(localImagePath)) {
+            console.log(`[product-image] ✅ Found local image fallback: ${productName}`);
+            const ext = path.extname(localImagePath).toLowerCase();
+            const contentType = {
+              '.jpg': 'image/jpeg',
+              '.jpeg': 'image/jpeg',
+              '.png': 'image/png',
+              '.webp': 'image/webp'
+            }[ext] || 'image/jpeg';
+            
+            res.set('Content-Type', contentType);
+            return fs.createReadStream(localImagePath).pipe(res);
           }
         }
       }
