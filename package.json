@@ -20,7 +20,9 @@
     "fix-processors": "node fix-processors-back.js",
     "fix-categories": "node final-category-fix.js",
     "fix-ram": "node fix-ram-category.js",
-    "fix-all": "node fix-all-categories.js"
+    "fix-all": "node fix-all-categories.js",
+    "test-search": "node test-admin-search.js",
+    "verify-products": "node verify-all-products.js"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

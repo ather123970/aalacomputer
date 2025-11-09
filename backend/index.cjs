@@ -1967,35 +1967,45 @@ app.get('/api/admin/products', async (req, res) => {
           
           console.log(`[admin/products] Searching for words: ${JSON.stringify(searchWords)}`);
           
-          // Create an array of conditions where ANY word matches ANY field
-          const searchConditions = [];
+          // Create AND conditions where ALL words must be present
+          // Each word can match ANY field, but ALL words must be found
+          const andConditions = [];
           
-          // For each word, create conditions across all fields
+          // For each word, create an OR condition across all fields
           searchWords.forEach(word => {
-            searchConditions.push(
-              { name: { $regex: word, $options: 'i' } },
-              { title: { $regex: word, $options: 'i' } },
-              { Name: { $regex: word, $options: 'i' } },
-              { description: { $regex: word, $options: 'i' } },
-              { brand: { $regex: word, $options: 'i' } },
-              { category: { $regex: word, $options: 'i' } },
-              { id: { $regex: word, $options: 'i' } }
-            );
+            andConditions.push({
+              $or: [
+                { name: { $regex: word, $options: 'i' } },
+                { title: { $regex: word, $options: 'i' } },
+                { Name: { $regex: word, $options: 'i' } },
+                { description: { $regex: word, $options: 'i' } },
+                { brand: { $regex: word, $options: 'i' } },
+                { category: { $regex: word, $options: 'i' } },
+                { id: { $regex: word, $options: 'i' } }
+              ]
+            });
           });
           
           // Also try exact _id match if it looks like a MongoDB ObjectId (24 hex chars)
           if (search.length === 24 && /^[0-9a-fA-F]{24}$/.test(search)) {
             try {
-              searchConditions.push({ _id: search });
+              // If searching by ID, use OR with text search
+              query = {
+                $or: [
+                  { _id: search },
+                  { $and: andConditions }
+                ]
+              };
             } catch (e) {
-              // Invalid ObjectId format, skip
+              // Invalid ObjectId format, use text search only
+              query = { $and: andConditions };
             }
+          } else {
+            // Match if ALL words are found (each word in ANY field)
+            query = { $and: andConditions };
           }
           
-          // Match if ANY word matches ANY field
-          query = { $or: searchConditions };
-          
-          console.log(`[admin/products] Search query created with ${searchConditions.length} conditions`);
+          console.log(`[admin/products] Search query: ALL of ${searchWords.length} words must be present`);
         }
         
         // Get total count
