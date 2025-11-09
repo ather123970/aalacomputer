@@ -22,6 +22,7 @@
     "fix-ram": "node fix-ram-category.js",
     "fix-all": "node fix-all-categories.js",
     "test-search": "node test-admin-search.js",
+    "test-api": "node test-backend-api.js",
     "verify-products": "node verify-all-products.js"
   },
   "dependencies": {
