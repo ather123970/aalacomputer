@@ -96,25 +96,17 @@ const SmartImage = ({
     // Try to load the image
     const img = new Image();
     
-    // Set timeout for slow-loading images
-    // Use longer timeout for product-image API (backend needs time to fetch), shorter for direct loads
+    // Set timeout for slow-loading images  
+    // Use SHORTER timeouts to show fallbacks faster (better UX than waiting)
     const isApiCall = imageUrl.includes('/api/product-image/');
-    const timeoutDuration = isApiCall ? 35000 : 3000; // 35s for API (allows backend 30s fetch), 3s for direct
+    const timeoutDuration = isApiCall ? 10000 : 1500; // 10s for API, 1.5s for direct (much faster)
     
     const timeout = setTimeout(() => {
       console.warn(`[SmartImage] ⏱️ Image load timeout after ${timeoutDuration}ms for ${imageUrl.substring(0, 80)}...`);
       img.src = ''; // Cancel loading
       
-      // Try product-image API if not already tried
-      if (!isRetry && !imageUrl.includes('/api/product-image/') && (product?._id || product?.id)) {
-        const productId = product._id || product.id;
-        const apiUrl = `/api/product-image/${productId}?t=${Date.now()}`;
-        console.log(`[SmartImage] Timeout, trying product-image API: ${productId}`);
-        loadImage(apiUrl, true);
-        return;
-      }
-      
-      // Try fallback
+      // Show fallback immediately instead of trying more retries
+      // This prevents the long wait times users are experiencing
       const smartFallback = getSmartFallback(product);
       setImageSrc(smartFallback);
       setLoadingState(false);

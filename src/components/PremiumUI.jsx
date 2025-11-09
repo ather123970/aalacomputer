@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import SmartImage from './SmartImage';
 import { getProductImageUrl } from '../utils/imageUtils';
 
-export const ProductCard = ({ product, onClick }) => {
+export const ProductCard = ({ product, onClick, priority = false }) => {
   const amount = typeof product?.price === 'number' ? product.price : (product?.price?.amount ?? 0);
   const marketPrice = typeof product?.price === 'number' ? product.price : (product?.price?.marketPrice ?? amount);
   const discount = typeof product?.price === 'number' ? 0 : (product?.price?.discount ?? 0);
@@ -52,8 +52,8 @@ export const ProductCard = ({ product, onClick }) => {
           alt={product?.name || product?.title || 'Product image'}
           product={product}
           className="object-contain w-full h-full transition-transform hover:scale-105 bg-white p-2"
-          loading="lazy"
-          priority={false}
+          loading={priority ? "eager" : "lazy"}
+          priority={priority}
         />
         {discount > 0 && (
           <div className="absolute top-4 right-4 bg-accent-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
@@ -168,11 +168,12 @@ export const ProductGrid = ({ products }) => {
   const navigate = useNavigate();
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-      {products.map(product => (
+      {products.map((product, index) => (
         <ProductCard
           key={product._id || product.id}
           product={product}
           onClick={() => navigate(`/products/${product._id || product.id}`)}
+          priority={index < 8} // Load first 8 images eagerly (2 rows on desktop)
         />
       ))}
     </div>

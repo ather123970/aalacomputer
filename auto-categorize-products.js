@@ -198,31 +198,41 @@ function autoDetectCategory(product) {
   let bestMatch = null;
   let highestScore = 0;
 
-  for (const category of PC_HARDWARE_CATEGORIES) {
-    let score = 0;
+  // PRIORITY CHECK: If explicit category keywords exist, heavily favor them
+  // This prevents motherboards mentioning "Ryzen 9000" from being categorized as Processors
+  const explicitCategoryMatch = PC_HARDWARE_CATEGORIES.find(category => {
+    const hasExplicitName = searchText.includes(category.name.toLowerCase());
+    const hasExplicitSlug = searchText.includes(category.slug);
+    const hasExplicitAlt = category.alternativeNames?.some(altName => 
+      searchText.includes(altName.toLowerCase())
+    );
+    
+    return hasExplicitName || hasExplicitSlug || hasExplicitAlt;
+  });
 
-    // Check category name and slug
-    if (searchText.includes(category.name.toLowerCase())) score += 10;
-    if (searchText.includes(category.slug)) score += 10;
+  // If we found an explicit match, give it a huge boost
+  if (explicitCategoryMatch) {
+    bestMatch = explicitCategoryMatch;
+    highestScore = 100; // Very high score to override other matches
+  } else {
+    // Otherwise, use keyword-based scoring
+    for (const category of PC_HARDWARE_CATEGORIES) {
+      let score = 0;
 
-    // Check alternative names
-    category.alternativeNames?.forEach(altName => {
-      if (searchText.includes(altName.toLowerCase())) score += 8;
-    });
+      // Check keywords
+      category.keywords?.forEach(keyword => {
+        if (searchText.includes(keyword.toLowerCase())) score += 3;
+      });
 
-    // Check keywords
-    category.keywords?.forEach(keyword => {
-      if (searchText.includes(keyword.toLowerCase())) score += 3;
-    });
+      // Check brands (weaker signal)
+      category.brands?.forEach(brand => {
+        if (searchText.includes(brand.toLowerCase())) score += 2;
+      });
 
-    // Check brands (weaker signal)
-    category.brands?.forEach(brand => {
-      if (searchText.includes(brand.toLowerCase())) score += 2;
-    });
-
-    if (score > highestScore) {
-      highestScore = score;
-      bestMatch = category;
+      if (score > highestScore) {
+        highestScore = score;
+        bestMatch = category;
+      }
     }
   }
 
