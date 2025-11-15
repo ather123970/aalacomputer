@@ -1,0 +1,14 @@
+[
+  { "name": "NVIDIA GeForce RTX 3050", "model": "RTX 3050", "price": 75000, "vendor": "Daraz", "url": "https://daraz.pk/rtx-3050" },
+  { "name": "NVIDIA GeForce RTX 3060", "model": "RTX 3060", "price": 105000, "vendor": "Daraz", "url": "https://daraz.pk/rtx-3060" },
+  { "name": "NVIDIA GeForce RTX 4060", "model": "RTX 4060", "price": 160000, "vendor": "Zestro Gaming", "url": "https://zestrogaming.pk/rtx-4060" },
+  { "name": "NVIDIA GeForce RTX 4070", "model": "RTX 4070", "price": 188000, "vendor": "Zestro Gaming", "url": "https://zestrogaming.pk/rtx-4070" },
+  { "name": "AMD Radeon RX 6600", "model": "RX 6600", "price": 60000, "vendor": "Daraz", "url": "https://daraz.pk/rx-6600" },
+  { "name": "Intel Core i5-12400F", "model": "i5-12400F", "price": 34000, "vendor": "Techarc.pk", "url": "https://techarc.pk/i5-12400f" },
+  { "name": "AMD Ryzen 5 5600", "model": "Ryzen 5 5600", "price": 30000, "vendor": "RB Tech & Games", "url": "https://rbtech.pk/ryzen-5-5600" },
+  { "name": "AMD Ryzen 5 7600", "model": "Ryzen 5 7600", "price": 50500, "vendor": "amdhouse.pk", "url": "https://amdhouse.pk/ryzen-5-7600" },
+  { "name": "Samsung 970 EVO Plus 1TB", "model": "970 EVO 1TB", "price": 28000, "vendor": "RB Tech & Games", "url": "https://rbtech.pk/970-evo-1tb" },
+  { "name": "Kingston NV1 500GB", "model": "Kingston NV1 500GB", "price": 11000, "vendor": "generaltraders.pk", "url": "https://generaltraders.pk/kingston-nv1-500gb" },
+  { "name": "16GB DDR4 Kit (2x8)", "model": "16GB DDR4", "price": 14000, "vendor": "Acom Distributors", "url": "https://acom.pk/16gb-ddr4" },
+  { "name": "650W 80+ Bronze PSU", "model": "650W PSU", "price": 12000, "vendor": "ZAH Computers", "url": "https://zahcomputers.pk/650w-psu" }
+]

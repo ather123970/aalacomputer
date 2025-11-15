@@ -1,0 +1,25 @@
+{
+  "name": "Aala Computer",
+  "short_name": "Aala PC",
+  "description": "Premium PC Parts and Gaming Accessories Store",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0ea5e9",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/placeholder.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["shopping", "electronics"],
+  "orientation": "any",
+  "lang": "en",
+  "prefer_related_applications": false
+}
