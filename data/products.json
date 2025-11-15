@@ -1,0 +1,155 @@
+[
+  {
+    "id": "pc_case_001",
+    "title": "NZXT H510 Elite - Compact ATX Mid-Tower PC Gaming Case",
+    "name": "NZXT H510 Elite",
+    "price": 14900,
+    "category": "pc-cases",
+    "img": "https://m.media-amazon.com/images/I/71CPNy4NdIL._AC_SL1500_.jpg",
+    "imageUrl": "https://m.media-amazon.com/images/I/71CPNy4NdIL._AC_SL1500_.jpg",
+    "description": "Premium mid-tower ATX case with tempered glass panels and RGB lighting",
+    "specs": [
+      "ATX, Micro-ATX, Mini-ITX Motherboard Support",
+      "Tempered Glass Front and Side Panels",
+      "2x 140mm Front, 1x 120mm Rear, 1x 120mm Top Fan Mounts",
+      "USB 3.1 Gen 2 Type-C Port"
+    ],
+    "tags": [
+      "pc-case",
+      "mid-tower",
+      "rgb",
+      "atx"
+    ],
+    "brand": "NZXT",
+    "stock": 15,
+    "sold": 8
+  },
+  {
+    "id": "monitor_001",
+    "title": "ASUS TUF Gaming 27\" 1440P HDR Monitor (VG27AQ) - QHD (2560 x 1440), 165Hz (Supports 144Hz), 1ms, Extreme Low Motion Blur, Speaker, G-SYNC Compatible",
+    "name": "ASUS TUF Gaming VG27AQ",
+    "price": 45000,
+    "category": "monitors",
+    "img": "https://m.media-amazon.com/images/I/81xV3GdcKQL._AC_SL1500_.jpg",
+    "imageUrl": "https://m.media-amazon.com/images/I/81xV3GdcKQL._AC_SL1500_.jpg",
+    "description": "27-inch WQHD (2560x1440) IPS gaming monitor with 165Hz refresh rate and 1ms response time",
+    "specs": [
+      "27-inch WQHD (2560 x 1440) IPS display",
+      "165Hz refresh rate (supports 144Hz)",
+      "1ms (GTG) response time",
+      "G-SYNC compatible"
+    ],
+    "tags": [
+      "gaming",
+      "monitor",
+      "1440p",
+      "165hz",
+      "ips"
+    ],
+    "brand": "ASUS",
+    "stock": 12,
+    "sold": 5
+  },
+  {
+    "id": "laptop_001",
+    "title": "ASUS ROG Zephyrus G14 (2023) 14\" 165Hz Gaming Laptop | AMD Ryzen 9 7940HS | NVIDIA GeForce RTX 4060 | 16GB DDR5 | 1TB PCIe SSD | Windows 11 | Moonlight White",
+    "name": "ASUS ROG Zephyrus G14 (2023)",
+    "price": 250000,
+    "category": "laptops",
+    "img": "https://m.media-amazon.com/images/I/61DgY3bPQBL._AC_SL1500_.jpg",
+    "imageUrl": "https://m.media-amazon.com/images/I/61DgY3bPQBL._AC_SL1500_.jpg",
+    "description": "Powerful 14-inch gaming laptop with AMD Ryzen 9 and NVIDIA RTX 4060",
+    "specs": [
+      "AMD Ryzen 9 7940HS Processor",
+      "NVIDIA GeForce RTX 4060 8GB GDDR6",
+      "16GB DDR5-4800MHz RAM",
+      "1TB PCIe 4.0 NVMe SSD"
+    ],
+    "tags": [
+      "gaming",
+      "laptop",
+      "ryzen",
+      "rtx-4060"
+    ],
+    "brand": "ASUS",
+    "stock": 8,
+    "sold": 3
+  },
+  {
+    "id": "accessory_001",
+    "title": "Logitech C920 HD Pro Webcam, Full HD 1080p/30fps Video Calling, Clear Stereo Audio, HD Light Correction, Works with Zoom and Other Video Apps, PC/Mac/Laptop/Macbook/Tablet - Black",
+    "name": "Logitech C920 HD Pro Webcam",
+    "price": 12000,
+    "category": "accessories",
+    "img": "https://m.media-amazon.com/images/I/71iNwni9TsL._AC_SL1500_.jpg",
+    "imageUrl": "https://m.media-amazon.com/images/I/71iNwni9TsL._AC_SL1500_.jpg",
+    "description": "Full HD 1080p webcam with premium autofocus and stereo audio",
+    "specs": [
+      "Full HD 1080p video calling and recording at 30 fps",
+      "HD autofocus and light correction",
+      "Dual stereo microphones with noise reduction",
+      "Universal clip fits laptops, monitors, or tripods"
+    ],
+    "tags": [
+      "webcam",
+      "1080p",
+      "video-call",
+      "logitech"
+    ],
+    "brand": "Logitech",
+    "stock": 20,
+    "sold": 12
+  },
+  {
+    "id": "pc_case_002",
+    "title": "Lian Li PC-O11 Dynamic Razer Edition - Black Tempered Glass ATX Mid Tower Computer Case - O11D Razer",
+    "name": "Lian Li PC-O11 Dynamic Razer Edition",
+    "price": 22000,
+    "category": "pc-cases",
+    "img": "https://m.media-amazon.com/images/I/71yZQ4XhXIL._AC_SL1500_.jpg",
+    "imageUrl": "https://m.media-amazon.com/images/I/71yZQ4XhXIL._AC_SL1500_.jpg",
+    "description": "Premium mid-tower ATX case with tempered glass and Razer Chroma RGB lighting",
+    "specs": [
+      "Razer Chroma RGB Lighting with Razer Synapse",
+      "Dual-chamber design for optimal cooling",
+      "Supports up to E-ATX motherboards",
+      "3x 120mm RGB fans included"
+    ],
+    "tags": [
+      "pc-case",
+      "mid-tower",
+      "razer",
+      "rgb",
+      "atx"
+    ],
+    "brand": "Lian Li",
+    "stock": 10,
+    "sold": 5
+  },
+  {
+    "id": "monitor_002",
+    "title": "Dell 27 Inch 4K UHD Monitor (S2721QS) - 4K UHD (3840 x 2160) Display, 60Hz Refresh Rate, 4ms Response Time, AMD FreeSync, 99% sRGB, HDMI, DisplayPort, VESA Certified, Silver",
+    "name": "Dell S2721QS 27\" 4K UHD Monitor",
+    "price": 55000,
+    "category": "monitors",
+    "img": "https://m.media-amazon.com/images/I/81Q+Z2y9+IL._AC_SL1500_.jpg",
+    "imageUrl": "https://m.media-amazon.com/images/I/81Q+Z2y9+IL._AC_SL1500_.jpg",
+    "description": "27-inch 4K UHD monitor with AMD FreeSync and 99% sRGB color coverage",
+    "specs": [
+      "27-inch 4K UHD (3840 x 2160) display",
+      "60Hz refresh rate with 4ms response time",
+      "AMD FreeSync technology",
+      "99% sRGB color coverage"
+    ],
+    "tags": [
+      "4k",
+      "monitor",
+      "uhd",
+      "dell",
+      "ips"
+    ],
+    "brand": "Dell",
+    "stock": 18,
+    "sold": 7
+  }
+]
