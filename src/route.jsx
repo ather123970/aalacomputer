@@ -14,17 +14,22 @@ const Cart = React.lazy(() => import('./cart'));
 const Profile = React.lazy(() => import('./pages/Profile'));
 const AuthPage = React.lazy(() => import('./pages/Auth'));
 const Checkout = React.lazy(() => import('./pages/Checkout'));
+const CheckoutPage = React.lazy(() => import('./pages/CheckoutPage'));
 const DealDetail = React.lazy(() => import('./pages/Dealdetail'));
 const Prebuilds = React.lazy(() => import('./pages/Prebuilds'));
-const AdminLogin = React.lazy(() => import('./pages/AdminLogin'));
-const AdminDashboard = React.lazy(() => import('./pages/admin/ModernDashboard'));
-const AdminDashboardV2 = React.lazy(() => import('./pages/AdminDashboardV2'));
+const AdminLogin = React.lazy(() => import('./pages/AdminLoginNew'));
+const AdminDashboard = React.lazy(() => import('./pages/AdminDashboardPro'));
+const AdminImageManager = React.lazy(() => import('./pages/AdminImageManager'));
 const BulkProductManager = React.lazy(() => import('./pages/BulkProductManager'));
 const BulkEditPage = React.lazy(() => import('./pages/BulkEditPage'));
+const BulkCategoryManager = React.lazy(() => import('./pages/BulkCategoryManager'));
 const CategoriesPage = React.lazy(() => import('./pages/CategoriesPage'));
 const CategoryProductsPage = React.lazy(() => import('./pages/CategoryProductsPage'));
 const BrandsPage = React.lazy(() => import('./pages/BrandsPage'));
 const DiagnosticPage = React.lazy(() => import('./pages/DiagnosticPage'));
+const UpdateProductImages = React.lazy(() => import('./pages/UpdateProductImages'));
+const QuickCategoryUpdate = React.lazy(() => import('./pages/QuickCategoryUpdate'));
+
 const Layout = () => {
   const location = useLocation();
   
@@ -224,14 +229,25 @@ export const router = createBrowserRouter([
       },
       { 
         path: 'checkout',
+        element: <ErrorBoundary><CheckoutPage /></ErrorBoundary>
+      },
+      { 
+        path: 'orders',
         children: [
-          { index: true, element: <Checkout /> },
-          { path: 'orders/:id', element: <Checkout /> }
+          { path: ':id', element: <Checkout /> }
         ]
       },
       {
         path: 'diagnostic',
         element: <ErrorBoundary><DiagnosticPage /></ErrorBoundary>
+      },
+      {
+        path: 'update-images',
+        element: <ErrorBoundary><UpdateProductImages /></ErrorBoundary>
+      },
+      {
+        path: 'quick-category-update',
+        element: <ErrorBoundary><QuickCategoryUpdate /></ErrorBoundary>
       }
     ]
   },
@@ -239,18 +255,22 @@ export const router = createBrowserRouter([
     path: '/admin',
     children: [
       { path: 'login', element: <AdminLogin /> },
-      // Fast inline-edit products dashboard (default)
-      { index: true, element: <AdminDashboardV2 /> },
-      { path: 'products', element: <AdminDashboardV2 /> },
+      // Main admin dashboard with full product management (V2 - Ultra-Fast)
+      { index: true, element: <AdminDashboard /> },
+      { path: 'dashboard', element: <AdminDashboard /> },
+      { path: 'products', element: <AdminDashboard /> },
+      // Image manager - shows ALL products at once
+      { path: 'images', element: <AdminImageManager /> },
       // Bulk product management
       { path: 'bulk-manager', element: <BulkProductManager /> },
       { path: 'bulk-edit', element: <BulkEditPage /> },
-      // Old overview-style dashboard
-      { path: 'overview', element: <AdminDashboard /> }
+      { path: 'bulk-categories', element: <ErrorBoundary><BulkCategoryManager /></ErrorBoundary> },
+      // Update product images
+      { path: 'update-images', element: <ErrorBoundary><UpdateProductImages /></ErrorBoundary> }
     ]
   }
 ])
 
-export const RouterRoot = () => <RouterProvider router={router} />
+const RouterRoot = () => <RouterProvider router={router} />
 
 export default RouterRoot

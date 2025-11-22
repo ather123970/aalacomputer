@@ -1,0 +1,203 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Lock, Mail, Eye, EyeOff, Package } from 'lucide-react';
+
+const AdminLoginNew = () => {
+  const navigate = useNavigate();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    // Always use "admin" as username (field is disabled)
+    const adminUsername = 'admin';
+    
+    // Hardcoded credentials
+    if (adminUsername === 'admin' && password === 'admin123') {
+      // Set admin token
+      localStorage.setItem('adminToken', 'admin-token-' + Date.now());
+      localStorage.setItem('adminUsername', adminUsername);
+      
+      // Redirect to dashboard
+      setTimeout(() => {
+        navigate('/admin/dashboard');
+      }, 500);
+    } else {
+      setError('Invalid password');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center p-4">
+      {/* Background decoration */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-100 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+      </div>
+
+      {/* Login Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="relative w-full max-w-md"
+      >
+        <div className="bg-white rounded-2xl shadow-2xl p-8 border border-blue-100">
+          {/* Header */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-center mb-8"
+          >
+            <div className="flex justify-center mb-4">
+              <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
+                <Package className="w-8 h-8 text-white" />
+              </div>
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Aala Admin</h1>
+            <p className="text-gray-600">Dashboard Login</p>
+          </motion.div>
+
+          {/* Error Message */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg"
+            >
+              <p className="text-red-700 text-sm font-medium">{error}</p>
+            </motion.div>
+          )}
+
+          {/* Login Form */}
+          <form onSubmit={handleLogin} className="space-y-6" autoComplete="off">
+            {/* Username Field - Always "admin" */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                Username
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 text-blue-500" size={20} />
+                <input
+                  type="text"
+                  value="admin"
+                  disabled
+                  className="w-full pl-10 pr-4 py-3 border-2 border-blue-200 rounded-lg bg-gray-100 text-gray-900 font-semibold cursor-not-allowed"
+                />
+              </div>
+            </motion.div>
+
+            {/* Password Field */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4 }}
+            >
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 text-blue-500" size={20} />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter password"
+                  autoComplete="off"
+                  spellCheck="false"
+                  className="w-full pl-10 pr-12 py-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-500 transition bg-blue-50 text-gray-900 placeholder-gray-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-blue-500 hover:text-blue-700 transition"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </motion.div>
+
+            {/* Login Button */}
+            <motion.button
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold rounded-lg transition shadow-lg flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                  Logging in...
+                </>
+              ) : (
+                <>
+                  <Lock size={20} />
+                  Login to Dashboard
+                </>
+              )}
+            </motion.button>
+          </form>
+
+          {/* Demo Credentials */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+            className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg"
+          >
+            <p className="text-xs text-gray-600 mb-2 font-semibold">Demo Credentials:</p>
+            <p className="text-xs text-gray-700">
+              <span className="font-semibold">Username:</span> admin
+            </p>
+            <p className="text-xs text-gray-700">
+              <span className="font-semibold">Password:</span> admin123
+            </p>
+          </motion.div>
+        </div>
+
+        {/* Footer */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.7 }}
+          className="text-center text-gray-600 text-sm mt-6"
+        >
+          © 2025 Aala Computer Admin. All rights reserved.
+        </motion.p>
+      </motion.div>
+
+      <style>{`
+        @keyframes blob {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(30px, -50px) scale(1.1); }
+          66% { transform: translate(-20px, 20px) scale(0.9); }
+        }
+        .animate-blob {
+          animation: blob 7s infinite;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default AdminLoginNew;

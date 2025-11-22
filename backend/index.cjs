@@ -43,9 +43,48 @@ app.use(compression({
   level: 6 // Compression level (0-9, 6 is default)
 }));
 
-// Flexible CORS: allow any origin for maximum compatibility
+// CORS Configuration - Allow localhost for development, specific domains for production
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+  'http://127.0.0.1:3000',
+  // Allow proxy URLs from IDE preview
+  /^http:\/\/127\.0\.0\.1:\d+$/, // Match any port on 127.0.0.1
+  /^http:\/\/localhost:\d+$/, // Match any port on localhost
+  'https://aalacomputer.com',
+  'https://www.aalacomputer.com',
+  'https://aalacomputerkarachi.vercel.app',
+  'https://aalacomputer.onrender.com'
+];
+
 app.use(cors({
-  origin: true, // Allow any origin
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+    
+    // Check if origin is in allowed list (string match)
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    
+    // Check if origin matches any regex pattern
+    for (const pattern of allowedOrigins) {
+      if (pattern instanceof RegExp && pattern.test(origin)) {
+        callback(null, true);
+        return;
+      }
+    }
+    
+    // Origin not allowed
+    callback(new Error('CORS not allowed for this origin: ' + origin));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Session-ID'],
@@ -336,11 +375,12 @@ app.use(express.json({ limit: '1mb' }));
 // This prevents index.html from being served for /api/* routes
 
 // Serve images directory - support multiple folders
-// Priority: zah_images > images > public
+// Priority: images > public/fallback > public > zah_images (empty)
 const zahImagesPath = path.join(__dirname, '..', 'zah_images');
 const imagesPath = path.join(__dirname, '..', 'images');
 const publicPath = path.join(__dirname, '..', 'public');
 const publicImagesPath = path.join(publicPath, 'images');
+const publicFallbackPath = path.join(publicPath, 'fallback');
 
 // Image serving configuration with proper CORS and headers
 const imageServeOptions = {
@@ -367,37 +407,47 @@ const imageServeOptions = {
   }
 };
 
-// Serve from dist/images first (from build output) - HIGHEST PRIORITY for production
+// PRIORITY 1: Serve from images folder (LOCAL IMAGES - HIGHEST PRIORITY)
+console.log('[server] Checking for images folder at:', imagesPath);
+if (fs.existsSync(imagesPath)) {
+  const imageCount = fs.readdirSync(imagesPath).length;
+  app.use('/images', express.static(imagesPath, imageServeOptions));
+  console.log(`[server] ✅ serving /images from images/ (${imageCount} files)`);
+} else {
+  console.log('[server] ⚠️ images folder not found');
+}
+
+// PRIORITY 2: Serve from public/fallback (FALLBACK IMAGES)
+console.log('[server] Checking for public/fallback at:', publicFallbackPath);
+if (fs.existsSync(publicFallbackPath)) {
+  const fallbackCount = fs.readdirSync(publicFallbackPath).length;
+  app.use('/fallback', express.static(publicFallbackPath, imageServeOptions));
+  console.log(`[server] ✅ serving /fallback from public/fallback/ (${fallbackCount} files)`);
+}
+
+// PRIORITY 3: Serve from dist/images (from build output)
 const distImagesPath = path.join(__dirname, '..', 'dist', 'images');
 console.log('[server] Checking for dist/images at:', distImagesPath);
 if (fs.existsSync(distImagesPath)) {
   const imageCount = fs.readdirSync(distImagesPath).length;
-  app.use('/images', express.static(distImagesPath, imageServeOptions));
-  console.log(`[server] ✅ serving /images from dist/images (${imageCount} files)`);
+  if (imageCount > 0) {
+    app.use('/dist-images', express.static(distImagesPath, imageServeOptions));
+    console.log(`[server] ✅ serving /dist-images from dist/images (${imageCount} files)`);
+  }
 } else {
-  console.log('[server] ⚠️ dist/images not found - will try other sources');
+  console.log('[server] ⚠️ dist/images not found');
 }
 
-// Serve from zah_images (source folder) - FALLBACK
+// PRIORITY 4: Serve from zah_images (if it has files)
 console.log('[server] Checking for zah_images at:', zahImagesPath);
 if (fs.existsSync(zahImagesPath)) {
-  const imageCount = fs.readdirSync(zahImagesPath).length;
-  app.use('/images', express.static(zahImagesPath, imageServeOptions));
-  console.log(`[server] ✅ serving /images from zah_images (${imageCount} files)`);
-} else {
-  console.log('[server] ⚠️ zah_images not found');
-}
-
-// Serve from images folder
-if (fs.existsSync(imagesPath)) {
-  app.use('/images', express.static(imagesPath, imageServeOptions));
-  console.log('[server] ✅ serving /images from:', imagesPath);
-}
-
-// Serve from public/images if it exists
-if (fs.existsSync(publicImagesPath)) {
-  app.use('/images', express.static(publicImagesPath, imageServeOptions));
-  console.log('[server] ✅ serving /images from public/images');
+  const zahCount = fs.readdirSync(zahImagesPath).length;
+  if (zahCount > 0) {
+    app.use('/zah-images', express.static(zahImagesPath, imageServeOptions));
+    console.log(`[server] ✅ serving /zah-images from zah_images (${zahCount} files)`);
+  } else {
+    console.log('[server] ⚠️ zah_images folder is empty');
+  }
 }
 
 // Serve public folder for fallback images and static assets
@@ -675,72 +725,12 @@ app.get('/api/product-image/:productId', async (req, res) => {
           imageUrl = product.images[0].url || product.images[0];
         }
         
-        console.log(`[product-image] Product has imageUrl: ${imageUrl}`);
+        console.log(`[product-image] Product: ${productName}, imageUrl: ${imageUrl}`);
         
-        // STEP 2: If it's an EXTERNAL URL (http/https), try to fetch it
-        // If fetch fails, fall back to local images by product name
+        // STEP 2: If it's an EXTERNAL URL (http/https), redirect to proxy
         if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
-          console.log(`[product-image] External URL detected: ${imageUrl}`);
-          
-          // Try to fetch the external image directly with proper headers and timeout
-          let externalFetchSuccess = false;
-          try {
-            const fetch = (await import('node-fetch')).default;
-            
-            // Use built-in AbortController (Node.js 15+)
-            const controller = new AbortController();
-            const timeout = setTimeout(() => {
-              controller.abort();
-            }, 30000); // 30 seconds for production environments
-            
-            console.log(`[product-image] Fetching external URL with 30s timeout...`);
-            const imageResponse = await fetch(imageUrl, {
-              signal: controller.signal,
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-                'Referer': imageUrl.includes('acom.pk') || imageUrl.includes('zahcomputers.pk') 
-                  ? new URL(imageUrl).origin + '/' 
-                  : undefined
-              }
-            });
-            
-            clearTimeout(timeout);
-            
-            if (imageResponse.ok && imageResponse.body) {
-              console.log(`[product-image] ✅ Successfully fetched external image`);
-              res.set('Content-Type', imageResponse.headers.get('content-type') || 'image/jpeg');
-              externalFetchSuccess = true;
-              return imageResponse.body.pipe(res);
-            } else {
-              console.log(`[product-image] ❌ External fetch failed: ${imageResponse.status}, trying local fallback`);
-            }
-          } catch (e) {
-            console.log(`[product-image] ❌ External fetch error: ${e.message}, trying local fallback`);
-          }
-          
-          // If external fetch failed, try local image by product name before using proxy
-          if (!externalFetchSuccess) {
-            console.log(`[product-image] Looking for local image as fallback for: ${productName}`);
-            const localImagePath = findLocalImageForProduct(productName);
-            if (localImagePath && fs.existsSync(localImagePath)) {
-              console.log(`[product-image] ✅ Found local image fallback for failed external URL: ${productName}`);
-              const ext = path.extname(localImagePath).toLowerCase();
-              const contentType = {
-                '.jpg': 'image/jpeg',
-                '.jpeg': 'image/jpeg',
-                '.png': 'image/png',
-                '.webp': 'image/webp'
-              }[ext] || 'image/jpeg';
-              
-              res.set('Content-Type', contentType);
-              return fs.createReadStream(localImagePath).pipe(res);
-            }
-            
-            // Final fallback: Use proxy endpoint for external URL
-            console.log(`[product-image] No local fallback found, using proxy for external URL`);
-            return res.redirect(302, `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`);
-          }
+          console.log(`[product-image] ✅ Redirecting to proxy for: ${imageUrl}`);
+          return res.redirect(302, `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`);
         }
         
         // STEP 3: If it's a local path (starts with /images/ or just filename), serve it
@@ -819,113 +809,26 @@ app.get('/api/product-image/:productId', async (req, res) => {
   return res.status(200).end();
 });
 
-// Image proxy endpoint to bypass hotlink protection from external sources
+// Image proxy endpoint - redirect to weserv.nl for reliable image serving
 app.get('/api/proxy-image', async (req, res) => {
   const originalUrl = req.query.url;
   if (!originalUrl) return res.status(400).send('Missing URL');
 
-  console.log(`[proxy-image] Request for: ${originalUrl}`);
-
-  // Always set permissive CORS so the browser can use the response anywhere
+  // CORS headers
   res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type');
-  res.set('Timing-Allow-Origin', '*');
-  res.set('Cache-Control', 'public, max-age=3600'); // 1 hour for faster updates
+  res.set('Cache-Control', 'public, max-age=86400');
 
   try {
-    const fetch = (await import('node-fetch')).default;
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
-      'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.9',
-      ...(originalUrl.includes('zahcomputers.pk') ? { 
-        'Referer': 'https://zahcomputers.pk/',
-        'Origin': 'https://zahcomputers.pk'
-      } : {})
-    };
+    // Use weserv.nl as a reliable image proxy CDN
+    // It handles image fetching, caching, and optimization
+    const weservUrl = `https://images.weserv.nl/?url=${encodeURIComponent(originalUrl.replace(/^https?:\/\//, ''))}&output=webp&q=80`;
+    
+    console.log(`[proxy-image] Redirecting to weserv for: ${originalUrl.substring(0, 60)}...`);
+    return res.redirect(301, weservUrl);
 
-    // 1) Try direct fetch with proper headers and timeout
-    console.log('[proxy-image] Trying direct fetch...');
-    const controller1 = new AbortController();
-    const timeout1 = setTimeout(() => controller1.abort(), 15000);
-    let response = await fetch(originalUrl, { headers, signal: controller1.signal });
-    clearTimeout(timeout1);
-    if (response && response.ok && response.body) {
-      console.log('[proxy-image] ✅ Direct fetch successful');
-      res.set('Content-Type', response.headers.get('content-type') || 'image/jpeg');
-      return response.body.pipe(res);
-    }
-    console.log('[proxy-image] ⚠️ Direct fetch failed');
-
-    // 2) Fallback to images.weserv.nl (anonymous image proxy CDN)
-    console.log('[proxy-image] Trying weserv.nl proxy...');
-    const weservUrl = `https://images.weserv.nl/?url=${encodeURIComponent(originalUrl.replace(/^https?:\/\//, ''))}&output=jpg&q=85`;
-    try {
-      const controller2 = new AbortController();
-      const timeout2 = setTimeout(() => controller2.abort(), 15000);
-      const alt = await fetch(weservUrl, { signal: controller2.signal });
-      clearTimeout(timeout2);
-      if (alt && alt.ok && alt.body) {
-        console.log('[proxy-image] ✅ Weserv proxy successful');
-        res.set('Content-Type', alt.headers.get('content-type') || 'image/jpeg');
-        return alt.body.pipe(res);
-      }
-    } catch (e) {
-      console.log('[proxy-image] ⚠️ Weserv proxy failed:', e.message);
-    }
-
-    // 3) Try Googleusercontent gadgets proxy
-    console.log('[proxy-image] Trying Google proxy...');
-    const googleProxy = `https://images1-focus-opensocial.googleusercontent.com/gadgets/proxy?container=focus&refresh=86400&url=${encodeURIComponent(originalUrl)}`;
-    try {
-      const controller3 = new AbortController();
-      const timeout3 = setTimeout(() => controller3.abort(), 15000);
-      const g = await fetch(googleProxy, { signal: controller3.signal });
-      clearTimeout(timeout3);
-      if (g && g.ok && g.body) {
-        console.log('[proxy-image] ✅ Google proxy successful');
-        res.set('Content-Type', g.headers.get('content-type') || 'image/jpeg');
-        return g.body.pipe(res);
-      }
-    } catch (e) {
-      console.log('[proxy-image] ⚠️ Google proxy failed:', e.message);
-    }
-
-    // 4) Try imgproxy.net as last resort
-    console.log('[proxy-image] Trying imgproxy.net...');
-    const imgproxyUrl = `https://imgproxy.net/${encodeURIComponent(originalUrl)}`;
-    try {
-      const controller4 = new AbortController();
-      const timeout4 = setTimeout(() => controller4.abort(), 15000);
-      const imgproxy = await fetch(imgproxyUrl, { signal: controller4.signal });
-      clearTimeout(timeout4);
-      if (imgproxy && imgproxy.ok && imgproxy.body) {
-        console.log('[proxy-image] ✅ Imgproxy successful');
-        res.set('Content-Type', imgproxy.headers.get('content-type') || 'image/jpeg');
-        return imgproxy.body.pipe(res);
-      }
-    } catch (e) {
-      console.log('[proxy-image] ⚠️ Imgproxy failed:', e.message);
-    }
-
-    // 5) Redirect the client to weserv URL as last attempt
-    console.log('[proxy-image] ⚠️ All proxies failed, redirecting to weserv');
-    return res.redirect(302, weservUrl);
-  } catch (err) {
-    console.error('[proxy-image] ❌ All methods failed:', err && (err.stack || err.message));
-    // Absolute fallback: serve local placeholder so UI never breaks
-    try {
-      const placeholder = path.join(__dirname, '..', 'images', 'placeholder.png');
-      if (fs.existsSync(placeholder)) {
-        console.log('[proxy-image] Using local placeholder');
-        res.set('Content-Type', 'image/png');
-        return fs.createReadStream(placeholder).pipe(res);
-      }
-    } catch (e) {
-      // fall through
-    }
-    return res.status(200).end();
+  } catch (error) {
+    console.error(`[proxy-image] Error: ${error.message}`);
+    res.status(500).send('Image proxy error');
   }
 });
 
@@ -1280,8 +1183,8 @@ function writeAdminFile(obj) {
 }
 
 async function ensureAdminUser() {
-  const email = process.env.ADMIN_EMAIL || 'aalacomputerstore@gmail.com';
-  const password = process.env.ADMIN_PASSWORD || 'karachi123';
+  const username = process.env.ADMIN_USERNAME || 'admin';
+  const password = process.env.ADMIN_PASSWORD || 'admin123';
   try {
     if (AdminModel && mongoose.connection.readyState === 1) {
       // Delete ALL existing admins
@@ -1290,8 +1193,8 @@ async function ensureAdminUser() {
       
       // Create only the required admin
       const hash = await bcrypt.hash(password, 10);
-      await new AdminModel({ email, passwordHash: hash, name: 'Site Admin', role: 'admin' }).save();
-      console.log('[admin] Created single admin user:', email);
+      await new AdminModel({ username, passwordHash: hash, name: 'Site Admin', role: 'admin' }).save();
+      console.log('[admin] Created single admin user:', username);
       return;
     }
   } catch (e) {
@@ -1299,10 +1202,10 @@ async function ensureAdminUser() {
   }
   // file fallback: create admin.json if missing
   const adm = readAdminFile();
-  if (!adm || !adm.email) {
+  if (!adm || !adm.username) {
     const hash = await bcrypt.hash(password, 10);
-    writeAdminFile({ email, passwordHash: hash, name: 'Site Admin' });
-    console.log('[admin] default admin created in data/admin.json:', email);
+    writeAdminFile({ username, passwordHash: hash, name: 'Site Admin' });
+    console.log('[admin] default admin created in data/admin.json:', username);
   }
 }
 function readDataFile(filename) {
@@ -1327,21 +1230,20 @@ function writeDataFile(filename, data) {
   }
 }
 
-// Admin login: POST /api/admin/login { username, password } or { email, password }
+// Admin login: POST /api/admin/login { username, password }
 app.post('/api/admin/login', async (req, res) => {
   try {
-    const { username, email, password } = req.body || {};
-    const loginEmail = email || username;
-    if (!loginEmail || !password) return res.status(400).json({ ok: false, error: 'email/username and password required' });
+    const { username, password } = req.body || {};
+    if (!username || !password) return res.status(400).json({ ok: false, error: 'username and password required' });
 
     // Try DB first
     try {
       if (AdminModel && mongoose.connection.readyState === 1) {
-        const admin = await AdminModel.findOne({ email: String(loginEmail).toLowerCase() }).lean();
+        const admin = await AdminModel.findOne({ username: String(username).toLowerCase() }).lean();
         if (!admin) return res.status(401).json({ ok: false, error: 'invalid credentials' });
         const ok = await bcrypt.compare(String(password), String(admin.passwordHash || ''));
         if (!ok) return res.status(401).json({ ok: false, error: 'invalid credentials' });
-        const token = jwt.sign({ sub: admin.email, role: admin.role || 'admin' }, JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ sub: admin.username, role: admin.role || 'admin' }, JWT_SECRET, { expiresIn: '7d' });
         return res.json({ ok: true, token });
       }
     } catch (e) {
@@ -1350,11 +1252,11 @@ app.post('/api/admin/login', async (req, res) => {
 
     // Fallback to admin.json file
     const adm = readAdminFile();
-    if (!adm || !adm.email) return res.status(500).json({ ok: false, error: 'admin not configured' });
-    if (String(adm.email).toLowerCase() !== String(loginEmail).toLowerCase()) return res.status(401).json({ ok: false, error: 'invalid credentials' });
+    if (!adm || !adm.username) return res.status(500).json({ ok: false, error: 'admin not configured' });
+    if (String(adm.username).toLowerCase() !== String(username).toLowerCase()) return res.status(401).json({ ok: false, error: 'invalid credentials' });
     const ok = await bcrypt.compare(String(password), String(adm.passwordHash || ''));
     if (!ok) return res.status(401).json({ ok: false, error: 'invalid credentials' });
-    const token = jwt.sign({ sub: adm.email, role: adm.role || 'admin' }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ sub: adm.username, role: adm.role || 'admin' }, JWT_SECRET, { expiresIn: '7d' });
     return res.json({ ok: true, token });
   } catch (e) {
     console.error('/api/admin/login error', e && e.stack || e);
@@ -1772,34 +1674,49 @@ app.get('/api/chatbase/search', async (req, res) => {
   }
 });
 
-// List all products (PUBLIC - for frontend products page) - Optimized with pagination and caching
-app.get('/api/products', (req, res) => {
+// List all products (PUBLIC - for frontend products page) - Using testproduct collection
+app.get('/api/products', async (req, res) => {
   // Add caching headers for better performance
   res.setHeader('Cache-Control', 'public, max-age=300'); // Cache for 5 minutes
   
   // Get query parameters
   const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 32; // Default 32 products per page
+  let limit = parseInt(req.query.limit) || 32; // Default 32 products per page
+  
+  // Cap limit to 5000 to allow fetching all products
+  if (limit > 5000) limit = 5000;
+  
   const skip = (page - 1) * limit;
   const category = req.query.category;
   const brand = req.query.brand;
   const search = req.query.search;
   
+  const fs = require('fs');
+  const logMsg = `[${new Date().toISOString()}] [products] Request: page=${page}, limit=${limit}, skip=${skip}\n`;
+  fs.appendFileSync('products-api.log', logMsg);
+  
   try {
     const mongoose = require('mongoose');
-    const ProductModel = getProductModel();
-    if (ProductModel && mongoose.connection.readyState === 1) {
+    const dbReady = mongoose.connection.readyState === 1;
+    const logMsg2 = `[${new Date().toISOString()}] [products] DB ready: ${dbReady}\n`;
+    fs.appendFileSync('products-api.log', logMsg2);
+    
+    if (mongoose.connection.readyState === 1) {
+      // Get product collection model
+      let ProductModel;
+      if (mongoose.models && mongoose.models.Product) {
+        ProductModel = mongoose.models.Product;
+      } else {
+        const schema = new mongoose.Schema({}, { strict: false });
+        ProductModel = mongoose.model('Product', schema, 'products');
+      }
+      
       // Build query based on filters
       const query = {};
       
-      // Category filter - support both simple string and nested object
+      // Category filter - EXACT match only (no cross-category pollution)
       if (category && category !== 'All') {
-        query.$or = [
-          { category: { $regex: category, $options: 'i' } },
-          { 'category.main': { $regex: category, $options: 'i' } },
-          { Name: { $regex: category, $options: 'i' } },
-          { name: { $regex: category, $options: 'i' } }
-        ];
+        query.category = { $regex: `^${category}$`, $options: 'i' };
       }
       
       // Brand filter
@@ -1820,31 +1737,40 @@ app.get('/api/products', (req, res) => {
         ];
       }
       
-      // Count total documents for pagination
-      ProductModel.countDocuments(query).then(total => {
-        // Use lean() for better performance and select only needed fields
-        return ProductModel.find(query)
-          .select('id Name name title price img imageUrl image category brand description WARRANTY link Spec type stock')
-          .lean()
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limit)
-          .then((docs) => res.json({
-            products: docs,
-            total,
-            page,
-            limit,
-            totalPages: Math.ceil(total / limit),
-            hasMore: skip + docs.length < total
-          }));
-      }).catch(err => { 
-        console.error('[products] products list failed', err && (err.stack || err.message)); 
-        res.status(500).json({ ok: false, error: 'db error' }); 
-      });
-      return;
+      // Use Promise.all to fetch count and products in parallel
+      try {
+        const [total, docs] = await Promise.all([
+          ProductModel.countDocuments(query),
+          ProductModel.find(query)
+            // Return all fields - don't restrict with .select()
+            .lean()
+            .skip(skip)
+            .limit(limit)
+            .exec()
+        ]);
+        
+        console.log(`[products] Success: page=${page}, returned ${docs.length} products, total=${total}`);
+        return res.json({
+          products: docs,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+          hasMore: skip + docs.length < total
+        });
+      } catch (queryErr) {
+        const errMsg = `[${new Date().toISOString()}] [products] Query error: ${queryErr && (queryErr.stack || queryErr.message)}\n`;
+        fs.appendFileSync('products-api.log', errMsg);
+        throw queryErr;
+      }
+    } else {
+      const warnMsg = `[${new Date().toISOString()}] [products] DB not ready, falling back to file\n`;
+      fs.appendFileSync('products-api.log', warnMsg);
     }
   } catch (e) { 
-    console.warn('[products] DB query failed, using file fallback', e && e.message);
+    const errMsg = `[${new Date().toISOString()}] [products] DB query failed: ${e && (e.stack || e.message)}\n`;
+    fs.appendFileSync('products-api.log', errMsg);
+    return res.status(500).json({ ok: false, error: 'db error' });
   }
   
   // Fallback to file with filtering
@@ -1915,12 +1841,21 @@ app.get('/api/admin/products', async (req, res) => {
     }
 
     // Parse query parameters
-    const limit = parseInt(req.query.limit) || 50; // Load 50 by default
-    const page = parseInt(req.query.page) || 1;
+    let limit = parseInt(req.query.limit) || 50; // Load 50 by default
+    let page = parseInt(req.query.page) || 1;
     const search = req.query.search || req.query.q || ''; // Support both 'search' and 'q' parameters
     const fetchAll = req.query.fetchAll === 'true'; // Fetch all products flag
     
-    console.log(`[admin/products] limit=${limit}, page=${page}, search="${search}", fetchAll=${fetchAll}`);
+    // Validate and constrain parameters
+    if (limit < 1) limit = 50;
+    if (limit > 50) limit = 50;  // Cap at 50 products per page
+    if (page < 1) page = 1;
+    
+    // Calculate skip
+    const skip = (page - 1) * limit;
+    
+    console.log(`[admin/products] limit=${limit}, page=${page}, skip=${skip}, search="${search}", fetchAll=${fetchAll}`);
+    console.log(`[admin/products] 📊 Will return products ${skip + 1} to ${skip + limit}`);
 
     // Try database first
     try {
@@ -1960,6 +1895,46 @@ app.get('/api/admin/products', async (req, res) => {
         // Build query
         let query = {};
         
+        // Category filter with smart filtering
+        const category = req.query.category || req.query.cat || '';
+        if (category && category !== 'All' && category !== '') {
+          console.log(`[admin/products] Filtering by category: "${category}"`);
+          
+          // Smart filtering for Processor category
+          if (category.toLowerCase() === 'processor') {
+            // Only show actual CPUs (Intel/AMD), not GPUs with those names
+            query.$and = [
+              {
+                $or: [
+                  { category: { $regex: 'processor', $options: 'i' } },
+                  { category: { $regex: 'cpu', $options: 'i' } }
+                ]
+              },
+              {
+                $or: [
+                  { Name: { $regex: '\\b(intel|amd|ryzen|i3|i5|i7|i9|xeon)\\b', $options: 'i' } },
+                  { name: { $regex: '\\b(intel|amd|ryzen|i3|i5|i7|i9|xeon)\\b', $options: 'i' } }
+                ]
+              },
+              {
+                // Exclude graphics cards that might have AMD/Intel in name
+                $nor: [
+                  { Name: { $regex: '\\b(graphics|gpu|video|card|geforce|gtx|rtx|radeon|arc)\\b', $options: 'i' } },
+                  { name: { $regex: '\\b(graphics|gpu|video|card|geforce|gtx|rtx|radeon|arc)\\b', $options: 'i' } }
+                ]
+              }
+            ];
+          } else {
+            // Standard filtering for other categories
+            query.$or = [
+              { category: { $regex: category, $options: 'i' } },
+              { 'category.main': { $regex: category, $options: 'i' } },
+              { Name: { $regex: category, $options: 'i' } },
+              { name: { $regex: category, $options: 'i' } }
+            ];
+          }
+        }
+        
         // Search across multiple fields - split search into words for better matching
         if (search) {
           // Split search into individual words (minimum 1 character)
@@ -1986,51 +1961,74 @@ app.get('/api/admin/products', async (req, res) => {
             });
           });
           
-          // Also try exact _id match if it looks like a MongoDB ObjectId (24 hex chars)
-          if (search.length === 24 && /^[0-9a-fA-F]{24}$/.test(search)) {
-            try {
-              // If searching by ID, use OR with text search
-              query = {
-                $or: [
-                  { _id: search },
-                  { $and: andConditions }
-                ]
-              };
-            } catch (e) {
-              // Invalid ObjectId format, use text search only
-              query = { $and: andConditions };
-            }
+          const searchQuery = { $and: andConditions };
+          
+          // Combine category filter with search filter
+          if (query.$or) {
+            // If category filter exists, combine with search using $and
+            query = {
+              $and: [
+                { $or: query.$or },  // Category filter
+                searchQuery           // Search filter
+              ]
+            };
           } else {
-            // Match if ALL words are found (each word in ANY field)
-            query = { $and: andConditions };
+            // No category filter, just use search
+            query = searchQuery;
           }
           
           console.log(`[admin/products] Search query: ALL of ${searchWords.length} words must be present`);
         }
         
         // Get total count
+        console.log(`[admin/products] Counting documents with query...`);
         const total = await ProductModel.countDocuments(query);
+        console.log(`[admin/products] Total documents found: ${total}`);
         
-        // Fetch products with pagination (unless fetchAll is true)
+        // Fetch products with pagination (ALWAYS paginate, even with search)
         let docs;
-        if (fetchAll || search) {
-          // When searching or fetching all, return all matching products
+        const skip = (page - 1) * limit;
+        
+        console.log(`[admin/products] Skip: ${skip}, Limit: ${limit}, Page: ${page}`);
+        
+        if (fetchAll && !search) {
+          // Only fetch all if explicitly requested AND no search term
+          console.log(`[admin/products] Fetching ALL products (fetchAll mode)...`);
           docs = await ProductModel.find(query)
             .select('id Name name title price img imageUrl image category brand description stock inStock')
             .lean()
             .sort({ createdAt: -1 });
-          console.log(`[admin/products] Fetched ALL ${docs.length} products (search or fetchAll mode)`);
+          console.log(`[admin/products] ✅ Fetched ALL ${docs.length} products (fetchAll mode)`);
         } else {
-          // Default: paginated results
-          const skip = (page - 1) * limit;
+          // Default: ALWAYS paginate (even with search)
+          console.log(`[admin/products] Fetching paginated products...`);
           docs = await ProductModel.find(query)
             .select('id Name name title price img imageUrl image category brand description stock inStock')
             .lean()
-            .sort({ createdAt: -1 })
             .skip(skip)
-            .limit(limit);
-          console.log(`[admin/products] Fetched ${docs.length} of ${total} products (page ${page})`);
+            .limit(limit)
+            .exec();
+          console.log(`[admin/products] ✅ Fetched ${docs.length} of ${total} products (page ${page}, search: ${!!search})`);
         }
+        
+        // Validate and mark products with missing/failed images - ONLY on fetched docs
+        docs = docs.map(doc => {
+          const primaryUrl = doc.imageUrl || doc.img || doc.image || '';
+          const url = String(primaryUrl).trim();
+          
+          // Check if image is missing or invalid
+          const hasMissingImage = !url || 
+            url === 'undefined' || 
+            url === 'null' || 
+            url === '/placeholder.svg' || 
+            url.startsWith('/fallback/') || 
+            url.startsWith('data:image/svg+xml');
+          
+          return {
+            ...doc,
+            _hasMissingImage: hasMissingImage
+          };
+        });
         
         return res.json({ 
           ok: true, 
@@ -2060,6 +2058,227 @@ app.get('/api/admin/products', async (req, res) => {
       ok: false, 
       error: 'Internal server error',
       details: process.env.NODE_ENV === 'development' ? e.message : undefined
+    });
+  }
+});
+
+// Get all products with missing or placeholder images (PROTECTED - for admin)
+app.get('/api/admin/products-missing-images', async (req, res) => {
+  try {
+    if (!requireAdmin(req)) {
+      return res.status(401).json({ ok: false, error: 'unauthorized' });
+    }
+
+    console.log('[admin/products-missing-images] Fetching products with missing/placeholder images');
+
+    const mongoose = require('mongoose');
+    
+    if (mongoose.connection.readyState !== 1) {
+      console.log('[admin/products-missing-images] MongoDB not connected');
+      return res.status(500).json({ ok: false, error: 'Database not connected' });
+    }
+
+    const ProductModel = getProductModel();
+    
+    // Query for products with missing or placeholder images
+    const missingImageProducts = await ProductModel.find({
+      $or: [
+        // Empty or missing image fields
+        { img: { $in: ['', null, undefined] } },
+        { imageUrl: { $in: ['', null, undefined] } },
+        { image: { $in: ['', null, undefined] } },
+        // Placeholder images
+        { img: { $regex: 'placeholder|default|no-image|missing|broken|error|404', $options: 'i' } },
+        { imageUrl: { $regex: 'placeholder|default|no-image|missing|broken|error|404', $options: 'i' } },
+        { image: { $regex: 'placeholder|default|no-image|missing|broken|error|404', $options: 'i' } },
+        // Common fallback paths
+        { img: { $regex: '/images/placeholder|/assets/placeholder|/img/default|/public/placeholder', $options: 'i' } },
+        { imageUrl: { $regex: '/images/placeholder|/assets/placeholder|/img/default|/public/placeholder', $options: 'i' } },
+        { image: { $regex: '/images/placeholder|/assets/placeholder|/img/default|/public/placeholder', $options: 'i' } }
+      ]
+    })
+    .select('_id name title img imageUrl image category price')
+    .limit(1000)
+    .lean();
+
+    console.log(`[admin/products-missing-images] Found ${missingImageProducts.length} products with missing/placeholder images`);
+
+    return res.json(missingImageProducts);
+
+  } catch (err) {
+    console.error('[admin/products-missing-images] Error:', err.message);
+    return res.status(500).json({ 
+      ok: false, 
+      error: 'Failed to fetch products with missing images'
+    });
+  }
+});
+
+// Extract image from Google Images (PROTECTED - for admin) - OPTIMIZED FOR SPEED
+// Helper function to extract image from Bing
+const extractImageFromBing = async (searchQuery) => {
+  const axios = require('axios');
+  
+  const bingSearchUrl = `https://www.bing.com/images/search?q=${encodeURIComponent(searchQuery)}&form=HDRSC2&first=1&tsc=ImageBasicHover`;
+  
+  const response = await axios.get(bingSearchUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'gzip, deflate',
+      'Connection': 'keep-alive',
+      'Upgrade-Insecure-Requests': '1'
+    },
+    timeout: 10000
+  });
+
+  const html = response.data;
+  const imageUrls = [];
+  
+  // Method 1: Look for murl in the m attribute (Bing's format)
+  const mMatches = html.match(/m="([^"]+)"/g);
+  if (mMatches) {
+    for (const match of mMatches) {
+      try {
+        const mValue = match.match(/m="([^"]+)"/)[1];
+        const decoded = decodeURIComponent(mValue);
+        const murlMatch = decoded.match(/"murl":"([^"]+)"/);
+        if (murlMatch && murlMatch[1]) {
+          let url = murlMatch[1];
+          // Clean up HTML entities
+          url = url.replace(/&amp;/g, '&').replace(/\\u0026/g, '&');
+          // Extract just the URL part (remove query params after image extension)
+          const urlMatch = url.match(/https?:\/\/[^\s"'&]+\.(jpg|jpeg|png|gif|webp)/i);
+          if (urlMatch) {
+            imageUrls.push(urlMatch[0]);
+          }
+        }
+      } catch (e) {
+        // Continue
+      }
+    }
+  }
+  
+  // Method 2: Direct image URL extraction
+  if (imageUrls.length === 0) {
+    const directMatches = html.match(/https?:\/\/[^\s"'`<>&]+\.(jpg|jpeg|png|gif|webp)/gi);
+    if (directMatches) {
+      imageUrls.push(...directMatches);
+    }
+  }
+  
+  // Filter and return the first valid image
+  for (const url of imageUrls) {
+    if (url.length > 50 && !url.includes('bing.com') && !url.includes('gstatic.com')) {
+      return url;
+    }
+  }
+  
+  return null;
+};
+
+// Helper function to simplify product name for fallback search
+const simplifyProductName = (fullName) => {
+  // Remove color, specs, and extra details
+  // Examples:
+  // "Apple MacBook 14 inch blue color" -> "Apple MacBook"
+  // "SteelSeries Arctis Nova 3P Wireless Multi-Platform Gaming Headset – White" -> "SteelSeries Arctis Nova"
+  // "MSI MAG PANO M100R PZ Premium Mid-Tower Gaming PC Case – White" -> "MSI MAG PANO"
+  
+  // Remove common color words
+  let simplified = fullName.replace(/\b(blue|black|white|red|green|silver|gold|gray|grey|pink|purple|yellow|orange|brown|beige|transparent|matte|glossy|metallic)\b/gi, '');
+  
+  // Remove common descriptors
+  simplified = simplified.replace(/\b(inch|color|style|version|edition|model|variant|pro|max|plus|lite|standard|premium|deluxe|ultimate|professional)\b/gi, '');
+  
+  // Remove special characters and extra spaces
+  simplified = simplified.replace(/[–\-—]/g, ' ').replace(/\s+/g, ' ').trim();
+  
+  // Take first 2-3 words (usually brand + product type)
+  const words = simplified.split(' ').filter(w => w.length > 0);
+  return words.slice(0, 3).join(' ');
+};
+
+app.post('/api/admin/extract-image', async (req, res) => {
+  try {
+    if (!requireAdmin(req)) {
+      return res.status(401).json({ ok: false, error: 'unauthorized' });
+    }
+
+    const { productName } = req.body;
+    
+    if (!productName) {
+      return res.status(400).json({ ok: false, error: 'Product name required' });
+    }
+
+    console.log('[extract-image] 🔍 Extracting image for:', productName);
+
+    try {
+      // Try 1: Search with full product name
+      console.log('[extract-image] 📍 Attempt 1: Full product name search');
+      let imageUrl = await extractImageFromBing(productName);
+      
+      if (imageUrl) {
+        console.log('[extract-image] ✅ Found with full name:', imageUrl);
+        return res.json({ 
+          ok: true, 
+          imageUrl: imageUrl,
+          source: 'bing-images',
+          searchType: 'full-name'
+        });
+      }
+      
+      // Try 2: Search with simplified name (brand + product type only)
+      const simplifiedName = simplifyProductName(productName);
+      if (simplifiedName !== productName) {
+        console.log('[extract-image] 📍 Attempt 2: Simplified search -', simplifiedName);
+        imageUrl = await extractImageFromBing(simplifiedName);
+        
+        if (imageUrl) {
+          console.log('[extract-image] ✅ Found with simplified name:', imageUrl);
+          return res.json({ 
+            ok: true, 
+            imageUrl: imageUrl,
+            source: 'bing-images',
+            searchType: 'simplified-name'
+          });
+        }
+      }
+      
+      // Try 3: Search with just the brand name
+      const brandName = productName.split(' ')[0];
+      if (brandName && brandName.length > 2) {
+        console.log('[extract-image] 📍 Attempt 3: Brand only search -', brandName);
+        imageUrl = await extractImageFromBing(brandName);
+        
+        if (imageUrl) {
+          console.log('[extract-image] ✅ Found with brand name:', imageUrl);
+          return res.json({ 
+            ok: true, 
+            imageUrl: imageUrl,
+            source: 'bing-images',
+            searchType: 'brand-only'
+          });
+        }
+      }
+      
+      console.log('[extract-image] ❌ No image found after all attempts');
+      return res.status(404).json({ ok: false, error: 'No image found' });
+
+    } catch (error) {
+      console.error('[extract-image] Error:', error.message);
+      return res.status(500).json({ 
+        ok: false, 
+        error: 'Failed to extract image'
+      });
+    }
+
+  } catch (err) {
+    console.error('[extract-image] Error:', err.message);
+    return res.status(500).json({ 
+      ok: false, 
+      error: 'Internal server error'
     });
   }
 });
@@ -2130,6 +2349,93 @@ app.get('/api/products/:id', (req, res) => {
   } catch (e) {
     console.error('get product failed', e);
     res.status(500).json({ ok: false, error: 'server error' });
+  }
+});
+
+// Update product (PUBLIC - for frontend)
+app.put('/api/product/:id', async (req, res) => {
+  const id = req.params.id;
+  const updateData = req.body;
+  
+  console.log(`[product] PUT request for ID: ${id}`);
+  console.log(`[product] Update data:`, JSON.stringify(updateData, null, 2));
+  
+  if (!updateData || Object.keys(updateData).length === 0) {
+    console.log(`[product] No update data provided`);
+    return res.status(400).json({ ok: false, error: 'No update data provided' });
+  }
+
+  try {
+    // Try MongoDB first
+    try {
+      const mongoose = require('mongoose');
+      const ProductModel = getProductModel();
+      
+      if (ProductModel && mongoose.connection.readyState === 1) {
+        console.log(`[product] MongoDB connected, attempting update...`);
+        const product = await ProductModel.findByIdAndUpdate(
+          id,
+          updateData,
+          { new: true, runValidators: false }
+        );
+        
+        if (product) {
+          console.log(`[product] Successfully updated in MongoDB`);
+          return res.json({ ok: true, product });
+        } else {
+          console.log(`[product] Product not found in MongoDB: ${id}`);
+        }
+      } else {
+        console.log(`[product] MongoDB not connected, using JSON fallback`);
+      }
+    } catch (mongoErr) {
+      console.log(`[product] MongoDB error, using JSON fallback:`, mongoErr.message);
+    }
+    
+    // Fallback to JSON file
+    console.log(`[product] Reading from JSON file...`);
+    const products = readDataFile('products.json') || [];
+    console.log(`[product] Total products in JSON: ${products.length}`);
+    
+    const index = products.findIndex(p => {
+      const pId = String(p.id || p._id);
+      const searchId = String(id);
+      return pId === searchId;
+    });
+    
+    console.log(`[product] Found product at index: ${index}`);
+    
+    if (index === -1) {
+      console.log(`[product] Product not found in JSON: ${id}`);
+      return res.status(404).json({ ok: false, error: `Product not found: ${id}` });
+    }
+    
+    // Update all provided fields - but preserve existing images if not explicitly changed
+    const oldProduct = JSON.parse(JSON.stringify(products[index]));
+    Object.keys(updateData).forEach(key => {
+      // Only update image fields if they have a non-empty value
+      if (key === 'imageUrl' || key === 'img' || key === 'image') {
+        if (updateData[key] && updateData[key].trim()) {
+          products[index][key] = updateData[key];
+        }
+        // If empty, don't update - keep existing image
+      } else {
+        // For all other fields, update normally
+        products[index][key] = updateData[key];
+      }
+    });
+    
+    console.log(`[product] Old product:`, oldProduct);
+    console.log(`[product] New product:`, products[index]);
+    
+    writeDataFile('products.json', products);
+    console.log(`[product] Successfully saved to JSON file`);
+    
+    res.json({ ok: true, product: products[index] });
+  } catch (e) {
+    console.error(`[product] Error updating product:`, e.message);
+    console.error(`[product] Stack:`, e.stack);
+    res.status(500).json({ ok: false, error: e.message || 'server error' });
   }
 });
 
@@ -2284,6 +2590,129 @@ app.get('/api/prebuilds', (req, res) => {
   const prebuilds = readDataFile('prebuilds.json') || [];
   res.json(prebuilds);
 });
+
+// PUBLIC: Get all videos from database
+app.get('/api/videos', (req, res) => {
+  try {
+    const videos = safeLoadJSON('videos.json') || [];
+    res.json({ 
+      success: true,
+      videos: videos,
+      total: videos.length
+    });
+  } catch (err) {
+    console.error('[videos] Error fetching videos:', err.message);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch videos'
+    });
+  }
+});
+
+// PUBLIC: Get TikTok videos for a user
+app.get('/api/tiktok/videos', async (req, res) => {
+  try {
+    const username = req.query.username || 'aalacomputers';
+    const apiKey = process.env.TIKTOK_API_KEY || process.env.RAPIDAPI_KEY;
+    
+    if (!apiKey) {
+      console.warn('[tiktok] No API key configured, returning mock data');
+      return res.json({ 
+        videos: getMockTikTokVideos(),
+        source: 'mock'
+      });
+    }
+
+    const options = {
+      method: 'GET',
+      headers: {
+        'X-RapidAPI-Key': apiKey,
+        'X-RapidAPI-Host': 'tiktok-api.p.rapidapi.com'
+      }
+    };
+
+    const response = await fetch(
+      `https://tiktok-api.p.rapidapi.com/user/info?username=${username}`,
+      options
+    );
+
+    if (!response.ok) {
+      throw new Error(`TikTok API returned ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (data.user && data.user.pinnedVideos && data.user.pinnedVideos.length > 0) {
+      const videos = data.user.pinnedVideos.slice(0, 3).map(video => ({
+        id: video.id,
+        title: video.desc || 'TikTok Video',
+        likes: video.stats?.likeCount || 0,
+        comments: video.stats?.commentCount || 0,
+        shares: video.stats?.shareCount || 0,
+        videoUrl: `https://www.tiktok.com/@${username}/video/${video.id}`,
+        thumbnail: video.video?.downloadAddr || video.dynamicCover || '/placeholder.svg',
+        author: data.user.nickname || 'Aala Computers',
+        authorAvatar: data.user.avatarLarger || '/placeholder.svg'
+      }));
+      
+      console.log(`[tiktok] Fetched ${videos.length} videos for @${username}`);
+      return res.json({ videos, source: 'tiktok' });
+    } else {
+      console.warn('[tiktok] No pinned videos found, returning mock data');
+      return res.json({ 
+        videos: getMockTikTokVideos(),
+        source: 'mock'
+      });
+    }
+  } catch (err) {
+    console.error('[tiktok] Error fetching videos:', err.message);
+    // Return mock data as fallback
+    res.json({ 
+      videos: getMockTikTokVideos(),
+      source: 'mock',
+      error: err.message
+    });
+  }
+});
+
+// Helper function for mock TikTok videos
+function getMockTikTokVideos() {
+  return [
+    {
+      id: '7565218063243627794',
+      title: '110k PC that runs GTA 5 like a butter 🔥',
+      likes: 125400,
+      comments: 8900,
+      shares: 5200,
+      videoUrl: 'https://www.tiktok.com/@aalacomputers/video/7565218063243627794',
+      thumbnail: 'https://p16-sign.tiktokcdn.com/tos-pk-0-0-0/7565218063243627794~c5_1080x1920.jpeg',
+      author: 'Aala Computers',
+      authorAvatar: 'https://p16-sign.tiktokcdn.com/avatar/v2/aalacomputers.jpeg'
+    },
+    {
+      id: '2',
+      title: 'Budget Gaming PC Build - 50K PKR 💻',
+      likes: 89200,
+      comments: 6500,
+      shares: 3800,
+      videoUrl: 'https://www.tiktok.com/@aalacomputers/video/7564123456789012345',
+      thumbnail: 'https://via.placeholder.com/300x400?text=Budget+Gaming+PC',
+      author: 'Aala Computers',
+      authorAvatar: 'https://p16-sign.tiktokcdn.com/avatar/v2/aalacomputers.jpeg'
+    },
+    {
+      id: '3',
+      title: 'High-End Gaming Rig - RTX 4070 Beast 🚀',
+      likes: 156800,
+      comments: 11200,
+      shares: 7400,
+      videoUrl: 'https://www.tiktok.com/@aalacomputers/video/7563987654321098765',
+      thumbnail: 'https://via.placeholder.com/300x400?text=RTX+4070+Gaming+PC',
+      author: 'Aala Computers',
+      authorAvatar: 'https://p16-sign.tiktokcdn.com/avatar/v2/aalacomputers.jpeg'
+    }
+  ];
+}
 
 // PROTECTED: Create prebuild
 app.post('/api/admin/prebuilds', async (req, res) => {
@@ -3016,6 +3445,7 @@ app.get('/api/categories/dynamic', async (req, res) => {
 
 // Public: Get products for a specific category with OPTIMIZED filtering
 app.get('/api/categories/:slug/products', async (req, res) => {
+  const startTime = Date.now();
   try {
     const { slug } = req.params;
     const limit = parseInt(req.query.limit) || 24;
@@ -3024,7 +3454,7 @@ app.get('/api/categories/:slug/products', async (req, res) => {
     const brand = req.query.brand;
     const sortBy = req.query.sortBy || 'featured';
     
-    console.log(`[categories/${slug}/products] OPTIMIZED: slug="${slug}", page=${page}, brand="${brand || 'all'}"`);
+    console.log(`[categories/${slug}/products] START: slug="${slug}", page=${page}, brand="${brand || 'all'}"`);
     
     const ProductModel = getProductModel();
     
@@ -3084,7 +3514,8 @@ app.get('/api/categories/:slug/products', async (req, res) => {
         ProductModel.countDocuments(query)
       ]);
       
-      console.log(`[categories/${slug}/products] Found ${products.length} of ${total} total products (DB-level filtering)`);
+      const elapsed = Date.now() - startTime;
+      console.log(`[categories/${slug}/products] Found ${products.length} of ${total} total products (${elapsed}ms, DB-level filtering)`);
       
       // Apply keyword-based validation and auto-correct if needed
       const validatedProducts = products.map(product => {
@@ -3118,6 +3549,7 @@ app.get('/api/categories/:slug/products', async (req, res) => {
       
     } else {
       // Fallback to file-based products
+      console.log(`[categories/${slug}/products] Using JSON fallback (MongoDB not connected)`);
       const fileProducts = readDataFile('products.json') || [];
       const category = (readDataFile('categories.json') || []).find(c => c.slug === slug);
       const categoryName = category ? category.name : slug;
@@ -3128,6 +3560,8 @@ app.get('/api/categories/:slug/products', async (req, res) => {
       });
       
       const paginatedProducts = filtered.slice(skip, skip + limit);
+      const elapsed = Date.now() - startTime;
+      console.log(`[categories/${slug}/products] JSON fallback: Found ${paginatedProducts.length} of ${filtered.length} (${elapsed}ms)`);
       
       res.json({
         products: paginatedProducts,
@@ -3500,6 +3934,60 @@ app.delete('/api/admin/deals/:id', (req, res) => {
 // Endpoint to increment AI-open counter (called by frontend when AI opens product via window.aalaaiOpen)
 // AI open tracking endpoint removed.
 
+// ===== IMAGE PROXY ENDPOINT =====
+// Proxy endpoint to serve external images (Bing, Google, etc.) through our server
+// This bypasses CORS issues and allows frontend to display images
+app.get('/api/proxy-image', async (req, res) => {
+  try {
+    const imageUrl = req.query.url;
+    
+    if (!imageUrl) {
+      return res.status(400).json({ error: 'Missing url parameter' });
+    }
+    
+    // Validate URL is actually an image URL
+    if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+      return res.status(400).json({ error: 'Invalid URL' });
+    }
+    
+    // Use node-fetch or https to fetch the image
+    const https = require('https');
+    const http = require('http');
+    
+    const protocol = imageUrl.startsWith('https') ? https : http;
+    
+    // Set timeout and headers
+    const options = {
+      timeout: 10000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    };
+    
+    protocol.get(imageUrl, options, (response) => {
+      // Check if response is successful
+      if (response.statusCode !== 200) {
+        return res.status(response.statusCode).json({ error: 'Failed to fetch image' });
+      }
+      
+      // Set appropriate headers
+      res.setHeader('Content-Type', response.headers['content-type'] || 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      
+      // Pipe the image directly to response
+      response.pipe(res);
+    }).on('error', (err) => {
+      console.error('[proxy-image] Error fetching image:', err.message);
+      res.status(500).json({ error: 'Failed to fetch image' });
+    });
+    
+  } catch (error) {
+    console.error('[proxy-image] Error:', error.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Catch-all handler: send back React's index.html file for client-side routing
 // Use a middleware approach that's more reliable
 app.use((req, res, next) => {
@@ -3642,6 +4130,180 @@ async function startServer() {
       console.warn('[db] No MONGO_URI configured; using file-based storage');
     }
     
+    // ===== ADMIN STATISTICS ENDPOINT =====
+    app.get('/api/admin/statistics', async (req, res) => {
+      try {
+        if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+        
+        const mongoose = require('mongoose');
+        const ProductModel = getProductModel();
+        
+        let statistics = {
+          totalProducts: 0,
+          totalSales: 0,
+          totalRevenue: 0,
+          totalOrders: 0,
+          avgOrderValue: 0,
+          topProducts: [],
+          recentOrders: [],
+          salesByCategory: {}
+        };
+        
+        // Get total products from database
+        if (ProductModel && mongoose.connection.readyState === 1) {
+          try {
+            statistics.totalProducts = await ProductModel.countDocuments();
+          } catch (err) {
+            console.error('[admin/statistics] DB product count error:', err);
+          }
+        } else {
+          // Fallback to file
+          const products = readDataFile('products.json') || [];
+          statistics.totalProducts = products.length;
+        }
+        
+        // Load REAL orders from file
+        try {
+          const ordersData = readDataFile('orders.json') || [];
+          statistics.totalOrders = ordersData.length;
+          statistics.totalSales = ordersData.length;
+          statistics.totalRevenue = ordersData.reduce((sum, order) => sum + (order.total || 0), 0);
+          statistics.avgOrderValue = statistics.totalOrders > 0 ? Math.round(statistics.totalRevenue / statistics.totalOrders) : 0;
+          
+          // Get REAL top products from orders
+          const productSales = {};
+          ordersData.forEach(order => {
+            if (order.items && Array.isArray(order.items)) {
+              order.items.forEach(item => {
+                if (!productSales[item.name]) {
+                  productSales[item.name] = { name: item.name, sales: 0, revenue: 0 };
+                }
+                productSales[item.name].sales += item.qty || 1;
+                productSales[item.name].revenue += (item.price || 0) * (item.qty || 1);
+              });
+            }
+          });
+          
+          // Sort by revenue and get top 5
+          statistics.topProducts = Object.values(productSales)
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, 5);
+          
+          // Get REAL recent orders
+          statistics.recentOrders = ordersData.slice(-5).reverse().map(order => ({
+            id: order.id || Math.random().toString(36).substr(2, 9),
+            customerName: order.customerName || order.customer?.name || 'Guest',
+            total: order.total || 0,
+            date: order.date || order.createdAt || new Date().toISOString(),
+            items: order.items || []
+          }));
+          
+          // Calculate sales by category from orders
+          const categorySales = {};
+          ordersData.forEach(order => {
+            if (order.items && Array.isArray(order.items)) {
+              order.items.forEach(item => {
+                const category = item.category || 'Unknown';
+                if (!categorySales[category]) {
+                  categorySales[category] = 0;
+                }
+                categorySales[category] += (item.price || 0) * (item.qty || 1);
+              });
+            }
+          });
+          statistics.salesByCategory = categorySales;
+        } catch (err) {
+          console.error('[admin/statistics] Orders file error:', err);
+        }
+        
+        res.json({ ok: true, statistics });
+      } catch (err) {
+        console.error('[admin/statistics] Error:', err);
+        res.status(500).json({ ok: false, error: 'Failed to load statistics' });
+      }
+    });
+
+    // ===== UPDATE PRODUCT ENDPOINT =====
+    app.put('/api/admin/products/:id', async (req, res) => {
+      try {
+        if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+        
+        const productId = req.params.id;
+        const updateData = req.body;
+        
+        const mongoose = require('mongoose');
+        const ProductModel = getProductModel();
+        
+        if (ProductModel && mongoose.connection.readyState === 1) {
+          try {
+            const updated = await ProductModel.findByIdAndUpdate(
+              productId,
+              { $set: updateData },
+              { new: true }
+            );
+            
+            if (updated) {
+              return res.json({ ok: true, product: updated });
+            }
+          } catch (err) {
+            console.error('[admin/products/update] DB error:', err);
+          }
+        }
+        
+        // Fallback to file-based update
+        let products = readDataFile('products.json') || [];
+        const index = products.findIndex(p => (p.id || p._id) === productId);
+        
+        if (index !== -1) {
+          products[index] = { ...products[index], ...updateData };
+          writeDataFile('products.json', products);
+          return res.json({ ok: true, product: products[index] });
+        }
+        
+        res.status(404).json({ ok: false, error: 'Product not found' });
+      } catch (err) {
+        console.error('[admin/products/update] Error:', err);
+        res.status(500).json({ ok: false, error: 'Failed to update product' });
+      }
+    });
+
+    // ===== DELETE PRODUCT ENDPOINT =====
+    app.delete('/api/admin/products/:id', async (req, res) => {
+      try {
+        if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+        
+        const productId = req.params.id;
+        
+        const mongoose = require('mongoose');
+        const ProductModel = getProductModel();
+        
+        if (ProductModel && mongoose.connection.readyState === 1) {
+          try {
+            const deleted = await ProductModel.findByIdAndDelete(productId);
+            if (deleted) {
+              return res.json({ ok: true, message: 'Product deleted' });
+            }
+          } catch (err) {
+            console.error('[admin/products/delete] DB error:', err);
+          }
+        }
+        
+        // Fallback to file-based delete
+        let products = readDataFile('products.json') || [];
+        const filtered = products.filter(p => (p.id || p._id) !== productId);
+        
+        if (filtered.length < products.length) {
+          writeDataFile('products.json', filtered);
+          return res.json({ ok: true, message: 'Product deleted' });
+        }
+        
+        res.status(404).json({ ok: false, error: 'Product not found' });
+      } catch (err) {
+        console.error('[admin/products/delete] Error:', err);
+        res.status(500).json({ ok: false, error: 'Failed to delete product' });
+      }
+    });
+
     // ===== STATIC FILE SERVING (AFTER ALL API ROUTES) =====
     // Serve static files from dist (built frontend) - MUST be after API routes
     const distPath = path.join(__dirname, '..', 'dist');

@@ -1,230 +1,309 @@
-   # 🖥️ Aala Computer - E-Commerce Platform
+# Aala Computer - E-commerce Platform
 
-> A modern, high-performance e-commerce platform for PC parts and accessories with smart filtering, urgency indicators, and optimized image loading.
+A full-stack e-commerce application for PC parts and accessories, built with React, Vite, Express.js, and MongoDB.
 
-## ✨ Features
+## 🚀 Features
 
-### 🚀 Performance Optimized
-- **Fast Image Loading**: Preloading + compression + caching
-- **Gzip Compression**: 70% smaller response sizes
-- **Lazy Loading**: Images load as you scroll
-- **Code Splitting**: Optimized bundle sizes
+### Frontend
+- **Modern React 19** with hooks and suspense
+- **Vite** for fast development and building
+- **Tailwind CSS 4** for responsive design
+- **Framer Motion** for smooth animations
+- **React Router** for navigation
+- **Lucide React** for icons
 
-### 🎯 Sales Boosting
-- **Urgency Indicators**: "X viewing • Y bought • Z left" with fire icon
-- **FOMO Psychology**: Creates urgency to purchase
-- **Social Proof**: Shows real-time activity
+### Backend
+- **Express.js** REST API
+- **MongoDB** with Mongoose ODM
+- **JWT Authentication** for admin access
+- **CORS** enabled for cross-origin requests
+- **Compression** for performance
+- **Helmet** for security
 
-### 🔍 Smart Filtering
-- **Category Matching**: Fuzzy search in name and category
-- **Brand Filtering**: Works across all products
-- **Price Range**: Adjustable price filters
-- **Search**: Full-text search across all fields
+### Admin Dashboard
+- **Product Management** - Full CRUD operations
+- **Image Upload** - Local and external image support
+- **Deals Creation** - Create product combos with discounts
+- **Analytics** - Sales and product insights
+- **Category/Brand Management** - Organize inventory
+- **Bulk Operations** - Mass edit and update
 
-### 🎨 Modern UI/UX
-- **Gradient Buttons**: Professional design
-- **Hover Effects**: Smooth animations
-- **Image Zoom**: Interactive product cards
-- **Responsive**: Works on all devices
-
-### 🌐 Domain-Agnostic
-- Works on ANY domain automatically
-- No configuration needed
-- Supports custom backend URLs
+### User Features
+- **Product Catalog** - Browse with pagination
+- **Search & Filter** - Find products easily
+- **Shopping Cart** - Add to cart functionality
+- **Checkout** - Complete order process
+- **WhatsApp Integration** - Order notifications
 
 ## 📦 Installation
 
+### Prerequisites
+- Node.js 18+ 
+- MongoDB (local or cloud)
+- Git
+
+### Setup
+
 1. **Clone the repository**
-   ```bash
-   git clone https://github.com/ather123970/aalacomputer.git
-   cd aalacomputer
-   ```
+```bash
+git clone https://github.com/ather123970/aalacomputer.git
+cd aalacomputer
+```
 
 2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+```
 
-3. **Create `.env` file**
-   ```env
-   MONGO_URI=mongodb+srv://uni804043_db_user:2124377as@cluster0.0cy1usa.mongodb.net/aalacomputer?retryWrites=true&w=majority
-   ADMIN_EMAIL=admin@aalacomputer.com
-   ADMIN_PASSWORD=your_secure_password
-   JWT_SECRET=your_jwt_secret
-   PORT=10000
-   NODE_ENV=development
-   ```
+3. **Environment Setup**
+```bash
+# Copy environment template
+cp .env.example .env
 
-4. **Start development servers**
-   ```bash
-   # Terminal 1: Backend
-   npm run backend:start
-   
-   # Terminal 2: Frontend
-   npm run dev
-   ```
+# Edit .env with your configuration
+# Required: MONGO_URI, JWT_SECRET
+# Optional: PORT, FRONTEND_ORIGIN, etc.
+```
 
-5. **Access the application**
-   - Frontend: http://localhost:5173
-   - Backend: http://localhost:10000
-   - API: http://localhost:10000/api
+4. **Start Development**
+```bash
+# Start frontend (Vite dev server)
+npm run dev
 
-## 🛠️ Development
+# Start backend (Express server)
+npm run backend
 
-### Available Scripts
+# Or start both concurrently
+npm run dev & npm run backend
+```
 
-- `npm run dev` - Start Vite development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run backend:start` - Start Express server
-- `npm run backend:dev` - Start with nodemon (auto-restart)
+## 🌐 Deployment
 
-### Development Workflow
+### Production Build
+```bash
+# Build for production
+npm run build
 
-1. **Frontend Development**
-   ```bash
-   npm run dev
-   ```
-   - Frontend runs on http://localhost:5173
-   - API calls are proxied to http://localhost:3000
-
-2. **Backend Development**
-   ```bash
-   npm run backend:dev
-   ```
-   - Backend runs on http://localhost:3000
-   - Auto-restarts on file changes
-
-## 🚀 Deployment
-
-### Option 1: Render (Recommended)
-
-1. **Connect to GitHub**
-   - Link your GitHub repository to Render
-   - Set build command: `npm run build`
-   - Set start command: `node backend/index.cjs`
-
-2. **Environment Variables**
-   Set these in Render dashboard:
-   ```
-   MONGO_URI=mongodb+srv://uni804043_db_user:2124377as@cluster0.0cy1usa.mongodb.net/aalacomputer?retryWrites=true&w=majority
-   ADMIN_EMAIL=admin@yourdomain.com
-   ADMIN_PASSWORD=secure_password
-   JWT_SECRET=your_jwt_secret
-   ```
-
-3. **Deploy**
-   - Render will automatically deploy on git push
-
-### Option 2: Vercel
-
-1. **Connect Repository**
-   - Import project from GitHub to Vercel
-   - Vercel will auto-detect the configuration
-
-2. **Environment Variables**
-   Set in Vercel dashboard:
-   ```
-   MONGO_URI=mongodb+srv://uni804043_db_user:2124377as@cluster0.0cy1usa.mongodb.net/aalacomputer?retryWrites=true&w=majority
-   ADMIN_EMAIL=admin@yourdomain.com
-   ADMIN_PASSWORD=secure_password
-   JWT_SECRET=your_jwt_secret
-   ```
-
-### Option 3: Traditional VPS
-
-1. **Server Setup**
-   ```bash
-   # Install Node.js and MongoDB
-   sudo apt update
-   sudo apt install nodejs npm mongodb
-   
-   # Clone and setup
-   git clone https://github.com/ather123970/aalacomputer.git
-   cd aalacomputer
-   npm install
-   npm run build
-   ```
-
-2. **Start with PM2**
-   ```bash
-   npm install -g pm2
-   pm2 start backend/index.cjs --name "aalacomputer"
-   pm2 startup
-   pm2 save
-   ```
-
-## 🔧 Configuration
+# Preview production build
+npm run preview
+```
 
 ### Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `MONGO_URI` | MongoDB connection string | Yes |
-| `ADMIN_EMAIL` | Admin login email | Yes |
-| `ADMIN_PASSWORD` | Admin login password | Yes |
-| `JWT_SECRET` | JWT signing secret | Yes |
-| `PORT` | Server port (default: 10000) | No |
-| `FRONTEND_ORIGINS` | Allowed frontend origins | No |
+#### Required
+- `MONGO_URI` - MongoDB connection string
+- `JWT_SECRET` - Secret for JWT tokens
 
-### MongoDB Setup
+#### Optional
+- `PORT` - Backend port (default: 10000)
+- `NODE_ENV` - Environment (development/production)
+- `FRONTEND_ORIGIN` - Allowed frontend origins
+- `VITE_BACKEND_URL` - Backend URL for frontend
 
-1. **MongoDB Atlas (Cloud) - Recommended**
-   - Create account at https://cloud.mongodb.com
-   - Create cluster and get connection string
-   - Use connection string as `MONGO_URI`
+### Platform-Specific Deployment
 
-2. **Local MongoDB (Development Only)**
-   ```bash
-   # Install MongoDB
-   # Start MongoDB service
-   sudo systemctl start mongod
-   ```
+#### Vercel (Recommended)
+1. Connect repository to Vercel
+2. Set environment variables in Vercel dashboard
+3. Deploy automatically on push
 
-## 📱 Features Overview
+#### Render
+1. Connect repository to Render
+2. Use `render.yaml` configuration
+3. Set environment variables
+4. Deploy automatically
 
-### Customer Features
-- Browse products and deals
-- Add items to cart
-- User authentication
-- Order placement via WhatsApp
-- Order tracking
+#### Docker
+```bash
+# Build image
+docker build -t aalacomputer .
 
-### Admin Features
-- Product management (CRUD)
-- Order management
-- Analytics dashboard
-- User management
+# Run container
+docker run -p 3000:3000 aalacomputer
+```
 
-### Technical Features
-- Responsive design
-- PWA ready
-- SEO optimized
-- Fast loading with Vite
-- Secure authentication
+## 📁 Project Structure
+
+```
+aalacomputer/
+├── src/                    # Frontend source
+│   ├── components/         # React components
+│   ├── pages/             # Page components
+│   ├── config/            # Configuration
+│   ├── utils/             # Utility functions
+│   └── styles/            # CSS/Tailwind
+├── backend/                # Backend source
+│   ├── routes/            # API routes
+│   ├── models/            # MongoDB models
+│   ├── middleware/        # Express middleware
+│   └── data/              # JSON data storage
+├── api/                   # Serverless API (Vercel)
+├── public/                # Static assets
+├── dist/                  # Build output
+└── docs/                  # Documentation
+```
+
+## 🔧 Configuration
+
+### API Endpoints
+
+#### Products
+- `GET /api/products` - Get all products (with pagination)
+- `GET /api/products/:id` - Get single product
+- `POST /api/products` - Create product (admin)
+- `PUT /api/products/:id` - Update product (admin)
+- `DELETE /api/products/:id` - Delete product (admin)
+
+#### Categories & Brands
+- `GET /api/categories` - Get all categories
+- `GET /api/brands` - Get all brands
+- `POST /api/categories` - Create category (admin)
+- `POST /api/brands` - Create brand (admin)
+
+#### Deals
+- `GET /api/deals` - Get all deals
+- `POST /api/deals` - Create deal (admin)
+- `DELETE /api/deals/:id` - Delete deal (admin)
+
+#### Admin
+- `POST /api/admin/login` - Admin login
+- `GET /api/admin/stats` - Dashboard stats
+
+### Frontend Routes
+
+#### Public
+- `/` - Home page
+- `/products` - Product catalog
+- `/products/:id` - Product detail
+- `/categories` - Categories page
+- `/brands` - Brands page
+- `/cart` - Shopping cart
+- `/checkout` - Checkout process
+
+#### Admin
+- `/admin/login` - Admin login
+- `/admin/dashboard` - Admin dashboard
+
+## 🎯 Key Features
+
+### Multi-Domain Support
+The application automatically detects the domain and adjusts API calls:
+- **Development**: `http://localhost:10000`
+- **Production**: Uses current domain (works on any domain)
+- **Override**: Set `VITE_BACKEND_URL` environment variable
+
+### Image Handling
+- **Local Upload**: Drag & drop or file selection
+- **External URLs**: Paste image links
+- **Auto Preview**: Live image preview
+- **Fallback**: Placeholder for broken images
+
+### Performance Optimizations
+- **Lazy Loading**: Components and images
+- **Pagination**: 32 products per page
+- **Compression**: Gzip compression enabled
+- **Caching**: Browser and server caching
+- **Code Splitting**: Automatic with Vite
+
+### Security
+- **CORS**: Configured for allowed origins
+- **Helmet**: Security headers
+- **JWT**: Secure admin authentication
+- **Rate Limiting**: API protection
+- **Input Validation**: Data sanitization
+
+## 🛠️ Development
+
+### Scripts
+```bash
+# Development
+npm run dev              # Start Vite dev server
+npm run backend          # Start Express backend
+npm run server           # Start with nodemon
+
+# Building
+npm run build            # Production build
+npm run build:prod       # Production mode build
+npm run preview          # Preview build
+
+# Database
+npm run seed             # Seed database
+npm run import-products  # Import products
+npm run update-prices    # Update product prices
+
+# Testing
+npm run test-backend     # Test backend API
+npm run verify-products  # Verify product data
+```
+
+### Code Quality
+- **ESLint**: Code linting
+- **Prettier**: Code formatting
+- **Git Hooks**: Pre-commit checks
+- **TypeScript**: Optional type checking
+
+## 📊 Analytics & Monitoring
+
+### Admin Dashboard Features
+- **Product Count**: Total products in database
+- **Total Valuation**: Sum of all product prices
+- **Top Sellers**: Best performing products
+- **Category Distribution**: Products by category
+- **Stock Management**: Low stock alerts
+
+### Performance Metrics
+- **Page Load**: Optimized for fast loading
+- **API Response**: Sub-second response times
+- **Image Loading**: Progressive image loading
+- **Search**: Instant search with debouncing
+
+## 🚀 Production Checklist
+
+### Before Deployment
+- [ ] Set `NODE_ENV=production`
+- [ ] Configure `MONGO_URI`
+- [ ] Set strong `JWT_SECRET`
+- [ ] Update `FRONTEND_ORIGIN`
+- [ ] Test all API endpoints
+- [ ] Verify image loading
+- [ ] Test admin login
+- [ ] Check checkout process
+
+### After Deployment
+- [ ] Monitor error logs
+- [ ] Check performance metrics
+- [ ] Verify SSL certificates
+- [ ] Test domain URLs
+- [ ] Check mobile responsiveness
+- [ ] Validate payment flow
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the ISC License.
 
-## 📞 Support
+## 🆘 Support
 
-For support, email support@aalacomputer.com or create an issue in this repository.
+For issues and questions:
+- Create an issue on GitHub
+- Check the documentation
+- Review the troubleshooting guide
 
-## 🔗 Links
+## 🔄 Updates
 
-- **Live Demo**: [https://aalacomputer.com](https://aalacomputer.com)
-- **GitHub Repository**: [https://github.com/ather123970/aalacomputer](https://github.com/ather123970/aalacomputer)
-- **Documentation**: [DEPLOYMENT.md](DEPLOYMENT.md)
+The application is actively maintained with:
+- Regular security updates
+- Performance improvements
+- New features based on feedback
+- Bug fixes and patches
 
 ---
 
-Built with ❤️ for Aala Computer
+**Built with ❤️ for Aala Computer**
