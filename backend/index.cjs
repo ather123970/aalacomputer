@@ -2516,14 +2516,20 @@ app.get('/api/deals', (req, res) => {
     const mongoose = require('mongoose');
     const DealModel = getDealModel();
     if (DealModel && mongoose.connection.readyState === 1) {
-      DealModel.find({}).lean().sort({ createdAt: -1 }).then((docs) => res.json(docs)).catch(err => { 
+      DealModel.find({}).lean().sort({ createdAt: -1 }).then((docs) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.json(docs || []);
+      }).catch(err => { 
         console.error('[deals] list failed', err && (err.stack || err.message)); 
         res.status(500).json({ ok: false, error: 'db error' }); 
       });
       return;
     }
-  } catch (e) { /* fallback to file */ }
+  } catch (e) { 
+    console.error('[deals] error:', e);
+  }
   const deals = readDataFile('deals.json') || [];
+  res.setHeader('Content-Type', 'application/json');
   res.json(deals);
 });
 

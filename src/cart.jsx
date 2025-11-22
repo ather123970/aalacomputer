@@ -4,8 +4,8 @@ import Navbar from './nav'
 import { ShoppingCart, Trash2, Plus, Minus, TrendingUp, Zap, Clock, Gift, MessageCircle, Star, Cpu, Monitor, HardDrive, Mouse, Keyboard, Eye, ShoppingBag, Package, Flame } from 'lucide-react'
 import SmartImage from './components/SmartImage'
 
-import { API_BASE } from './config'
-const BASE = API_BASE
+import { API_CONFIG } from './config/api'
+const BASE = API_CONFIG.BASE_URL
 const API_CART = `${BASE.replace(/\/+$/, '')}/api/v1/cart`
 const DEFAULT_WH_NUMBER = '+923125066195'
 

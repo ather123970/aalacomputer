@@ -49,7 +49,7 @@ export default function Deal() {
     const fetchDeals = async () => {
       setLoading(true);
       try {
-        const base = API_BASE ? API_BASE.replace(/\/+$/, '') : '';
+        const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
         const response = await fetch(`${base}/api/deals`);
         if (response.ok) {
           const data = await response.json();

@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { Menu, X, ChevronDown, ShoppingCart, User } from 'lucide-react';
 import { motion as FM, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { API_CONFIG } from './config/api';
 
 const categories = [
   { name: 'Prebuilds', path: '/prebuild' },
@@ -72,12 +73,7 @@ export default function Navbar() {
   }, [location.pathname]);
 
   // Helper function to get API base URL
-  const getApiBaseUrl = () => {
-    if (import.meta.env.DEV) {
-      return import.meta.env.VITE_BACKEND_URL || 'http://localhost:10000';
-    }
-    return window.location.origin;
-  };
+  const getApiBaseUrl = () => API_CONFIG.BASE_URL;
 
   // keep your original auth + cart logic intact
   useEffect(() => {

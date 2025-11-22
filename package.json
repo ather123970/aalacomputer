@@ -80,5 +80,9 @@
     "url": "https://github.com/ather123970/aalacomputer/issues"
   },
   "homepage": "https://github.com/ather123970/aalacomputer#readme",
-  "type": "commonjs"
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
 }

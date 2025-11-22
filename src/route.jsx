@@ -17,6 +17,8 @@ const Checkout = React.lazy(() => import('./pages/Checkout'));
 const CheckoutPage = React.lazy(() => import('./pages/CheckoutPage'));
 const DealDetail = React.lazy(() => import('./pages/Dealdetail'));
 const Prebuilds = React.lazy(() => import('./pages/Prebuilds'));
+const AdminLogin = React.lazy(() => import('./pages/AdminLoginNew'));
+const AdminDashboard = React.lazy(() => import('./pages/AdminDashboardPro'));
 
 const Layout = () => {
   const location = useLocation();
