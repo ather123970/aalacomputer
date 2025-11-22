@@ -4,7 +4,7 @@ import { motion as FM } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
 import { signInWithPopup } from 'firebase/auth';
 import { app, auth, googleProvider } from '../firebaseClient';
-import { API_BASE } from '../config'
+import { API_CONFIG } from '../config/api'
 
 const cardVariants = {
   hidden: { opacity: 0, y: 10 },
@@ -21,7 +21,7 @@ export default function AuthPage() {
   const [error, setError] = useState(null);
   const [info, setInfo] = useState(null);
 
-  const BACKEND_URL = API_BASE
+  const BACKEND_URL = API_CONFIG.BASE_URL
 
   function update(field, value) {
     setForm((s) => ({ ...s, [field]: value }));

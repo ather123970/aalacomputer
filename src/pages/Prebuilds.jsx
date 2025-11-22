@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Cpu, HardDrive, MemoryStick, Monitor, Zap, Package } from 'lucide-react';
-import { API_BASE } from '../config';
+import { API_CONFIG } from '../config/api';
 import SmartImage from '../components/SmartImage';
 
 export default function Prebuilds() {

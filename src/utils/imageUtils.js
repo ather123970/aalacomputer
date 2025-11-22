@@ -58,7 +58,12 @@ export function getProductImageUrl(product, fallback = '/placeholder.svg') {
   // Find the first valid image URL
   for (const field of imageFields) {
     const url = product[field];
-    if (url && typeof url === 'string' && url.trim() !== '') {
+    // Check if URL exists, is a string, is not empty, and is not the literal "empty" string
+    if (url && typeof url === 'string' && url.trim() !== '' && url !== 'empty' && url.toLowerCase() !== 'empty') {
+      // Handle base64 encoded images (data:image/...)
+      if (url.startsWith('data:image/')) {
+        return url;
+      }
       // Handle relative paths
       if (url.startsWith('/') || url.startsWith('http')) {
         return url;
@@ -70,27 +75,8 @@ export function getProductImageUrl(product, fallback = '/placeholder.svg') {
     }
   }
   
-  // If no image found in product data, try to construct from product ID
-  if (product.id || product._id) {
-    const productId = product.id || product._id;
-    // Try common image paths
-    const possiblePaths = [
-      `/images/products/${productId}.jpg`,
-      `/images/products/${productId}.jpeg`,
-      `/images/products/${productId}.png`,
-      `/images/${productId}.jpg`,
-      `/products/${productId}.jpg`,
-      `/uploads/products/${productId}.jpg`
-    ];
-    
-    // Check if any of these files exist (this is just a best-effort check)
-    // In a real app, you'd want to verify these against your actual file structure
-    for (const path of possiblePaths) {
-      // This is a client-side check that doesn't verify if the file actually exists
-      // but helps with common patterns
-      return path;
-    }
-  }
+  // Don't try to construct local image paths - use only scraper images
+  // If no image found in product data, fall back to category placeholder
   
   // If we have a category, try to use a category-specific placeholder
   if (product.category) {

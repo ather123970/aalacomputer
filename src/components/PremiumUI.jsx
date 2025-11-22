@@ -1,17 +1,30 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { colors, shadows, typography, spacing } from '../theme/theme';
 import { useNavigate } from 'react-router-dom';
-import SmartImage from './SmartImage';
-import { getProductImageUrl } from '../utils/imageUtils';
+import SimpleImage from './SimpleImage';
+import { getImageFromProduct } from '../utils/simpleImageLoader';
+import { useProductContext } from '../context/ProductContext';
 
 export const ProductCard = ({ product, onClick, priority = false }) => {
-  const amount = typeof product?.price === 'number' ? product.price : (product?.price?.amount ?? 0);
-  const marketPrice = typeof product?.price === 'number' ? product.price : (product?.price?.marketPrice ?? amount);
-  const discount = typeof product?.price === 'number' ? 0 : (product?.price?.discount ?? 0);
-  const stockStatus = product?.stock?.status || 'in_stock';
+  const { getUpdatedProduct } = useProductContext();
   
-  // Smart image URL handling - supports both local and external URLs
-  const initialSrc = getProductImageUrl(product, '/placeholder.svg');
+  // Check if product was updated globally
+  const updatedProductData = useMemo(() => {
+    return getUpdatedProduct(product._id || product.id);
+  }, [getUpdatedProduct, product._id, product.id]);
+  
+  // Use updated data if available, otherwise use original
+  const displayProduct = useMemo(() => {
+    return updatedProductData || product;
+  }, [updatedProductData, product]);
+
+  const amount = typeof displayProduct?.price === 'number' ? displayProduct.price : (displayProduct?.price?.amount ?? 0);
+  const marketPrice = typeof displayProduct?.price === 'number' ? displayProduct.price : (displayProduct?.price?.marketPrice ?? amount);
+  const discount = typeof displayProduct?.price === 'number' ? 0 : (displayProduct?.price?.discount ?? 0);
+  const stockStatus = displayProduct?.stock?.status || 'in_stock';
+  
+  // Get image URL from product - checks ALL possible image fields
+  const initialSrc = getImageFromProduct(displayProduct) || '/placeholder.svg';
   
   // Generate urgency data (would come from backend in production)
   const viewingCount = React.useMemo(() => Math.floor(Math.random() * 50) + 20, [product?.id]);
@@ -47,13 +60,11 @@ export const ProductCard = ({ product, onClick, priority = false }) => {
 
       {/* Image Container */}
       <div className="relative aspect-square overflow-hidden bg-neutral-100">
-        <SmartImage
+        <SimpleImage
           src={initialSrc}
           alt={product?.name || product?.title || 'Product image'}
           product={product}
           className="object-contain w-full h-full transition-transform hover:scale-105 bg-white p-2"
-          loading={priority ? "eager" : "lazy"}
-          priority={priority}
         />
         {discount > 0 && (
           <div className="absolute top-4 right-4 bg-accent-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
@@ -64,8 +75,8 @@ export const ProductCard = ({ product, onClick, priority = false }) => {
 
       {/* Content */}
       <div className="p-4">
-        <div className="text-sm text-primary-600 font-semibold mb-1">{product?.brand || ''}</div>
-        <h3 className="text-lg font-semibold text-neutral-900 mb-2 line-clamp-2">{product?.name || 'Unnamed Product'}</h3>
+        <div className="text-sm text-primary-600 font-semibold mb-1">{displayProduct?.brand || ''}</div>
+        <h3 className="product-name text-lg font-semibold text-neutral-900 mb-2 line-clamp-2">{displayProduct?.name || displayProduct?.Name || 'Unnamed Product'}</h3>
         
         {/* Star Rating */}
         <div className="flex items-center gap-1 mb-2">
@@ -97,14 +108,12 @@ export const ProductCard = ({ product, onClick, priority = false }) => {
         
         {/* Price Section */}
         <div className="flex items-baseline gap-2 mb-3">
-          <span className="text-xl font-bold text-neutral-900">
-            Rs. {Number(amount || 0).toLocaleString()}
-          </span>
-          {discount > 0 && (
-            <span className="text-sm text-neutral-500 line-through">
-              Rs. {Number(marketPrice || 0).toLocaleString()}
-            </span>
-          )}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500 line-through">{marketPrice > amount ? `PKR ${marketPrice.toLocaleString()}` : ''}</p>
+              <p className="text-xl font-bold text-primary-600">PKR {(typeof displayProduct?.price === 'number' ? displayProduct.price : amount).toLocaleString()}</p>
+            </div>
+          </div>
         </div>
 
         {/* Stock Status */}
@@ -160,6 +169,7 @@ export const ProductCard = ({ product, onClick, priority = false }) => {
           </button>
         </div>
       </div>
+
     </div>
   );
 };
@@ -173,7 +183,7 @@ export const ProductGrid = ({ products }) => {
           key={product._id || product.id}
           product={product}
           onClick={() => navigate(`/products/${product._id || product.id}`)}
-          priority={index < 8} // Load first 8 images eagerly (2 rows on desktop)
+          priority={index < 8}
         />
       ))}
     </div>

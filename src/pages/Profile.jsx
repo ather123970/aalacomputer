@@ -34,7 +34,7 @@ function formatDate(d) {
   }
 }
 
-import { API_BASE } from '../config'
+import { API_CONFIG } from '../config/api'
 
 export default function Profile() {
   const [user, setUser] = useState(null);
@@ -42,7 +42,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
 
-  const BACKEND_URL = API_BASE.replace(/\/$/, '')
+  const BACKEND_URL = API_CONFIG.BASE_URL.replace(/\/$/, '')
 
   const stats = useMemo(() => {
     const totalOrders = Array.isArray(orders) ? orders.length : 0;

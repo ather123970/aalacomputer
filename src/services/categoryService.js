@@ -158,7 +158,7 @@ export async function fetchCategoryProducts(slug, options = {}) {
     
     // Add timeout and abort controller for better error handling
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout (increased from 10s)
     
     try {
       const response = await fetch(url, { signal: controller.signal });

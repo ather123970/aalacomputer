@@ -29,6 +29,7 @@ const PAKISTAN_CATEGORIES_BRANDS = {
 const ProductsManager = ({ onStatsUpdate }) => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState(Object.keys(PAKISTAN_CATEGORIES_BRANDS));
+  const [customCategories, setCustomCategories] = useState([]);
   const [brands, setBrands] = useState([]);
   const [filteredBrands, setFilteredBrands] = useState([]);
   
@@ -40,6 +41,10 @@ const ProductsManager = ({ onStatsUpdate }) => {
   
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
+  
   const [formData, setFormData] = useState({
     name: '',
     title: '',
@@ -424,7 +429,7 @@ const ProductsManager = ({ onStatsUpdate }) => {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto">
                 <div className="flex items-center gap-2 mb-4">
                   <button
                     type="button"
@@ -437,6 +442,7 @@ const ProductsManager = ({ onStatsUpdate }) => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
+                  {/* Product Name */}
                   <div className="col-span-2">
                     <label className="block text-sm font-medium mb-2">Product Name *</label>
                     <input
@@ -449,6 +455,7 @@ const ProductsManager = ({ onStatsUpdate }) => {
                     />
                   </div>
 
+                  {/* Price */}
                   <div>
                     <label className="block text-sm font-medium mb-2">Price (PKR) *</label>
                     <input
@@ -460,6 +467,7 @@ const ProductsManager = ({ onStatsUpdate }) => {
                     />
                   </div>
 
+                  {/* Stock */}
                   <div>
                     <label className="block text-sm font-medium mb-2">Stock</label>
                     <input
@@ -470,23 +478,67 @@ const ProductsManager = ({ onStatsUpdate }) => {
                     />
                   </div>
 
+                  {/* Category with Create New Option */}
                   <div>
                     <label className="block text-sm font-medium mb-2">Category *</label>
-                    <select
-                      required
-                      value={formData.category}
-                      onChange={(e) => setFormData({...formData, category: e.target.value})}
-                      className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select category</option>
-                      {categories.map(cat => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex gap-2">
+                      <select
+                        required
+                        value={formData.category}
+                        onChange={(e) => {
+                          if (e.target.value === 'NEW') {
+                            setShowNewCategoryInput(true);
+                          } else {
+                            setFormData({...formData, category: e.target.value});
+                            setShowNewCategoryInput(false);
+                          }
+                        }}
+                        className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Select category</option>
+                        {categories.map(cat => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                        {customCategories.map(cat => (
+                          <option key={cat} value={cat}>
+                            {cat} (Custom)
+                          </option>
+                        ))}
+                        <option value="NEW">+ Create New Category</option>
+                      </select>
+                    </div>
+                    {showNewCategoryInput && (
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          type="text"
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          placeholder="New category name"
+                          className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (newCategoryName.trim()) {
+                              setCustomCategories([...customCategories, newCategoryName]);
+                              setFormData({...formData, category: newCategoryName});
+                              setNewCategoryName('');
+                              setShowNewCategoryInput(false);
+                              setSuccess('✅ New category created!');
+                              setTimeout(() => setSuccess(''), 2000);
+                            }
+                          }}
+                          className="px-3 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    )}
                   </div>
 
+                  {/* Brand */}
                   <div>
                     <label className="block text-sm font-medium mb-2">Brand</label>
                     <select
@@ -506,17 +558,7 @@ const ProductsManager = ({ onStatsUpdate }) => {
                     </p>
                   </div>
 
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium mb-2">Image URL</label>
-                    <input
-                      type="text"
-                      value={formData.imageUrl}
-                      onChange={(e) => setFormData({...formData, imageUrl: e.target.value})}
-                      className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="https://example.com/image.jpg"
-                    />
-                  </div>
-
+                  {/* Description */}
                   <div className="col-span-2">
                     <label className="block text-sm font-medium mb-2">Description</label>
                     <textarea
@@ -524,9 +566,69 @@ const ProductsManager = ({ onStatsUpdate }) => {
                       onChange={(e) => setFormData({...formData, description: e.target.value})}
                       rows={3}
                       className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Product description..."
                     />
                   </div>
 
+                  {/* Image Section */}
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium mb-2">Product Image</label>
+                    
+                    {/* Image Preview */}
+                    {(imagePreview || formData.imageUrl) && (
+                      <div className="mb-3 p-3 bg-gray-900 rounded-lg border border-gray-700">
+                        <img
+                          src={imagePreview || formData.imageUrl}
+                          alt="Preview"
+                          className="w-full h-40 object-contain rounded"
+                          onError={(e) => e.target.src = 'https://via.placeholder.com/300x300?text=Invalid+Image'}
+                        />
+                      </div>
+                    )}
+
+                    {/* Image URL Input */}
+                    <div className="mb-3">
+                      <label className="text-xs text-gray-400 mb-1 block">External Image URL</label>
+                      <input
+                        type="text"
+                        value={formData.imageUrl}
+                        onChange={(e) => {
+                          setFormData({...formData, imageUrl: e.target.value});
+                          setImagePreview(e.target.value);
+                        }}
+                        className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="https://example.com/image.jpg"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">💡 Paste image URL from Google Images, Amazon, etc.</p>
+                    </div>
+
+                    {/* Local File Upload */}
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">Or Upload from Device</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              const base64 = event.target?.result;
+                              setFormData({...formData, imageUrl: base64});
+                              setImagePreview(base64);
+                              setSuccess('✅ Image uploaded!');
+                              setTimeout(() => setSuccess(''), 2000);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">📁 Supported: JPG, PNG, GIF, WebP</p>
+                    </div>
+                  </div>
+
+                  {/* Warranty */}
                   <div>
                     <label className="block text-sm font-medium mb-2">Warranty</label>
                     <input
@@ -534,11 +636,12 @@ const ProductsManager = ({ onStatsUpdate }) => {
                       value={formData.WARRANTY}
                       onChange={(e) => setFormData({...formData, WARRANTY: e.target.value})}
                       className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="e.g., 1 Year"
                     />
                   </div>
                 </div>
 
-                <div className="flex gap-3 pt-4">
+                <div className="flex gap-3 pt-4 sticky bottom-0 bg-gray-900 p-4 -m-4 mt-4">
                   <button
                     type="submit"
                     disabled={loading}
@@ -549,7 +652,12 @@ const ProductsManager = ({ onStatsUpdate }) => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowModal(false)}
+                    onClick={() => {
+                      setShowModal(false);
+                      setShowNewCategoryInput(false);
+                      setNewCategoryName('');
+                      setImagePreview('');
+                    }}
                     className="px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-xl font-semibold transition-colors"
                   >
                     Cancel

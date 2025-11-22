@@ -29,6 +29,52 @@ router.get('/config', (req, res) => {
   res.json({ whatsapp: WHATSAPP_NUMBER });
 });
 
+// Send order details via WhatsApp (frontend handles the actual WhatsApp link)
+// This endpoint just logs the order and returns confirmation
+router.post('/send-whatsapp-order', async (req, res) => {
+  try {
+    const { items, total, customer, paymentMethod, message } = req.body;
+    
+    if (!items || !customer) {
+      return res.status(400).json({ ok: false, message: 'Missing required fields' });
+    }
+
+    // Log the order for admin reference
+    console.log('[WhatsApp Order] New order received:', {
+      customerName: customer.name,
+      customerPhone: customer.phone,
+      totalAmount: total,
+      paymentMethod: paymentMethod,
+      itemCount: items.length,
+      timestamp: new Date().toISOString()
+    });
+
+    // Save order to storage
+    const existing = await readJSON('orders', []);
+    const newOrder = {
+      id: 'whatsapp_' + Date.now(),
+      createdAt: new Date().toISOString(),
+      items: items,
+      total: total,
+      customer: customer,
+      paymentMethod: paymentMethod,
+      status: 'pending',
+      source: 'whatsapp'
+    };
+    existing.unshift(newOrder);
+    await writeJSON('orders', existing);
+
+    return res.json({
+      ok: true,
+      message: 'Order received. Our team will contact you shortly.',
+      orderId: newOrder.id
+    });
+  } catch (e) {
+    console.error('Failed to process WhatsApp order:', e);
+    return res.status(500).json({ ok: false, message: 'Failed to process order' });
+  }
+});
+
 // Get cart - return persisted cart (demo storage) or empty array
 router.get('/cart', async (req, res) => {
   try {

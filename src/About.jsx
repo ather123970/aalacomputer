@@ -69,13 +69,6 @@ const About = () => {
               Every build is tuned for speed, style, and reliability — made for gamers, creators, and everyday legends.
             </p>
 
-            {/* Social Icons */}
-            <div className="flex gap-6 mt-4">
-              <FM.a whileHover={{ scale: 1.2 }} href="#" className="hover:text-blue-500"><Facebook /></FM.a>
-              <FM.a whileHover={{ scale: 1.2 }} href="#" className="hover:text-pink-500"><Instagram /></FM.a>
-              <FM.a whileHover={{ scale: 1.2 }} href="#" className="hover:text-sky-400"><Twitter /></FM.a>
-              <FM.a whileHover={{ scale: 1.2 }} href="#" className="hover:text-red-500"><Youtube /></FM.a>
-            </div>
           </FM.div>
 
           {/* Contact Form */}
@@ -155,13 +148,6 @@ const About = () => {
               We build your dream PCs. Pre-Built, Custom Builds, and top-quality parts for gamers, creators, and professionals.
             </p>
 
-            {/* Social Icons */}
-            <div className="flex gap-4 mt-2">
-              <a href="#" className="hover:text-blue-500"><Facebook /></a>
-              <a href="#" className="hover:text-pink-500"><Instagram /></a>
-              <a href="#" className="hover:text-sky-400"><Twitter /></a>
-              <a href="#" className="hover:text-red-500"><Youtube /></a>
-            </div>
           </div>
 
           {/* Quick Links */}

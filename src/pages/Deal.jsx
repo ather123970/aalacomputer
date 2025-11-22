@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, Tag, TrendingDown, Flame, AlertCircle } from 'lucide-react';
-import { API_BASE } from '../config';
+import { API_CONFIG } from '../config/api';
 
 // Deal rotation settings
 const DEAL_ROTATION_HOURS = 5;

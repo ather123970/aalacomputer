@@ -28,7 +28,7 @@ const ProductSkeleton = () => (
 const CategoryProductsPage = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const ITEMS_PER_PAGE = 32;
+  const ITEMS_PER_PAGE = 500; // Increased to load more products at once
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,14 +42,16 @@ const CategoryProductsPage = () => {
   const [hasMore, setHasMore] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  const [allProductsLoaded, setAllProductsLoaded] = useState(false);
 
-  // Load category and initial products
+  // Load category and ALL products recursively
   const loadCategoryAndProducts = useCallback(async () => {
     setLoading(true);
     setIsInitialLoad(true);
     setCurrentPage(1);
     setProducts([]);
     setFilteredProducts([]);
+    setAllProductsLoaded(false);
     
     try {
       // Get category info from static data (fallback) or dynamic API
@@ -71,24 +73,39 @@ const CategoryProductsPage = () => {
       
       setCategory(categoryInfo);
       
-      // Fetch products - always start with page 1
-      const result = await fetchCategoryProducts(slug, { 
-        limit: ITEMS_PER_PAGE, 
-        page: 1
-      });
+      // Load ALL products by fetching all pages
+      let allProducts = [];
+      let page = 1;
+      let hasMorePages = true;
       
-      console.log(`[CategoryProducts] Loaded ${result.products?.length || 0} products for ${slug}`);
+      while (hasMorePages) {
+        const result = await fetchCategoryProducts(slug, { 
+          limit: ITEMS_PER_PAGE, 
+          page: page
+        });
+        
+        const pageProducts = result.products || [];
+        console.log(`[CategoryProducts] Page ${page}: Loaded ${pageProducts.length} products`);
+        
+        if (pageProducts.length === 0) {
+          hasMorePages = false;
+        } else {
+          allProducts = [...allProducts, ...pageProducts];
+          hasMorePages = result.hasMore || (pageProducts.length === ITEMS_PER_PAGE);
+          page++;
+        }
+      }
       
-      const newProducts = result.products || [];
-      setProducts(newProducts);
-      setFilteredProducts(newProducts); // Set immediately so products show on initial load
-      setTotalPages(Math.ceil((result.total || 0) / ITEMS_PER_PAGE));
-      setHasMore((result.products?.length || 0) >= ITEMS_PER_PAGE);
+      console.log(`[CategoryProducts] Total loaded: ${allProducts.length} products for ${slug}`);
       
-      console.log(`[CategoryProducts] Total: ${result.total}, Pages: ${Math.ceil((result.total || 0) / ITEMS_PER_PAGE)}, HasMore: ${(result.products?.length || 0) >= ITEMS_PER_PAGE}`);
+      setProducts(allProducts);
+      setFilteredProducts(allProducts);
+      setTotalPages(1); // All products on one page
+      setHasMore(false);
+      setAllProductsLoaded(true);
       
       // Extract unique brands
-      const brands = [...new Set(newProducts.map(p => p.brand).filter(Boolean))];
+      const brands = [...new Set(allProducts.map(p => p.brand).filter(Boolean))];
       setAvailableBrands(brands.sort());
       
     } catch (error) {
@@ -97,7 +114,7 @@ const CategoryProductsPage = () => {
       setLoading(false);
       setIsInitialLoad(false);
     }
-  }, [slug]);
+  }, [slug, ITEMS_PER_PAGE]);
 
   useEffect(() => {
     loadCategoryAndProducts();

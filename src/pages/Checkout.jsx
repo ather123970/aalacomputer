@@ -6,8 +6,8 @@ import { ShoppingCart, Package, CreditCard, CheckCircle, ArrowLeft } from 'lucid
 import SmartImage from '../components/SmartImage'
 
 const DEFAULT_WH_NUMBER = '+923125066195'
-import { API_BASE } from '../config'
-const API_CART = API_BASE.replace(/\/+$/, '') + '/v1/cart'
+import { API_CONFIG } from '../config/api'
+const API_CART = API_CONFIG.BASE_URL.replace(/\/+$/, '') + '/v1/cart'
 
 const Checkout = () => {
   const [pending, setPending] = useState(null)

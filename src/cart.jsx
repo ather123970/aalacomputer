@@ -549,7 +549,7 @@ export default function Cart() {
                   </div>
 
                   <button
-                    onClick={openWhatsApp}
+                    onClick={() => navigate('/checkout')}
                     className="w-full bg-green-500 hover:bg-green-600 text-white py-4 px-6 rounded-lg font-bold text-lg transition-all flex items-center justify-center gap-2 shadow-lg"
                   >
                     <MessageCircle className="w-6 h-6" />

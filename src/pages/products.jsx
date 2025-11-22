@@ -1,12 +1,22 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import Nav from "../nav";
-import { API_CONFIG } from '../config/api';
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useInView } from "react-intersection-observer";
+import { ProductGrid, LoadingSpinner } from "../components/PremiumUI";
+import { API_CONFIG } from "../config/api";
+import { PC_HARDWARE_CATEGORIES } from "../data/categoriesData";
+import { categoriesMatch, normalizeCategory } from "../utils/categoryMatcher";
+import SimpleImage from '../components/SimpleImage';
+import { getImageFromProduct } from '../utils/simpleImageLoader';
 import { ChevronDown, ArrowUp } from 'lucide-react';
-import SmartImage from '../components/SmartImage';
+import Nav from '../nav';
 
 const getImageUrl = (path) => {
   if (!path) return "/placeholder.svg";
+  
+  // For base64 images, return directly
+  if (path.startsWith('data:image/')) {
+    return path;
+  }
   
   // For external URLs, return them directly (no proxy)
   if (path.startsWith('http://') || path.startsWith('https://')) {
@@ -22,9 +32,60 @@ const getImageUrl = (path) => {
   return `/images/${path}`;
 };
 
+// Get image from product - more robust version for modal
+const getProductImage = (product) => {
+  if (!product) return '/placeholder.svg';
+  
+  // Check all possible image fields
+  const imageFields = [
+    'img', 'imageUrl', 'image', 'image_url', 'imageLink', 'image_link',
+    'photo', 'photoUrl', 'photo_url', 'picture', 'pictureUrl', 'picture_url',
+    'thumbnail', 'thumbnailUrl', 'thumbnail_url', 'src', 'url', 
+    'imageUrl1', 'image1', 'image1_url'
+  ];
+  
+  for (const field of imageFields) {
+    const value = product[field];
+    if (value && typeof value === 'string' && value.trim()) {
+      const trimmed = value.trim();
+      // Skip placeholder values
+      if (trimmed === 'empty' || trimmed === 'null' || trimmed === 'undefined') continue;
+      // Return valid URLs
+      if (trimmed.startsWith('http') || trimmed.startsWith('data:') || trimmed.startsWith('/')) {
+        return trimmed;
+      }
+    }
+  }
+  
+  return '/placeholder.svg';
+};
+
+// Get product name - more robust version
+const getProductName = (product) => {
+  if (!product) return 'Unnamed Product';
+  
+  // Check all possible name fields
+  const nameFields = ['Name', 'name', 'title', 'productName', 'product_name', 'productTitle', 'product_title'];
+  
+  for (const field of nameFields) {
+    const value = product[field];
+    if (value && typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed && trimmed !== 'empty' && trimmed !== 'null' && trimmed !== 'undefined') {
+        return trimmed;
+      }
+    }
+  }
+  
+  // If no name field found, log the product structure for debugging
+  console.log('[Modal] Product has no name field. Available fields:', Object.keys(product).slice(0, 20));
+  
+  return 'Unnamed Product';
+};
+
 // Enhanced categories with better organization
 const defaultCategories = [
-  "All Products",
+  "All",
   "Processors",
   "Motherboards", 
   "Graphics Cards",
@@ -45,7 +106,7 @@ const defaultCategories = [
 
 // Enhanced brand mapping with more comprehensive coverage
 const brandOptionsByCategory = {
-  "All Products": [],
+  "All": [],
   "Processors": ["Intel", "AMD"],
   "Motherboards": ["ASUS", "MSI", "Gigabyte", "ASRock", "Biostar"],
   "Graphics Cards": ["ASUS", "MSI", "Gigabyte", "ZOTAC", "PNY", "XFX", "Sapphire", "PowerColor"],
@@ -67,12 +128,12 @@ const brandOptionsByCategory = {
 const Products = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [selectedCategory, setSelectedCategory] = useState("All Products"); // Default to "All Products" to show all products
+  const [selectedCategory, setSelectedCategory] = useState("All");
   const [priceRange, setPriceRange] = useState([0, 500000]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 32;
+  const PAGE_SIZE = 200;
   const [loadingId, setLoadingId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [openCategory, setOpenCategory] = useState(null);
@@ -87,6 +148,8 @@ const Products = () => {
   const [totalProducts, setTotalProducts] = useState(0);
   const [categories, setCategories] = useState(defaultCategories);
   const [loadingCategories, setLoadingCategories] = useState(true);
+  const [productsWithoutImages, setProductsWithoutImages] = useState([]);
+  
 
   // Load categories from database
   useEffect(() => {
@@ -108,21 +171,25 @@ const Products = () => {
           // Extract category names and add "All" at the beginning
           // Filter out prebuild categories since they have their own page
           const categoryNames = categoriesData
-            .filter(cat => cat.published !== false)
             .filter(cat => {
-              const catName = (cat.name || '').toLowerCase();
-              return !catName.includes('prebuild') && 
+              // Handle both string and object formats
+              const catName = (typeof cat === 'string' ? cat : (cat.name || '')).toLowerCase();
+              return catName && 
+                     !catName.includes('prebuild') && 
                      !catName.includes('pre-build') &&
                      catName !== 'gaming pc' &&
                      catName !== 'pc build';
             })
-            .map(cat => cat.name);
+            .map(cat => typeof cat === 'string' ? cat : cat.name)
+            .filter(Boolean);
           
           if (categoryNames.length > 0) {
-            setCategories(['All', ...categoryNames]);
-            console.log('[Products] Loaded categories from database (excluding prebuilds):', categoryNames.length);
+            const finalCategories = ['All', ...categoryNames];
+            setCategories(finalCategories);
+            console.log('[Products] Loaded categories from database:', finalCategories);
           } else {
             console.log('[Products] Using default categories');
+            setCategories(defaultCategories);
           }
         }
       } catch (error) {
@@ -136,192 +203,128 @@ const Products = () => {
     loadCategories();
   }, []);
 
-  // Load products with pagination support (MUST be defined before useEffect that uses it)
-  const loadProducts = useCallback(async (page = 1, append = false) => {
-    console.log(`[Products] loadProducts called - page: ${page}, append: ${append}`);
-    
-    if (page === 1) {
+  // Load ALL products on mount (only once)
+  useEffect(() => {
+    const loadAllProducts = async () => {
+      console.log(`[Products] Loading ALL products...`);
+      
       setIsLoading(true);
-    } else {
-      setLoadingMore(true);
-    }
-    
-    try {
-      const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
-      console.log(`[Products] API Base URL: ${base}`);
       
-      const endpoints = [`${base}/api/products`]; // Use only the main endpoint
-      let allProductsData = [];
-      let total = 0;
-      
-      // Try each endpoint
-      for (const url of endpoints) {
-        try {
-          // Build query parameters
-          const queryParams = new URLSearchParams({
-            page: page,
-            limit: PAGE_SIZE
-          });
-          
-          // Add filters if they exist
-          if (selectedCategory && selectedCategory !== "All" && selectedCategory !== "All Products") {
-            queryParams.append('category', selectedCategory);
-          }
-          if (selectedBrand) {
-            queryParams.append('brand', selectedBrand);
-          }
-          if (searchQuery) {
-            queryParams.append('search', searchQuery);
-          }
-          
-          const batchUrl = `${url}?${queryParams.toString()}`;
-          console.log(`[Products] Fetching: ${batchUrl}`);
-          
-          const resp = await fetch(batchUrl, {
-            signal: AbortSignal.timeout(15000)
-          });
-          
-          if (resp.ok) {
-            const json = await resp.json();
-            console.log(`[Products] API Response type:`, Array.isArray(json) ? 'Array' : 'Object');
-            let batchData = [];
-            
-            if (Array.isArray(json)) {
-              batchData = json;
-              total = json.length;
-              console.log(`[Products] Got ${json.length} products as array`);
-            } else if (json && Array.isArray(json.products)) {
-              batchData = json.products;
-              total = json.total || batchData.length;
-              setHasMoreProducts(json.hasMore || batchData.length === PAGE_SIZE);
-              console.log(`[Products] Got ${batchData.length} products from json.products`);
-            }
-            
-            if (batchData.length > 0) {
-              allProductsData = batchData;
-              console.log(`[Products] Loaded page ${page}: ${batchData.length} products`);
-              break;
-            } else {
-              console.warn(`[Products] No products in response for page ${page}`);
-              setHasMoreProducts(false);
-            }
-          } else {
-            console.error(`[Products] API returned status ${resp.status}`);
-          }
-        } catch (error) {
-          console.warn(`[Products] Failed to load products from ${url}:`, error.message);
-        }
-      }
-      
-      console.log(`[Products] Total products fetched: ${allProductsData.length}`);
-      
-      if (allProductsData.length > 0) {
-        // Filter out prebuild products - they should only show on /prebuild page
-        const nonPrebuildProducts = allProductsData.filter(p => {
-          const category = (p.category || '').toLowerCase();
-          // Exclude any product with prebuild-related category
-          return !category.includes('prebuild') && 
-                 !category.includes('pre-build') && 
-                 !category.includes('gaming pc') &&
-                 category !== 'pc build';
+      try {
+        const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
+        console.log(`[Products] API Base URL: ${base}`);
+        
+        // Load ALL products at once - NO filters, NO pagination
+        // Use very high limit to get all products
+        const url = `${base}/api/products?limit=50000`;
+        console.log(`[Products] Fetching: ${url}`);
+        
+        const resp = await fetch(url, {
+          signal: AbortSignal.timeout(30000)
         });
         
-        console.log(`[Products] After filtering prebuilds: ${nonPrebuildProducts.length} products (filtered out ${allProductsData.length - nonPrebuildProducts.length})`);
+        if (!resp.ok) {
+          throw new Error(`API returned status ${resp.status}`);
+        }
         
-        const formattedProducts = nonPrebuildProducts.map(p => {
-          // Prefer normalized priceAmount if present, fall back to price
-          const numericPrice = Number(p.priceAmount ?? p.price ?? 0) || 0;
-
-          // Support images array and backward-compatible single fields
-          const images = Array.isArray(p.images) && p.images.length > 0
-            ? p.images
-            : (p.imageUrl || p.img) ? [{ url: p.imageUrl || p.img, alt: p.title || p.name || p.Name, primary: true }] : [];
-
-          const primaryFromArray = images.find(i => i.primary && i.url);
-          const imageUrlCandidate = p.imageUrlPrimary || (primaryFromArray && primaryFromArray.url) || (images[0] && images[0].url) || p.imageUrl || p.img;
-
-          return {
+        const json = await resp.json();
+        console.log(`[Products] API Response:`, json);
+        
+        let batchData = [];
+        let total = 0;
+        
+        // Handle different response formats
+        if (Array.isArray(json)) {
+          batchData = json;
+          total = json.length;
+          console.log(`[Products] Response is array with ${batchData.length} items`);
+        } else if (json && Array.isArray(json.products)) {
+          batchData = json.products;
+          total = json.total || batchData.length;
+          console.log(`[Products] Response has products array with ${batchData.length} items`);
+        } else {
+          console.warn(`[Products] Unexpected response format:`, json);
+          batchData = [];
+        }
+        
+        console.log(`[Products] Got ${batchData.length} products, total: ${total}`);
+        
+        if (batchData && batchData.length > 0) {
+          // Format all products - preserve ALL fields from database
+          const formattedProducts = batchData.map(p => ({
+            // IDs
             id: p._id || p.id,
+            _id: p._id,
+            
+            // Names
             Name: p.Name || p.title || p.name || 'Unnamed Product',
             name: p.Name || p.title || p.name || 'Unnamed Product',
-            price: numericPrice,
-            img: p.img || p.imageUrl || imageUrlCandidate,
-            imageUrl: p.imageUrl || p.img || imageUrlCandidate,
-            images,
-            imageUrlPrimary: p.imageUrlPrimary || null,
-            Spec: Array.isArray(p.Spec) ? p.Spec : (Array.isArray(p.specs) ? p.specs : (p.description ? [p.description] : [])),
+            title: p.title || p.Name || p.name,
+            
+            // Price
+            price: Number(p.priceAmount ?? p.price ?? 0) || 0,
+            
+            // Images - preserve ALL image fields from database
+            img: p.img,
+            imageUrl: p.imageUrl,
+            image: p.image,
+            image_url: p.image_url,
+            imageLink: p.imageLink,
+            image_link: p.image_link,
+            photo: p.photo,
+            photoUrl: p.photoUrl,
+            photo_url: p.photo_url,
+            picture: p.picture,
+            pictureUrl: p.pictureUrl,
+            picture_url: p.picture_url,
+            thumbnail: p.thumbnail,
+            thumbnailUrl: p.thumbnailUrl,
+            thumbnail_url: p.thumbnail_url,
+            src: p.src,
+            url: p.url,
+            imageUrl1: p.imageUrl1,
+            image1: p.image1,
+            image1_url: p.image1_url,
+            
+            // Category & Brand
             category: p.category || 'Other',
             brand: p.brand || null,
-            type: p.type || null,
-            styles: p.styles || null
-          };
-        });
-        
-        if (append) {
-          setAllProducts(prev => [...prev, ...formattedProducts]);
-        } else {
-          console.log(`[Products] Setting allProducts state with ${formattedProducts.length} products`);
+            
+            // Specs
+            Spec: Array.isArray(p.Spec) ? p.Spec : (Array.isArray(p.specs) ? p.specs : []),
+            
+            // Preserve all other fields
+            ...p
+          }));
+          
+          console.log(`[Products] Formatted ${formattedProducts.length} products`);
           setAllProducts(formattedProducts);
-          setTotalProducts(total);
+          setTotalProducts(formattedProducts.length);
+          
+          try {
+            localStorage.setItem("products", JSON.stringify(formattedProducts));
+            console.log(`[Products] Cached products to localStorage`);
+          } catch (e) {
+            console.warn("[Products] Failed to cache products in localStorage", e);
+          }
+        } else {
+          console.warn(`[Products] No products in response`);
+          setAllProducts([]);
+          setTotalProducts(0);
         }
-        
-        try {
-          localStorage.setItem("products", JSON.stringify(formattedProducts));
-        } catch (e) {
-          console.warn("[Products] Failed to cache products in localStorage", e);
-        }
-        
-        if (page === 1) {
-          setCurrentPage(1);
-        }
-      } else if (!append) {
+      } catch (error) {
+        console.error('[Products] Failed to load products from backend:', error);
         setAllProducts([]);
         setTotalProducts(0);
-      }
-    } catch (error) {
-      console.error('[Products] Failed to load products from backend:', error);
-      if (!append) {
-        setAllProducts([]);
-        setTotalProducts(0);
-      }
-    } finally {
-      if (page === 1) {
+      } finally {
         setIsLoading(false);
-      } else {
-        setLoadingMore(false);
       }
-    }
-  }, [selectedCategory, selectedBrand, searchQuery]);
-
-  // Fetch products from backend on component mount
-  useEffect(() => {
-    loadProducts(1, false);
-
-    // Listen for product updates from admin (same-tab) and storage events (cross-tab)
-    const onProductsUpdated = () => {
-      loadProducts(1, false);
     };
 
-    const onStorage = (e) => {
-      if (e && e.key === 'products_last_updated') onProductsUpdated();
-    };
+    loadAllProducts();
+  }, []); // Empty dependency array - only run once on mount
 
-    window.addEventListener('products-updated', onProductsUpdated);
-    window.addEventListener('storage', onStorage);
 
-    return () => {
-      window.removeEventListener('products-updated', onProductsUpdated);
-      window.removeEventListener('storage', onStorage);
-    };
-  }, [loadProducts]);
-
-  // Load more products when scrolling to bottom
-  const loadMoreProducts = useCallback(() => {
-    if (!loadingMore && hasMoreProducts) {
-      loadProducts(currentPage + 1, true);
-      setCurrentPage(prev => prev + 1);
-    }
-  }, [loadingMore, hasMoreProducts, currentPage, loadProducts]);
 
   // Filter products when category, brand, or price changes
   useEffect(() => {
@@ -339,53 +342,9 @@ const Products = () => {
         return matchPrice;
       }
       
-      // For specific categories, do flexible matching
-      const productCategory = norm(p.category);
-      const selectedCat = norm(selectedCategory);
-      
-      // Define category synonym groups - match database categories exactly
-      const categoryGroups = {
-        'processors': ['processors', 'processor', 'cpu', 'cpus'],
-        'processor': ['processors', 'processor', 'cpu', 'cpus'],
-        'cpu': ['processors', 'processor', 'cpu', 'cpus'],
-        'motherboards': ['motherboards', 'motherboard', 'mobo'],
-        'motherboard': ['motherboards', 'motherboard', 'mobo'],
-        'graphics cards': ['graphics cards', 'graphics card', 'gpu', 'graphics'],
-        'graphics card': ['graphics cards', 'graphics card', 'gpu', 'graphics'],
-        'gpu': ['graphics cards', 'graphics card', 'gpu', 'graphics'],
-        'ram': ['ram', 'memory'],
-        'memory': ['ram', 'memory'],
-        'storage': ['storage', 'ssd', 'hdd', 'nvme'],
-        'laptops': ['laptops', 'laptop', 'notebook'],
-        'laptop': ['laptops', 'laptop', 'notebook'],
-        'monitors': ['monitors', 'monitor', 'display'],
-        'monitor': ['monitors', 'monitor', 'display'],
-        'keyboards': ['keyboards', 'keyboard'],
-        'keyboard': ['keyboards', 'keyboard'],
-        'mouse': ['mouse', 'mice'],
-        'power supply': ['power supply', 'power supplies', 'psu'],
-        'power supplies': ['power supply', 'power supplies', 'psu'],
-        'psu': ['power supply', 'power supplies', 'psu'],
-        'pc cases': ['pc cases', 'pc case', 'casing', 'case'],
-        'pc case': ['pc cases', 'pc case', 'casing', 'case'],
-        'case': ['pc cases', 'pc case', 'casing', 'case'],
-        'cpu coolers': ['cpu coolers', 'cpu cooler', 'cooling', 'cooler'],
-        'cpu cooler': ['cpu coolers', 'cpu cooler', 'cooling', 'cooler'],
-        'cooling': ['cpu coolers', 'cpu cooler', 'cooling', 'cooler'],
-        'cooler': ['cpu coolers', 'cpu cooler', 'cooling', 'cooler'],
-        'peripherals': ['peripherals', 'peripheral', 'keyboard', 'mouse', 'headset'],
-        'headsets': ['headsets', 'headset', 'headphone', 'headphones'],
-        'headset': ['headsets', 'headset', 'headphone', 'headphones']
-      };
-      
-      // Get synonyms for selected category
-      const synonyms = categoryGroups[selectedCat] || [selectedCat];
-      
-      // Check if product category matches any synonym (flexible matching)
-      const matchCategory = synonyms.some(syn => {
-        // Contains match (more flexible)
-        return productCategory.includes(syn) || syn.includes(productCategory);
-      });
+      // For specific categories, use smart category matching
+      // This handles variations like "processor type" vs "processors"
+      const matchCategory = categoriesMatch(p.category, selectedCategory);
       
       return matchCategory && matchPrice;
     });
@@ -457,6 +416,7 @@ const Products = () => {
     setCurrentPage(1);
   }, [selectedCategory, selectedBrand, searchQuery, priceRange]);
 
+
   // Show/hide scroll to top button
   useEffect(() => {
     const handleScroll = () => {
@@ -472,17 +432,21 @@ const Products = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Add infinite scroll
+  // Scroll to top when page changes
   useEffect(() => {
-    const handleScroll = () => {
-      if (window.innerHeight + document.documentElement.scrollTop >= document.documentElement.offsetHeight - 1000) {
-        loadMoreProducts();
-      }
-    };
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [loadMoreProducts]);
+  // Handle products with missing images
+  const handleMissingImage = useCallback((product) => {
+    setProductsWithoutImages(prev => {
+      // Check if product already exists in the list
+      if (prev.some(p => p.id === product.id)) {
+        return prev;
+      }
+      return [...prev, product];
+    });
+  }, []);
 
   const buynow = (product) => {
     setLoadingId(product.id);
@@ -491,9 +455,9 @@ const Products = () => {
     }, 150);
   };
 
-  // Pagination derived values
-  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
-  const paginatedProducts = filteredProducts.slice((currentPage - 1) * PAGE_SIZE, (currentPage - 1) * PAGE_SIZE + PAGE_SIZE);
+
+  // Pagination derived values - use filtered products for display
+  const paginatedProducts = filteredProducts;
 
   return (
     <>
@@ -501,12 +465,22 @@ const Products = () => {
       <div className="p-4 sm:p-6 md:p-8 lg:p-10 bg-panel min-h-[calc(100vh-72px)] text-primary">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-blue-500">Explore Our Products</h1>
-          {totalProducts > 0 && (
-            <p className="text-muted">
-              Showing {Math.min(filteredProducts.length, PAGE_SIZE * currentPage)} of {filteredProducts.length} products
-            </p>
-          )}
+          <div className="flex items-center gap-4">
+            {totalProducts > 0 && (
+              <p className="text-muted text-sm">
+                Showing {allProducts.length} products
+              </p>
+            )}
+            <a
+              href="/quick-category-update"
+              className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
+            >
+              <span>⚡</span>
+              <span>Quick Category Update</span>
+            </a>
+          </div>
         </div>
+
 
         {/* Loading State */}
         {isLoading && (
@@ -667,37 +641,40 @@ const Products = () => {
               ) : (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {paginatedProducts.map((p, index) => (
+                    {filteredProducts.map((product, index) => (
                       <ProductCard
-                        key={p.id}
-                        p={p}
-                        buynow={buynow}
-                        loadingId={loadingId}
-                        navigate={navigate}
+                        key={product.id}
+                        product={product}
+                        onClick={() => navigate(`/products/${product.id}`)}
                         priority={index < 8} // First 8 products load immediately
+                        onMissingImage={handleMissingImage}
+                        categories={categories}
                       />
                     ))}
                   </div>
 
-                  {/* Load More Button */}
-                  {hasMoreProducts && (
-                    <div className="flex justify-center mt-8">
-                      <button
-                        onClick={loadMoreProducts}
-                        disabled={loadingMore}
-                        className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-xl font-semibold transition-colors flex items-center gap-2"
-                      >
-                        {loadingMore ? (
-                          <>
-                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            Loading More...
-                          </>
-                        ) : (
-                          "Load More Products"
-                        )}
-                      </button>
-                    </div>
-                  )}
+                  {/* Pagination Controls */}
+                  <div className="flex justify-center items-center gap-4 mt-8 flex-wrap">
+                    <button
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1 || isLoading}
+                      className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-xl font-semibold transition-colors"
+                    >
+                      ← Previous
+                    </button>
+                    
+                    <span className="text-muted font-semibold">
+                      Page {currentPage}
+                    </span>
+                    
+                    <button
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                      disabled={!hasMoreProducts || isLoading}
+                      className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-xl font-semibold transition-colors"
+                    >
+                      Next →
+                    </button>
+                  </div>
 
                   {/* Back to All Products Button */}
                   {selectedCategory !== "All" && (
@@ -713,6 +690,66 @@ const Products = () => {
                 </>
               )}
             </div>
+
+            {/* Not Found Products Section */}
+            {productsWithoutImages.length > 0 && (
+              <div className="mt-16 bg-gradient-to-r from-orange-50/10 to-red-50/10 border border-orange-500/30 rounded-2xl p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-3 bg-orange-500/20 rounded-lg">
+                    <svg className="w-6 h-6 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-orange-400">Products Without Images</h3>
+                    <p className="text-sm text-muted mt-1">These products need image uploads</p>
+                  </div>
+                  <div className="ml-auto bg-orange-500/20 px-4 py-2 rounded-lg">
+                    <span className="text-lg font-bold text-orange-400">{productsWithoutImages.length}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {productsWithoutImages.map((product) => (
+                    <div
+                      key={product.id}
+                      className="bg-card rounded-2xl p-4 border border-orange-500/30 hover:border-orange-500/60 transition-all group"
+                    >
+                      {/* No Image Placeholder */}
+                      <div className="relative w-full aspect-square mb-4 rounded-xl overflow-hidden bg-gradient-to-br from-orange-900/20 to-red-900/20 flex items-center justify-center border border-orange-500/30">
+                        <div className="text-center">
+                          <svg className="w-12 h-12 text-orange-500/50 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <p className="text-xs text-orange-400/60">No Image Available</p>
+                        </div>
+                      </div>
+
+                      <h2 className="product-name text-lg font-semibold text-orange-400 line-clamp-2 min-h-[3.5rem]">{product.Name}</h2>
+                      <p className="text-blue-500 font-medium text-xl mt-2">{typeof product.price === 'number' ? product.price.toLocaleString() : 'N/A'} PKR</p>
+                      
+                      {/* Specs */}
+                      {Array.isArray(product.Spec) && product.Spec.length > 0 && (
+                        <p className="text-muted text-sm mt-2 line-clamp-2">{product.Spec.join(", ")}</p>
+                      )}
+                      
+                      <button
+                        onClick={() => navigate(`/products/${product.id}`)}
+                        className="w-full mt-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
+                      >
+                        View Details
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                  <p className="text-sm text-muted">
+                    <span className="text-orange-400 font-semibold">Note:</span> These products are still available for purchase but need product images to be added. Contact admin to upload images for better visibility.
+                  </p>
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -731,51 +768,87 @@ const Products = () => {
   );
 };
 
-const ProductCard = ({ p, buynow, loadingId, navigate, priority = false }) => {
-  // Use actual image URL from product data
-  const imageUrl = p.img || p.imageUrl || p.images?.[0]?.url;
+const ProductCard = ({ product, onClick, priority = false, onMissingImage, categories = [] }) => {
+  // Get image URL from product - checks ALL possible image fields
+  const imageUrl = getImageFromProduct(product) || '/placeholder.svg';
+  const [hasNoImage, setHasNoImage] = useState(false);
 
   // Generate random urgency data (in production, this would come from backend)
   const viewingCount = Math.floor(Math.random() * 50) + 20;
   const boughtCount = Math.floor(Math.random() * 30) + 10;
   const leftCount = Math.floor(Math.random() * 40) + 15;
+  
+  // Show urgency indicator on only ~33% of products to look more realistic
+  const showUrgency = Math.random() < 0.33;
+
+  // Handle image load error
+  const handleImageError = useCallback(() => {
+    setHasNoImage(true);
+    if (onMissingImage) {
+      onMissingImage(product);
+    }
+  }, [product, onMissingImage]);
 
   return (
     <div
-      onClick={() => navigate(`/products/${p.id}`)}
-      className="bg-card rounded-2xl p-4 cursor-pointer hover:shadow-lg transition-shadow border border-gray-800 relative overflow-hidden group"
+      onClick={onClick}
+      className={`bg-card rounded-2xl p-4 cursor-pointer hover:shadow-lg transition-shadow border relative overflow-hidden group ${
+        hasNoImage ? 'border-orange-500/50' : 'border-gray-800'
+      }`}
     >
-      {/* Urgency Indicator */}
-      <div className="absolute top-2 left-2 bg-gradient-to-r from-red-500/90 to-orange-500/90 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 z-10 shadow-lg">
-        <svg className="w-3 h-3 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clipRule="evenodd" />
-        </svg>
-        <span className="font-semibold">{viewingCount} viewing • {boughtCount} bought • {leftCount} left</span>
-      </div>
+      {/* Missing Image Badge */}
+      {hasNoImage && (
+        <div className="absolute top-2 right-2 bg-orange-500/90 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 z-10 shadow-lg">
+          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          <span className="font-semibold">No Image</span>
+        </div>
+      )}
 
-      <div className="relative w-full aspect-square mb-4 rounded-xl overflow-hidden mt-6">
-        <SmartImage
+      {/* Urgency Indicator - Only show on ~33% of products */}
+      {showUrgency && !hasNoImage && (
+        <div className="absolute top-2 left-2 bg-gradient-to-r from-red-500/90 to-orange-500/90 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 z-10 shadow-lg">
+          <svg className="w-3 h-3 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clipRule="evenodd" />
+          </svg>
+          <span className="font-semibold">{viewingCount} viewing • {boughtCount} bought • {leftCount} left</span>
+        </div>
+      )}
+
+      {/* Image Container */}
+      <div className="relative w-full aspect-square mb-4 rounded-xl overflow-hidden mt-6 bg-gray-100">
+        <SimpleImage
           src={imageUrl}
-          alt={p.Name}
-          product={p}
-          priority={priority}
+          alt={product.Name}
+          product={product}
           className="w-full h-full object-contain transition-transform group-hover:scale-105 duration-300"
         />
       </div>
 
-      <h2 className="text-lg font-semibold text-blue-400 line-clamp-2 min-h-[3.5rem]">{p.Name}</h2>
-      <p className="text-blue-500 font-medium text-xl mt-2">{typeof p.price === 'number' ? p.price.toLocaleString() : 'N/A'} PKR</p>
-      <p className="text-muted text-sm mt-2 line-clamp-2">{Array.isArray(p.Spec) ? p.Spec.join(", ") : ''}</p>
+      {/* Product Info */}
+      <div className="mb-3">
+        <h2 className="product-name text-lg font-semibold text-blue-400 line-clamp-2">{product.Name}</h2>
+        {product.category && (
+          <p className="text-xs text-gray-400 mt-1">📂 {product.category}</p>
+        )}
+      </div>
+      
+      <p className="text-blue-500 font-medium text-xl">{typeof product.price === 'number' ? product.price.toLocaleString() : 'N/A'} PKR</p>
+      
+      {/* Specs as fallback */}
+      {Array.isArray(product.Spec) && product.Spec.length > 0 && (
+        <p className="text-muted text-sm mt-2 line-clamp-2">{product.Spec.join(", ")}</p>
+      )}
       
       <button
         onClick={(e) => {
           e.stopPropagation();
-          buynow(p);
+          onClick();
         }}
-        disabled={loadingId === p.id}
-        className="w-full mt-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 disabled:bg-gray-600 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
+        className="w-full mt-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
       >
-        {loadingId === p.id ? "Loading..." : "View Details"}
+        View Details
       </button>
     </div>
   );

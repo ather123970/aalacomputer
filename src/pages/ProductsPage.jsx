@@ -3,6 +3,7 @@ import { useInView } from 'react-intersection-observer';
 import { ProductGrid, LoadingSpinner } from '../components/PremiumUI';
 import { API_CONFIG } from '../config/api';
 import { PC_HARDWARE_CATEGORIES } from '../data/categoriesData';
+import { categoriesMatch } from '../utils/categoryMatcher';
 
 // Skeleton loader component
 const ProductSkeleton = () => (
@@ -68,19 +69,40 @@ const ProductsPage = () => {
         fetchedProducts = data.products;
       }
 
-      // Format products to ensure consistent structure
+      // Format products - preserve ALL image fields from database
       const formattedProducts = fetchedProducts.map(p => ({
         id: p._id || p.id,
-        _id: p._id || p.id,
+        _id: p._id,
         name: p.name || p.title || p.Name,
         title: p.title || p.name || p.Name,
         price: p.price,
-        img: p.imageUrl || p.img,
-        imageUrl: p.imageUrl || p.img,
+        // Preserve ALL image fields from database
+        img: p.img,
+        imageUrl: p.imageUrl,
+        image: p.image,
+        image_url: p.image_url,
+        imageLink: p.imageLink,
+        image_link: p.image_link,
+        photo: p.photo,
+        photoUrl: p.photoUrl,
+        photo_url: p.photo_url,
+        picture: p.picture,
+        pictureUrl: p.pictureUrl,
+        picture_url: p.picture_url,
+        thumbnail: p.thumbnail,
+        thumbnailUrl: p.thumbnailUrl,
+        thumbnail_url: p.thumbnail_url,
+        src: p.src,
+        url: p.url,
+        imageUrl1: p.imageUrl1,
+        image1: p.image1,
+        image1_url: p.image1_url,
         category: p.category || 'Uncategorized',
         brand: p.brand || '',
         description: p.description,
-        Spec: p.Spec || p.specs || []
+        Spec: p.Spec || p.specs || [],
+        // Preserve all other fields
+        ...p
       }));
 
       setAllProducts(formattedProducts);
@@ -174,7 +196,7 @@ const ProductsPage = () => {
     let filteredProducts = allProducts;
     
     if (selectedCategory !== 'All') {
-      filteredProducts = filteredProducts.filter(p => p.category === selectedCategory);
+      filteredProducts = filteredProducts.filter(p => categoriesMatch(p.category, selectedCategory));
     }
     
     if (selectedBrand !== 'All') {
@@ -211,7 +233,7 @@ const ProductsPage = () => {
       const uniqueBrands = ['All', ...new Set(allProducts.map(p => p.brand).filter(Boolean))];
       setAvailableBrands(uniqueBrands);
     } else {
-      const categoryProducts = allProducts.filter(p => p.category === category);
+      const categoryProducts = allProducts.filter(p => categoriesMatch(p.category, category));
       const categoryBrands = ['All', ...new Set(categoryProducts.map(p => p.brand).filter(Boolean))];
       setAvailableBrands(categoryBrands);
     }
@@ -219,7 +241,7 @@ const ProductsPage = () => {
     // Filter products by category
     let filteredProducts = category === 'All' 
       ? allProducts 
-      : allProducts.filter(p => p.category === category);
+      : allProducts.filter(p => categoriesMatch(p.category, category));
     
     // Apply priority sorting (official brands first)
     filteredProducts = prioritySortProducts(filteredProducts, category);
@@ -242,7 +264,7 @@ const ProductsPage = () => {
     let filteredProducts = allProducts;
     
     if (selectedCategory !== 'All') {
-      filteredProducts = filteredProducts.filter(p => p.category === selectedCategory);
+      filteredProducts = filteredProducts.filter(p => categoriesMatch(p.category, selectedCategory));
     }
     
     if (brand !== 'All') {
@@ -259,6 +281,30 @@ const ProductsPage = () => {
     
     setTimeout(() => setLoadingMore(false), 300);
   }, [allProducts, selectedCategory, prioritySortProducts]);
+
+  // Handle category change from product card
+  const handleProductCategoryChange = useCallback((productId, newCategory) => {
+    // Update the product in allProducts
+    const updatedProducts = allProducts.map(p => 
+      (p._id === productId || p.id === productId) 
+        ? { ...p, category: newCategory }
+        : p
+    );
+    
+    setAllProducts(updatedProducts);
+    
+    // Update displayed products
+    setDisplayedProducts(displayedProducts.map(p =>
+      (p._id === productId || p.id === productId)
+        ? { ...p, category: newCategory }
+        : p
+    ));
+    
+    // Update categories list if new category
+    if (!categories.includes(newCategory)) {
+      setCategories([...categories, newCategory]);
+    }
+  }, [allProducts, displayedProducts, categories]);
 
   // Initial load
   useEffect(() => {
@@ -281,32 +327,6 @@ const ProductsPage = () => {
         
         {/* Filter Section */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-6">
-          {/* Category Filter */}
-          {categories.length > 0 && (
-            <div className="mb-6">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-sm font-semibold text-gray-700">🏷️ Category:</span>
-                <span className="text-sm text-blue-600 font-medium">{selectedCategory}</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {categories.map((category) => (
-                  <button
-                    key={category}
-                    onClick={() => handleCategoryChange(category)}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                      selectedCategory === category
-                        ? 'bg-blue-600 text-white shadow-lg'
-                        : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-                    }`}
-                  >
-                    {category}
-                    {category !== 'All' && ` (${allProducts.filter(p => p.category === category).length})`}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          
           {/* Brand Filter Dropdown */}
           {availableBrands.length > 1 && (
             <div>

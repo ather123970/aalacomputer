@@ -49,50 +49,6 @@ const Footer = () => {
               that stands out.
             </p>
 
-            {/* Social Icons */}
-            <div className="flex gap-4 mt-3">
-              {[
-                { 
-                  Icon: TikTokIcon, 
-                  color: "hover:text-pink-400", 
-                  href: "https://www.tiktok.com/@aalacomputers",
-                  label: "TikTok"
-                },
-                { 
-                  Icon: Instagram, 
-                  color: "hover:text-pink-500", 
-                  href: "https://www.instagram.com/aalacomputers",
-                  label: "Instagram"
-                },
-                { 
-                  Icon: Facebook, 
-                  color: "hover:text-blue-500", 
-                  href: "https://www.facebook.com/aalacomputers",
-                  label: "Facebook"
-                },
-                { 
-                  Icon: Youtube, 
-                  color: "hover:text-red-500", 
-                  href: "https://www.youtube.com/@aalacomputers",
-                  label: "YouTube"
-                },
-              ].map(({ Icon, color, href, label }, i) => (
-                <a
-                  key={i}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`p-2 rounded-full bg-gray-800 hover:bg-gray-700 transition-colors ${color} group relative`}
-                  aria-label={label}
-                >
-                  <Icon size={18} />
-                  {/* Tooltip */}
-                  <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                    @aalacomputers
-                  </span>
-                </a>
-              ))}
-            </div>
           </div>
 
           {/* Quick Links */}

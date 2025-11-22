@@ -15,20 +15,6 @@ const Profile = React.lazy(() => import('./pages/Profile'));
 const AuthPage = React.lazy(() => import('./pages/Auth'));
 const Checkout = React.lazy(() => import('./pages/Checkout'));
 const CheckoutPage = React.lazy(() => import('./pages/CheckoutPage'));
-const DealDetail = React.lazy(() => import('./pages/Dealdetail'));
-const Prebuilds = React.lazy(() => import('./pages/Prebuilds'));
-const AdminLogin = React.lazy(() => import('./pages/AdminLoginNew'));
-const AdminDashboard = React.lazy(() => import('./pages/AdminDashboardPro'));
-const AdminImageManager = React.lazy(() => import('./pages/AdminImageManager'));
-const BulkProductManager = React.lazy(() => import('./pages/BulkProductManager'));
-const BulkEditPage = React.lazy(() => import('./pages/BulkEditPage'));
-const BulkCategoryManager = React.lazy(() => import('./pages/BulkCategoryManager'));
-const CategoriesPage = React.lazy(() => import('./pages/CategoriesPage'));
-const CategoryProductsPage = React.lazy(() => import('./pages/CategoryProductsPage'));
-const BrandsPage = React.lazy(() => import('./pages/BrandsPage'));
-const DiagnosticPage = React.lazy(() => import('./pages/DiagnosticPage'));
-const UpdateProductImages = React.lazy(() => import('./pages/UpdateProductImages'));
-const QuickCategoryUpdate = React.lazy(() => import('./pages/QuickCategoryUpdate'));
 
 const Layout = () => {
   const location = useLocation();
@@ -161,32 +147,32 @@ export const router = createBrowserRouter([
         index: true, 
         element: <ErrorBoundary><Home /></ErrorBoundary>
       },
-      { 
-        path: 'categories',
-        children: [
-          { 
-            index: true, 
-            element: <ErrorBoundary><CategoriesPage /></ErrorBoundary>
-          }
-        ]
-      },
-      { 
-        path: 'category/:slug',
-        element: <ErrorBoundary><CategoryProductsPage /></ErrorBoundary>
-      },
-      { 
-        path: 'brands',
-        children: [
-          { 
-            index: true, 
-            element: <ErrorBoundary><BrandsPage /></ErrorBoundary>
-          },
-          { 
-            path: ':brand', 
-            element: <ErrorBoundary><BrandsPage /></ErrorBoundary>
-          }
-        ]
-      },
+      // { 
+      //   path: 'categories',
+      //   children: [
+      //     { 
+      //       index: true, 
+      //       element: <ErrorBoundary><CategoriesPage /></ErrorBoundary>
+      //     }
+      //   ]
+      // },
+      // { 
+      //   path: 'category/:slug',
+      //   element: <ErrorBoundary><CategoryProductsPage /></ErrorBoundary>
+      // },
+      // { 
+      //   path: 'brands',
+      //   children: [
+      //     { 
+      //       index: true, 
+      //       element: <ErrorBoundary><BrandsPage /></ErrorBoundary>
+      //     },
+      //     { 
+      //       path: ':brand', 
+      //       element: <ErrorBoundary><BrandsPage /></ErrorBoundary>
+      //     }
+      //   ]
+      // },
       { 
         path: 'products',
         children: [
@@ -237,18 +223,18 @@ export const router = createBrowserRouter([
           { path: ':id', element: <Checkout /> }
         ]
       },
-      {
-        path: 'diagnostic',
-        element: <ErrorBoundary><DiagnosticPage /></ErrorBoundary>
-      },
-      {
-        path: 'update-images',
-        element: <ErrorBoundary><UpdateProductImages /></ErrorBoundary>
-      },
-      {
-        path: 'quick-category-update',
-        element: <ErrorBoundary><QuickCategoryUpdate /></ErrorBoundary>
-      }
+      // {
+      //   path: 'diagnostic',
+      //   element: <ErrorBoundary><DiagnosticPage /></ErrorBoundary>
+      // },
+      // {
+      //   path: 'update-images',
+      //   element: <ErrorBoundary><UpdateProductImages /></ErrorBoundary>
+      // },
+      // {
+      //   path: 'quick-category-update',
+      //   element: <ErrorBoundary><QuickCategoryUpdate /></ErrorBoundary>
+      // }
     ]
   },
   {
@@ -260,13 +246,13 @@ export const router = createBrowserRouter([
       { path: 'dashboard', element: <AdminDashboard /> },
       { path: 'products', element: <AdminDashboard /> },
       // Image manager - shows ALL products at once
-      { path: 'images', element: <AdminImageManager /> },
+      // { path: 'images', element: <AdminImageManager /> },
       // Bulk product management
-      { path: 'bulk-manager', element: <BulkProductManager /> },
-      { path: 'bulk-edit', element: <BulkEditPage /> },
-      { path: 'bulk-categories', element: <ErrorBoundary><BulkCategoryManager /></ErrorBoundary> },
+      // { path: 'bulk-manager', element: <BulkProductManager /> },
+      // { path: 'bulk-edit', element: <BulkEditPage /> },
+      // { path: 'bulk-categories', element: <ErrorBoundary><BulkCategoryManager /></ErrorBoundary> },
       // Update product images
-      { path: 'update-images', element: <ErrorBoundary><UpdateProductImages /></ErrorBoundary> }
+      // { path: 'update-images', element: <ErrorBoundary><UpdateProductImages /></ErrorBoundary> }
     ]
   }
 ])

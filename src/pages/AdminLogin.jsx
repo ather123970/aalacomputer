@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, Lock, Mail, AlertCircle, Sparkles, Shield, Zap } from 'lucide-react';
+import { Eye, EyeOff, Lock, User, AlertCircle, Sparkles, Shield, Zap } from 'lucide-react';
 import { getApiUrl } from '../config/api';
 
 const AdminLogin = () => {
@@ -122,28 +122,28 @@ const AdminLogin = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Field */}
+            {/* Username Field */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.6 }}
             >
               <label htmlFor="username" className="block text-sm font-medium text-slate-300 mb-2">
-                Email Address
+                Username
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-slate-400" />
+                  <User className="h-5 w-5 text-slate-400" />
                 </div>
                 <input
                   id="username"
                   name="username"
-                  type="email"
+                  type="text"
                   required
                   value={formData.username}
                   onChange={handleInputChange}
                   className="block w-full pl-12 pr-4 py-4 bg-slate-700/50 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
-                  placeholder="admin@example.com"
+                  placeholder="admin"
                 />
               </div>
             </motion.div>

@@ -7,37 +7,49 @@ const processProductImages = require('../middleware/imageProcessor');
 router.get('/', async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 32;
+        const limit = Math.min(parseInt(req.query.limit) || 10000, 10000); // Max 10000 products per request
         const category = req.query.category;
         const brand = req.query.brand;
         const search = req.query.search;
 
         const query = {};
+        const andConditions = [];
         
         // Category filter - support both simple string and nested object
         if (category && category !== 'All') {
-            query.$or = [
-                { category: { $regex: category, $options: 'i' } },
-                { 'category.main': { $regex: category, $options: 'i' } }
-            ];
+            andConditions.push({
+                $or: [
+                    { category: { $regex: category, $options: 'i' } },
+                    { 'category.main': { $regex: category, $options: 'i' } }
+                ]
+            });
         }
         
         // Brand filter
         if (brand) {
-            query.brand = { $regex: brand, $options: 'i' };
+            andConditions.push({
+                brand: { $regex: brand, $options: 'i' }
+            });
         }
         
         // Search filter - search in Name, title, category, brand, and specs
         if (search) {
-            query.$or = [
-                { Name: { $regex: search, $options: 'i' } },
-                { name: { $regex: search, $options: 'i' } },
-                { title: { $regex: search, $options: 'i' } },
-                { category: { $regex: search, $options: 'i' } },
-                { 'category.main': { $regex: search, $options: 'i' } },
-                { brand: { $regex: search, $options: 'i' } },
-                { Spec: { $regex: search, $options: 'i' } }
-            ];
+            andConditions.push({
+                $or: [
+                    { Name: { $regex: search, $options: 'i' } },
+                    { name: { $regex: search, $options: 'i' } },
+                    { title: { $regex: search, $options: 'i' } },
+                    { category: { $regex: search, $options: 'i' } },
+                    { 'category.main': { $regex: search, $options: 'i' } },
+                    { brand: { $regex: search, $options: 'i' } },
+                    { Spec: { $regex: search, $options: 'i' } }
+                ]
+            });
+        }
+        
+        // Combine all conditions with $and
+        if (andConditions.length > 0) {
+            query.$and = andConditions;
         }
 
         const result = await Product.paginateProducts(query, page, limit);

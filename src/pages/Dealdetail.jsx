@@ -4,7 +4,7 @@ import { Check, ShoppingCart } from "lucide-react";
 import { motion as FM } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 import deals from "./_dealsListForImport";
-import { API_BASE } from '../config'
+import { API_CONFIG } from '../config/api'
 
 const DealDetail = () => {
   const { id } = useParams();
