@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Filter, Edit2, Trash2, ChevronDown, X, Save, AlertCircle, Upload, Eye, EyeOff } from 'lucide-react';
+import { Search, Filter, Edit2, Trash2, ChevronDown, X, Save, AlertCircle, Upload, Eye, EyeOff, Copy, Check } from 'lucide-react';
 import { API_CONFIG } from '../../config/api';
 
 const AdminProductsTableV2 = ({ showMessage }) => {
@@ -17,6 +17,7 @@ const AdminProductsTableV2 = ({ showMessage }) => {
   const [savingEdit, setSavingEdit] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [copiedProductId, setCopiedProductId] = useState(null);
   const fileInputRef = useRef(null);
   const productsEndRef = useRef(null);
   const searchTimeoutRef = useRef(null);
@@ -54,7 +55,7 @@ const AdminProductsTableV2 = ({ showMessage }) => {
     }
   };
 
-  // Direct database search
+  // Direct database search - use admin API endpoint
   const searchDatabase = async (query) => {
     if (!query.trim()) {
       fetchAllProducts();
@@ -64,25 +65,41 @@ const AdminProductsTableV2 = ({ showMessage }) => {
     setLoading(true);
     try {
       const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
-      // Search directly from database
+      const token = localStorage.getItem('adminToken');
+      
+      // Search directly from database using ADMIN API
       const response = await fetch(
-        `${base}/api/products?search=${encodeURIComponent(query)}&limit=5000`,
-        { cache: 'no-store' }
+        `${base}/api/admin/products?search=${encodeURIComponent(query)}&limit=5000`,
+        { 
+          cache: 'no-store',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
       );
+      
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`);
+      }
+      
       const data = await response.json();
-      const searchResults = Array.isArray(data) ? data : data.products || [];
+      const searchResults = data.products || [];
+      
+      console.log(`[AdminProductsTableV2] Search "${query}" returned ${searchResults.length} results`);
       
       setAllProducts(searchResults);
       loadPage(1, searchResults);
     } catch (error) {
       console.error('Search failed:', error);
+      showMessage(`Search failed: ${error.message}`, 'error');
       // Fallback to client-side search
       const term = query.toLowerCase();
       const filtered = allProducts.filter(p => {
         const name = (p.name || p.Name || '').toLowerCase();
         const brand = (p.brand || '').toLowerCase();
         const id = String(p._id || p.id).toLowerCase();
-        return name.includes(term) || brand.includes(term) || id.includes(term);
+        const category = (p.category || '').toLowerCase();
+        return name.includes(term) || brand.includes(term) || id.includes(term) || category.includes(term);
       });
       setAllProducts(filtered);
       loadPage(1, filtered);
@@ -212,27 +229,21 @@ const AdminProductsTableV2 = ({ showMessage }) => {
       const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
       const productId = editingProduct._id || editingProduct.id;
       
-      // Try different API endpoints
-      let response = null;
-      let endpoint = `${base}/api/products/${productId}`;
+      // Get admin token from localStorage
+      const adminToken = localStorage.getItem('aalacomp_admin_token');
       
-      response = await fetch(endpoint, {
+      // Use admin-protected endpoint for product updates
+      const endpoint = `${base}/api/admin/products/${productId}`;
+      
+      const response = await fetch(endpoint, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(adminToken && { 'Authorization': `Bearer ${adminToken}` })
+        },
         body: JSON.stringify(editData),
         cache: 'no-store'
       });
-
-      // If 404, try alternative endpoint
-      if (response.status === 404) {
-        endpoint = `${base}/api/product/${productId}`;
-        response = await fetch(endpoint, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(editData),
-          cache: 'no-store'
-        });
-      }
 
       if (response.ok) {
         // Update local state
@@ -267,8 +278,13 @@ const AdminProductsTableV2 = ({ showMessage }) => {
 
     try {
       const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
-      const response = await fetch(`${base}/api/products/${id}`, {
-        method: 'DELETE'
+      const adminToken = localStorage.getItem('aalacomp_admin_token');
+      
+      const response = await fetch(`${base}/api/admin/products/${id}`, {
+        method: 'DELETE',
+        headers: {
+          ...(adminToken && { 'Authorization': `Bearer ${adminToken}` })
+        }
       });
 
       if (response.ok) {
@@ -281,6 +297,27 @@ const AdminProductsTableV2 = ({ showMessage }) => {
     } catch (error) {
       console.error('Failed to delete product:', error);
       showMessage('Error deleting product', 'error');
+    }
+  };
+
+  const copyProductToClipboard = async (product) => {
+    try {
+      const productText = `ID: ${product._id || product.id}
+Name: ${product.name || product.Name}
+Price: ${product.price}
+Category: ${product.category}
+Brand: ${product.brand || 'N/A'}
+Stock: ${product.stock || 0}`;
+      
+      await navigator.clipboard.writeText(productText);
+      setCopiedProductId(product._id || product.id);
+      showMessage('Product copied to clipboard!', 'success');
+      
+      // Reset after 2 seconds
+      setTimeout(() => setCopiedProductId(null), 2000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      showMessage('Failed to copy product', 'error');
     }
   };
 
@@ -403,6 +440,23 @@ const AdminProductsTableV2 = ({ showMessage }) => {
                       title="Edit product"
                     >
                       <Edit2 size={16} />
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => copyProductToClipboard(product)}
+                      className={`p-2 rounded transition text-white ${
+                        copiedProductId === (product._id || product.id)
+                          ? 'bg-green-500'
+                          : 'bg-purple-500 hover:bg-purple-600'
+                      }`}
+                      title="Copy product to clipboard"
+                    >
+                      {copiedProductId === (product._id || product.id) ? (
+                        <Check size={16} />
+                      ) : (
+                        <Copy size={16} />
+                      )}
                     </motion.button>
                     <motion.button
                       whileHover={{ scale: 1.05 }}
@@ -583,14 +637,14 @@ const AdminProductsTableV2 = ({ showMessage }) => {
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-2">
-                      Category
+                      Category {editingProduct?.category && <span className="text-xs text-gray-500">(Current: {editingProduct.category})</span>}
                     </label>
                     <input
                       type="text"
                       value={editData.category}
                       onChange={(e) => setEditData({ ...editData, category: e.target.value })}
                       className="w-full px-4 py-2 border border-blue-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
-                      placeholder="Enter category"
+                      placeholder={editingProduct?.category || "Enter category"}
                     />
                   </div>
                 </div>

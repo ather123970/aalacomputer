@@ -68,6 +68,17 @@ export default function Cart() {
     loadAllProducts() // Load products for recommendations
   }, [])
 
+  // Refresh cart when page becomes visible (user returns to tab)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        getCart()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [])
+
   // Load all products for recommendations
   const loadAllProducts = async () => {
     try {

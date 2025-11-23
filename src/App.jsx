@@ -241,7 +241,7 @@ const App = () => {
               <button
                 key={idx}
                 onClick={() => navigate(`/category/${category.slug}`)}
-                className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-6 text-center transform hover:-translate-y-2 border border-gray-100"
+                className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-6 text-center transform hover:-translate-y-2 border border-blue-300"
               >
                 <div className={`w-16 h-16 mx-auto mb-4 ${category.color} rounded-2xl flex items-center justify-center text-2xl text-white transform group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
                   {category.icon}

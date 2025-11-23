@@ -1770,63 +1770,14 @@ app.get('/api/products', async (req, res) => {
   } catch (e) { 
     const errMsg = `[${new Date().toISOString()}] [products] DB query failed: ${e && (e.stack || e.message)}\n`;
     fs.appendFileSync('products-api.log', errMsg);
-    return res.status(500).json({ ok: false, error: 'db error' });
+    console.error('[products] MongoDB query failed - no file fallback available:', e && e.message);
+    return res.status(503).json({ ok: false, error: 'Database unavailable - please try again later' });
   }
   
-  // Fallback to file with filtering
-  let prods = readDataFile('products.json') || [];
-  
-  // Apply filters to file-based data
-  if (category && category !== 'All') {
-    prods = prods.filter(p => {
-      const productCategory = (p.category || '').toLowerCase();
-      const productName = (p.Name || p.name || '').toLowerCase();
-      const selectedCat = category.toLowerCase();
-      return productCategory.includes(selectedCat) || 
-             selectedCat.includes(productCategory) ||
-             productName.includes(selectedCat);
-    });
-  }
-  
-  if (brand) {
-    const brandLower = brand.toLowerCase();
-    prods = prods.filter(p => {
-      const productBrand = (p.brand || '').toLowerCase();
-      const productName = (p.Name || p.name || '').toLowerCase();
-      const productSpecs = Array.isArray(p.Spec) ? p.Spec.join(' ').toLowerCase() : '';
-      return productBrand.includes(brandLower) ||
-             productName.includes(brandLower) ||
-             productSpecs.includes(brandLower);
-    });
-  }
-  
-  if (search) {
-    const searchLower = search.toLowerCase();
-    prods = prods.filter(p => {
-      const productName = (p.Name || p.name || '').toLowerCase();
-      const productTitle = (p.title || '').toLowerCase();
-      const productCategory = (p.category || '').toLowerCase();
-      const productBrand = (p.brand || '').toLowerCase();
-      const productSpecs = Array.isArray(p.Spec) ? p.Spec.join(' ').toLowerCase() : '';
-      return productName.includes(searchLower) ||
-             productTitle.includes(searchLower) ||
-             productCategory.includes(searchLower) ||
-             productBrand.includes(searchLower) ||
-             productSpecs.includes(searchLower);
-    });
-  }
-  
-  const total = prods.length;
-  const paginatedProds = prods.slice(skip, skip + limit);
-  
-  res.json({
-    products: paginatedProds,
-    total,
-    page,
-    limit,
-    totalPages: Math.ceil(total / limit),
-    hasMore: skip + paginatedProds.length < total
-  });
+  // MongoDB only - no file fallback
+  // If we reach here, MongoDB is not connected and we cannot serve products
+  console.error('[products] MongoDB not connected and no fallback available');
+  return res.status(503).json({ ok: false, error: 'Database unavailable' });
 });
 
 // List all products (PROTECTED - for admin dashboard)
@@ -1925,43 +1876,53 @@ app.get('/api/admin/products', async (req, res) => {
               }
             ];
           } else {
-            // Standard filtering for other categories
+            // Standard filtering for other categories - ONLY match category field
             query.$or = [
               { category: { $regex: category, $options: 'i' } },
-              { 'category.main': { $regex: category, $options: 'i' } },
-              { Name: { $regex: category, $options: 'i' } },
-              { name: { $regex: category, $options: 'i' } }
+              { 'category.main': { $regex: category, $options: 'i' } }
             ];
           }
         }
         
-        // Search across multiple fields - split search into words for better matching
+        // Search across multiple fields - improved flexible matching with fallback
         if (search) {
-          // Split search into individual words (minimum 1 character)
-          const searchWords = search.trim().split(/\s+/).filter(word => word.length > 0);
+          const searchTerm = search.trim();
+          console.log(`[admin/products] Searching for: "${searchTerm}" (length: ${searchTerm.length})`);
           
-          console.log(`[admin/products] Searching for words: ${JSON.stringify(searchWords)}`);
+          // For very long search terms (100+ chars), split into key words
+          let searchQueries = [];
           
-          // Create AND conditions where ALL words must be present
-          // Each word can match ANY field, but ALL words must be found
-          const andConditions = [];
-          
-          // For each word, create an OR condition across all fields
-          searchWords.forEach(word => {
-            andConditions.push({
+          if (searchTerm.length > 100) {
+            // Split long search into key words (first 3-4 words)
+            const words = searchTerm.split(/\s+/).slice(0, 4).join(' ');
+            console.log(`[admin/products] Long search term detected, using key words: "${words}"`);
+            
+            // Try with key words first
+            searchQueries.push({
               $or: [
-                { name: { $regex: word, $options: 'i' } },
-                { title: { $regex: word, $options: 'i' } },
-                { Name: { $regex: word, $options: 'i' } },
-                { description: { $regex: word, $options: 'i' } },
-                { brand: { $regex: word, $options: 'i' } },
-                { category: { $regex: word, $options: 'i' } },
-                { id: { $regex: word, $options: 'i' } }
+                { name: { $regex: words, $options: 'i' } },
+                { title: { $regex: words, $options: 'i' } },
+                { Name: { $regex: words, $options: 'i' } }
               ]
             });
+          }
+          
+          // Also try full phrase match
+          searchQueries.push({
+            $or: [
+              { name: { $regex: searchTerm, $options: 'i' } },
+              { title: { $regex: searchTerm, $options: 'i' } },
+              { Name: { $regex: searchTerm, $options: 'i' } },
+              { description: { $regex: searchTerm, $options: 'i' } },
+              { brand: { $regex: searchTerm, $options: 'i' } },
+              { category: { $regex: searchTerm, $options: 'i' } },
+              { id: { $regex: searchTerm, $options: 'i' } },
+              { Spec: { $regex: searchTerm, $options: 'i' } }
+            ]
           });
           
-          const searchQuery = { $and: andConditions };
+          // Use $or to try multiple search strategies
+          const searchQuery = { $or: searchQueries };
           
           // Combine category filter with search filter
           if (query.$or) {
@@ -1977,7 +1938,7 @@ app.get('/api/admin/products', async (req, res) => {
             query = searchQuery;
           }
           
-          console.log(`[admin/products] Search query: ALL of ${searchWords.length} words must be present`);
+          console.log(`[admin/products] Search query: Multi-strategy matching (${searchQueries.length} strategies)`);
         }
         
         // Get total count
@@ -2352,92 +2313,8 @@ app.get('/api/products/:id', (req, res) => {
   }
 });
 
-// Update product (PUBLIC - for frontend)
-app.put('/api/product/:id', async (req, res) => {
-  const id = req.params.id;
-  const updateData = req.body;
-  
-  console.log(`[product] PUT request for ID: ${id}`);
-  console.log(`[product] Update data:`, JSON.stringify(updateData, null, 2));
-  
-  if (!updateData || Object.keys(updateData).length === 0) {
-    console.log(`[product] No update data provided`);
-    return res.status(400).json({ ok: false, error: 'No update data provided' });
-  }
 
-  try {
-    // Try MongoDB first
-    try {
-      const mongoose = require('mongoose');
-      const ProductModel = getProductModel();
-      
-      if (ProductModel && mongoose.connection.readyState === 1) {
-        console.log(`[product] MongoDB connected, attempting update...`);
-        const product = await ProductModel.findByIdAndUpdate(
-          id,
-          updateData,
-          { new: true, runValidators: false }
-        );
-        
-        if (product) {
-          console.log(`[product] Successfully updated in MongoDB`);
-          return res.json({ ok: true, product });
-        } else {
-          console.log(`[product] Product not found in MongoDB: ${id}`);
-        }
-      } else {
-        console.log(`[product] MongoDB not connected, using JSON fallback`);
-      }
-    } catch (mongoErr) {
-      console.log(`[product] MongoDB error, using JSON fallback:`, mongoErr.message);
-    }
-    
-    // Fallback to JSON file
-    console.log(`[product] Reading from JSON file...`);
-    const products = readDataFile('products.json') || [];
-    console.log(`[product] Total products in JSON: ${products.length}`);
-    
-    const index = products.findIndex(p => {
-      const pId = String(p.id || p._id);
-      const searchId = String(id);
-      return pId === searchId;
-    });
-    
-    console.log(`[product] Found product at index: ${index}`);
-    
-    if (index === -1) {
-      console.log(`[product] Product not found in JSON: ${id}`);
-      return res.status(404).json({ ok: false, error: `Product not found: ${id}` });
-    }
-    
-    // Update all provided fields - but preserve existing images if not explicitly changed
-    const oldProduct = JSON.parse(JSON.stringify(products[index]));
-    Object.keys(updateData).forEach(key => {
-      // Only update image fields if they have a non-empty value
-      if (key === 'imageUrl' || key === 'img' || key === 'image') {
-        if (updateData[key] && updateData[key].trim()) {
-          products[index][key] = updateData[key];
-        }
-        // If empty, don't update - keep existing image
-      } else {
-        // For all other fields, update normally
-        products[index][key] = updateData[key];
-      }
-    });
-    
-    console.log(`[product] Old product:`, oldProduct);
-    console.log(`[product] New product:`, products[index]);
-    
-    writeDataFile('products.json', products);
-    console.log(`[product] Successfully saved to JSON file`);
-    
-    res.json({ ok: true, product: products[index] });
-  } catch (e) {
-    console.error(`[product] Error updating product:`, e.message);
-    console.error(`[product] Stack:`, e.stack);
-    res.status(500).json({ ok: false, error: e.message || 'server error' });
-  }
-});
+// NOTE: Public product editing endpoint removed - only admin endpoints available
 
 // Products stats summary endpoint (protected)
 app.get('/api/products/stats/summary', (req, res) => {
@@ -2884,63 +2761,7 @@ app.delete('/api/admin/prebuilds/:id', async (req, res) => {
   }
 });
 
-// PUBLIC: Delete prebuild (fallback for non-admin routes)
-app.delete('/api/prebuilds/:id', async (req, res) => {
-  // Allow deletion from public endpoint for testing/development
-  const { id } = req.params;
-  console.log(`[prebuild] PUBLIC DELETE request for ID: ${id}`);
-
-  try {
-    const mongoose = require('mongoose');
-    const PrebuildModel = getPrebuildModel();
-    
-    if (PrebuildModel && mongoose.connection.readyState === 1) {
-      console.log('[prebuild] Using MongoDB for public deletion');
-      
-      // Try multiple approaches
-      let result = null;
-      
-      try {
-        result = await PrebuildModel.findByIdAndDelete(id);
-      } catch (err) {
-        console.log('[prebuild] findByIdAndDelete failed:', err.message);
-      }
-      
-      if (!result) {
-        result = await PrebuildModel.findOneAndDelete({ _id: id });
-      }
-      
-      if (!result) {
-        result = await PrebuildModel.findOneAndDelete({ id: id });
-      }
-      
-      if (!result) {
-        console.log(`[prebuild] Not found in MongoDB`);
-      } else {
-        console.log(`[prebuild] Successfully deleted from MongoDB (public): ${id}`);
-        return res.json({ ok: true, message: 'Prebuild deleted' });
-      }
-    }
-    
-    // JSON file fallback
-    console.log('[prebuild] Using JSON file for public deletion');
-    const prebuilds = readDataFile('prebuilds.json') || [];
-    const idx = prebuilds.findIndex(p => String(p._id) === String(id) || String(p.id) === String(id));
-    
-    if (idx === -1) {
-      console.log('[prebuild] Prebuild not found in file');
-      return res.status(404).json({ ok: false, error: 'Prebuild not found' });
-    }
-    
-    const deleted = prebuilds.splice(idx, 1);
-    writeDataFile('prebuilds.json', prebuilds);
-    console.log(`[prebuild] Deleted from file (public):`, deleted[0]);
-    return res.json({ ok: true, message: 'Prebuild deleted' });
-  } catch (e) {
-    console.error('[prebuild] Public delete failed:', e);
-    return res.status(500).json({ ok: false, error: `Server error: ${e.message}` });
-  }
-});
+// NOTE: Public prebuild delete endpoint removed - only admin endpoints available
 
 // Database status endpoint (for debugging)
 app.get('/api/db-status', (req, res) => {

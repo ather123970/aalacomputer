@@ -1,0 +1,52 @@
+{
+  "timestamp": "2025-11-23T15:49:30.065Z",
+  "totalProducts": 4704,
+  "emptyBrandCounts": [
+    {
+      "name": "Products with brand = \"\" (empty string)",
+      "query": {
+        "brand": ""
+      },
+      "description": "Brand field is empty string",
+      "count": 0
+    },
+    {
+      "name": "Products with brand = null",
+      "query": {
+        "brand": null
+      },
+      "description": "Brand field is null",
+      "count": 0
+    },
+    {
+      "name": "Products with brand = undefined",
+      "query": {
+        "brand": {
+          "$exists": false
+        }
+      },
+      "description": "Brand field does not exist",
+      "count": 0
+    },
+    {
+      "name": "Products with brand = \"empty\"",
+      "query": {
+        "brand": "empty"
+      },
+      "description": "Brand field is literally \"empty\"",
+      "count": 0
+    },
+    {
+      "name": "Products with brand containing only whitespace",
+      "query": {
+        "brand": {
+          "$regex": {}
+        }
+      },
+      "description": "Brand field contains only whitespace",
+      "count": 0
+    }
+  ],
+  "totalEmptyBrands": 0,
+  "sampleProducts": []
+}

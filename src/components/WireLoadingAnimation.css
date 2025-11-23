@@ -1,0 +1,295 @@
+/* Wire Loading Animation Styles */
+
+.wire-loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 40px 20px;
+  min-height: 300px;
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  border-radius: 16px;
+  transition: all 0.6s ease-out;
+}
+
+.wire-loading-container.complete {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s ease-out;
+}
+
+/* SVG Container */
+.wire-svg {
+  width: 200px;
+  height: 120px;
+  filter: drop-shadow(0 4px 12px rgba(59, 130, 246, 0.15));
+}
+
+/* Wire Styles */
+.wire {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: wire-draw 1.5s ease-out forwards;
+}
+
+.wire-left {
+  animation-delay: 0s;
+}
+
+.wire-right {
+  animation-delay: 0.3s;
+}
+
+@keyframes wire-draw {
+  0% {
+    stroke-dashoffset: 100;
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+/* Wire Glow Effect */
+.wire-glow {
+  filter: blur(1px);
+  animation: wire-glow-pulse 2s ease-in-out infinite;
+}
+
+.wire-glow-left {
+  animation-delay: 0s;
+}
+
+.wire-glow-right {
+  animation-delay: 0.3s;
+}
+
+@keyframes wire-glow-pulse {
+  0%, 100% {
+    opacity: 0.2;
+    stroke-width: 6;
+  }
+  50% {
+    opacity: 0.5;
+    stroke-width: 8;
+  }
+}
+
+/* Terminal Styles */
+.terminal {
+  animation: terminal-pulse 1.5s ease-out forwards;
+}
+
+@keyframes terminal-pulse {
+  0% {
+    r: 2;
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    r: 4;
+    opacity: 1;
+  }
+}
+
+/* Connection Line Animation */
+.connection-line {
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  animation: connection-draw 0.6s ease-out forwards;
+  filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.6));
+}
+
+@keyframes connection-draw {
+  0% {
+    stroke-dashoffset: 60;
+    opacity: 0;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+/* Spark Animations */
+.spark-group {
+  transform-origin: 100px 60px;
+}
+
+@keyframes spark-jump {
+  0% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(0, -15px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes spark-fade {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes spark-glow-fade {
+  0% {
+    opacity: 0.8;
+    r: 3;
+  }
+  100% {
+    opacity: 0;
+    r: 8;
+  }
+}
+
+/* Spark Particle Styles */
+.spark-particle {
+  filter: drop-shadow(0 0 2px rgba(251, 191, 36, 0.8));
+}
+
+.spark-glow {
+  filter: blur(0.5px);
+}
+
+/* Loading Text */
+.loading-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  animation: fade-in 0.6s ease-out forwards;
+}
+
+.loading-text p {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Dots Animation */
+.dots-animation {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.dots-animation span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+  animation: dot-bounce 1.4s infinite;
+}
+
+.dots-animation span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.dots-animation span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.dots-animation span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes dot-bounce {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-8px);
+    opacity: 1;
+  }
+}
+
+/* Connected Text */
+.connected-text {
+  animation: fade-in 0.4s ease-out forwards;
+}
+
+.connected-text p {
+  font-size: 16px;
+  font-weight: 600;
+  color: #10b981;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+  .wire-loading-container {
+    min-height: 250px;
+    padding: 30px 15px;
+  }
+
+  .wire-svg {
+    width: 160px;
+    height: 100px;
+  }
+
+  .loading-text p {
+    font-size: 14px;
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .wire-loading-container {
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+  }
+
+  .loading-text p {
+    color: #f3f4f6;
+  }
+
+  .wire-svg {
+    filter: drop-shadow(0 4px 12px rgba(59, 130, 246, 0.25));
+  }
+}
+
+/* Animation Performance Optimization */
+@media (prefers-reduced-motion: reduce) {
+  .wire,
+  .wire-glow,
+  .terminal,
+  .connection-line,
+  .spark-group,
+  .loading-text,
+  .dots-animation span {
+    animation: none !important;
+  }
+
+  .wire-loading-container {
+    transition: none;
+  }
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useInView } from "react-intersection-observer";
 import { ProductGrid, LoadingSpinner } from "../components/PremiumUI";
 import { API_CONFIG } from "../config/api";
@@ -128,6 +128,7 @@ const brandOptionsByCategory = {
 const Products = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { slug } = useParams();
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [priceRange, setPriceRange] = useState([0, 500000]);
   const [filteredProducts, setFilteredProducts] = useState([]);
@@ -203,54 +204,77 @@ const Products = () => {
     loadCategories();
   }, []);
 
-  // Load ALL products on mount (only once)
+  // Load products with pagination - optimized for instant display
+  // Desktop: 500 per page (shows 10+ instantly), Mobile: 300 per page (shows 10+ instantly)
+  const [PRODUCTS_PER_PAGE, setPRODUCTS_PER_PAGE] = useState(500);
+  const [totalPages, setTotalPages] = useState(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const loadMoreTimeoutRef = useRef(null);
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+  
+  // Detect screen size changes
   useEffect(() => {
-    const loadAllProducts = async () => {
-      console.log(`[Products] Loading ALL products...`);
+    const handleResize = () => {
+      const desktop = window.innerWidth >= 1024;
+      setIsDesktop(desktop);
+      setPRODUCTS_PER_PAGE(desktop ? 500 : 300);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  useEffect(() => {
+    const loadProductsPage = async (page = 1) => {
+      console.log(`[Products] Loading page ${page} (${PRODUCTS_PER_PAGE} products per page)...`);
       
-      setIsLoading(true);
+      if (page === 1) {
+        setIsLoading(true);
+      } else {
+        setIsLoadingMore(true);
+      }
       
       try {
         const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
         console.log(`[Products] API Base URL: ${base}`);
         
-        // Load ALL products at once - NO filters, NO pagination
-        // Use very high limit to get all products
-        const url = `${base}/api/products?limit=50000`;
+        // Fetch products per page from MongoDB (optimized for screen size)
+        const url = `${base}/api/products?page=${page}&limit=${PRODUCTS_PER_PAGE}`;
         console.log(`[Products] Fetching: ${url}`);
         
-        const resp = await fetch(url, {
-          signal: AbortSignal.timeout(30000)
-        });
+        const resp = await fetch(url);
         
         if (!resp.ok) {
           throw new Error(`API returned status ${resp.status}`);
         }
         
         const json = await resp.json();
-        console.log(`[Products] API Response:`, json);
+        console.log(`[Products] API Response for page ${page}:`, json);
         
         let batchData = [];
         let total = 0;
+        let pages = 0;
         
         // Handle different response formats
         if (Array.isArray(json)) {
           batchData = json;
           total = json.length;
+          pages = Math.ceil(total / PRODUCTS_PER_PAGE);
           console.log(`[Products] Response is array with ${batchData.length} items`);
         } else if (json && Array.isArray(json.products)) {
           batchData = json.products;
           total = json.total || batchData.length;
-          console.log(`[Products] Response has products array with ${batchData.length} items`);
+          pages = json.totalPages || Math.ceil(total / PRODUCTS_PER_PAGE);
+          console.log(`[Products] Response has products array with ${batchData.length} items, total: ${total}, pages: ${pages}`);
         } else {
           console.warn(`[Products] Unexpected response format:`, json);
           batchData = [];
         }
         
-        console.log(`[Products] Got ${batchData.length} products, total: ${total}`);
+        console.log(`[Products] Got ${batchData.length} products for page ${page}`);
         
         if (batchData && batchData.length > 0) {
-          // Format all products - preserve ALL fields from database
+          // Format products - preserve ALL fields from database
           const formattedProducts = batchData.map(p => ({
             // IDs
             id: p._id || p.id,
@@ -297,34 +321,73 @@ const Products = () => {
             ...p
           }));
           
-          console.log(`[Products] Formatted ${formattedProducts.length} products`);
-          setAllProducts(formattedProducts);
-          setTotalProducts(formattedProducts.length);
+          console.log(`[Products] Formatted ${formattedProducts.length} products for page ${page}`);
           
-          try {
-            localStorage.setItem("products", JSON.stringify(formattedProducts));
-            console.log(`[Products] Cached products to localStorage`);
-          } catch (e) {
-            console.warn("[Products] Failed to cache products in localStorage", e);
+          if (page === 1) {
+            // First page - replace all
+            setAllProducts(formattedProducts);
+            setTotalProducts(total);
+            setTotalPages(pages);
+            setCurrentPage(1);
+          } else {
+            // Subsequent pages - append
+            setAllProducts(prev => [...prev, ...formattedProducts]);
+            setCurrentPage(page);
           }
         } else {
-          console.warn(`[Products] No products in response`);
-          setAllProducts([]);
-          setTotalProducts(0);
+          console.warn(`[Products] No products in response for page ${page}`);
+          // Don't clear products if we're on a higher page - keep existing products
+          if (page === 1) {
+            setAllProducts([]);
+            setTotalProducts(0);
+          }
+          // For higher pages, just stop loading more
+          setHasMoreProducts(false);
         }
       } catch (error) {
-        console.error('[Products] Failed to load products from backend:', error);
-        setAllProducts([]);
-        setTotalProducts(0);
+        console.error('[Products] Error loading products:', error);
+        setError(error.message || 'Failed to load products');
       } finally {
-        setIsLoading(false);
+        if (currentPage === 1) {
+          setIsLoading(false);
+        } else {
+          setIsLoadingMore(false);
+        }
       }
     };
 
-    loadAllProducts();
-  }, []); // Empty dependency array - only run once on mount
-
-
+    loadProductsPage(currentPage);
+  }, [currentPage]);
+  
+  // Infinite scroll - load next page ONLY when user manually scrolls near bottom
+  useEffect(() => {
+    let timeoutId = null;
+    const handleScroll = () => {
+      // Only load if user scrolled near bottom AND there are more pages
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
+        // Check if we can load more products
+        if (hasMoreProducts && currentPage < totalPages && !isLoading && !isLoadingMore) {
+          console.log(`[Products] User scrolled to bottom - Loading next page: ${currentPage + 1}`);
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+          timeoutId = setTimeout(() => {
+            setCurrentPage(currentPage + 1);
+          }, 500);
+        } else if (!hasMoreProducts || currentPage >= totalPages) {
+          console.log(`[Products] All products loaded (page ${currentPage} of ${totalPages})`);
+        }
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [currentPage, totalPages, isLoading, isLoadingMore, hasMoreProducts]);
 
   // Filter products when category, brand, or price changes
   useEffect(() => {
@@ -378,17 +441,54 @@ const Products = () => {
     setFilteredProducts(base);
   }, [selectedCategory, priceRange, allProducts, selectedBrand, searchQuery]);
 
-  // Sync selectedCategory with URL query param (?category=...)
+  // Sync selectedCategory with URL slug param (/category/:slug) or query param (?category=...)
   useEffect(() => {
-    const params = new URLSearchParams(location.search || window.location.search);
-    const cat = params.get('category');
-    if (cat) {
-      const match = categories.find((c) => c.toLowerCase() === cat.toLowerCase());
-      if (match && match !== selectedCategory) {
-        setSelectedCategory(match);
+    if (slug && categories.length > 0) {
+      console.log(`[Products] URL slug detected: ${slug}`);
+      
+      // Convert slug to category name (e.g., "graphics-cards" -> "Graphics Cards")
+      const slugToCategory = {
+        'graphics-cards': 'Graphics Cards',
+        'processors': 'Processors',
+        'motherboards': 'Motherboards',
+        'ram': 'RAM',
+        'storage': 'Storage',
+        'power-supplies': 'Power Supplies',
+        'cpu-coolers': 'CPU Coolers',
+        'pc-cases': 'PC Cases',
+        'monitors': 'Monitors',
+        'keyboards': 'Keyboards',
+        'mouse': 'Mouse',
+        'headsets': 'Headsets',
+        'laptops': 'Laptops',
+        'deals': 'Deals',
+        'prebuilds': 'Prebuilds',
+        'cables-accessories': 'Cables & Accessories',
+        'networking': 'Networking'
+      };
+      
+      const categoryName = slugToCategory[slug.toLowerCase()] || slug;
+      
+      // Find exact match in categories
+      const matchedCategory = categories.find(cat => cat.toLowerCase() === categoryName.toLowerCase());
+      
+      if (matchedCategory && matchedCategory !== selectedCategory) {
+        console.log(`[Products] Setting category from slug: ${matchedCategory}`);
+        setSelectedCategory(matchedCategory);
+      }
+    } else if (!slug) {
+      // Check query params if no slug
+      const params = new URLSearchParams(location.search || window.location.search);
+      const cat = params.get('category');
+      if (cat) {
+        const match = categories.find((c) => c.toLowerCase() === cat.toLowerCase());
+        if (match && match !== selectedCategory) {
+          console.log(`[Products] Setting category from query param: ${match}`);
+          setSelectedCategory(match);
+        }
       }
     }
-  }, [location.search]);
+  }, [slug, location.search, categories]);
 
   // Reset selected brand when category changes and scroll to products
   useEffect(() => {
@@ -432,10 +532,8 @@ const Products = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Scroll to top when page changes
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [currentPage]);
+  // NOTE: Removed auto-scroll when page changes to allow user to scroll at their own pace
+  // Users can still use the "Scroll to Top" button if they want to go back to the top
 
   // Handle products with missing images
   const handleMissingImage = useCallback((product) => {
@@ -471,13 +569,6 @@ const Products = () => {
                 Showing {allProducts.length} products
               </p>
             )}
-            <a
-              href="/quick-category-update"
-              className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
-            >
-              <span>⚡</span>
-              <span>Quick Category Update</span>
-            </a>
           </div>
         </div>
 
@@ -640,18 +731,38 @@ const Products = () => {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
                     {filteredProducts.map((product, index) => (
                       <ProductCard
                         key={product.id}
                         product={product}
                         onClick={() => navigate(`/products/${product.id}`)}
-                        priority={index < 8} // First 8 products load immediately
+                        priority={isDesktop ? index < 10 : index < 6} // Desktop: 10, Mobile: 6 load immediately
                         onMissingImage={handleMissingImage}
                         categories={categories}
                       />
                     ))}
                   </div>
+
+                  {/* Loading Indicator - Auto Load */}
+                  {isLoadingMore && (
+                    <div className="flex justify-center items-center py-8 mt-8">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-muted font-semibold">Loading more products...</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* End of Products Message */}
+                  {!hasMoreProducts && filteredProducts.length > 0 && (
+                    <div className="flex justify-center items-center py-8 mt-8">
+                      <div className="text-center">
+                        <p className="text-muted font-semibold">✓ All products loaded</p>
+                        <p className="text-sm text-muted mt-2">Total: {filteredProducts.length} products</p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Pagination Controls */}
                   <div className="flex justify-center items-center gap-4 mt-8 flex-wrap">

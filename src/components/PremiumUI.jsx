@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import SimpleImage from './SimpleImage';
 import { getImageFromProduct } from '../utils/simpleImageLoader';
 import { useProductContext } from '../context/ProductContext';
+import WireLoadingAnimation from './WireLoadingAnimation';
 
 export const ProductCard = ({ product, onClick, priority = false }) => {
   const { getUpdatedProduct } = useProductContext();
@@ -209,10 +210,8 @@ export const PremiumButton = ({ children, variant = 'primary', ...props }) => {
 };
 
 export const LoadingSpinner = () => (
-  <div className="flex items-center justify-center py-8">
-    <div
-      className="w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"
-    />
+  <div className="flex items-center justify-center py-8 w-full">
+    <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
   </div>
 );
 

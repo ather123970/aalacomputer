@@ -189,9 +189,12 @@ const AdminDealsV2 = ({ showMessage }) => {
         createdAt: new Date().toISOString()
       };
 
-      const response = await fetch(`${base}/api/deals`, {
+      const response = await fetch(`${base}/api/admin/deals`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('aalacomp_admin_token')}`
+        },
         body: JSON.stringify(dealData)
       });
 
@@ -227,8 +230,11 @@ const AdminDealsV2 = ({ showMessage }) => {
 
     try {
       const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
-      const response = await fetch(`${base}/api/deals/${dealId}`, {
-        method: 'DELETE'
+      const response = await fetch(`${base}/api/admin/deals/${dealId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('aalacomp_admin_token')}`
+        }
       });
 
       if (response.ok) {

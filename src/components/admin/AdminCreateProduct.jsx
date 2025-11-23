@@ -21,6 +21,8 @@ const AdminCreateProduct = ({ showMessage }) => {
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(false);
   const [imageInputMode, setImageInputMode] = useState('upload'); // 'upload' or 'link'
+  const [showNewBrandInput, setShowNewBrandInput] = useState(false);
+  const [newBrandName, setNewBrandName] = useState('');
 
   useEffect(() => {
     fetchCategoriesAndBrands();
@@ -75,6 +77,31 @@ const AdminCreateProduct = ({ showMessage }) => {
     });
   };
 
+  const handleAddNewBrand = () => {
+    if (!newBrandName.trim()) {
+      showMessage('Please enter a brand name', 'error');
+      return;
+    }
+
+    if (brands.includes(newBrandName)) {
+      showMessage('Brand already exists', 'error');
+      return;
+    }
+
+    // Add new brand to list
+    const updatedBrands = [...brands, newBrandName].sort();
+    setBrands(updatedBrands);
+    
+    // Set it as selected
+    setFormData({ ...formData, brand: newBrandName });
+    
+    // Reset input
+    setNewBrandName('');
+    setShowNewBrandInput(false);
+    
+    showMessage('Brand added successfully!', 'success');
+  };
+
   const validateForm = () => {
     if (!formData.name.trim()) {
       showMessage('Product name is required', 'error');
@@ -101,6 +128,8 @@ const AdminCreateProduct = ({ showMessage }) => {
     setLoading(true);
     try {
       const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
+      const adminToken = localStorage.getItem('aalacomp_admin_token');
+      
       const productData = {
         name: formData.name,
         price: parseInt(formData.price) || 0,
@@ -114,9 +143,12 @@ const AdminCreateProduct = ({ showMessage }) => {
         inStock: true
       };
 
-      const response = await fetch(`${base}/api/products`, {
+      const response = await fetch(`${base}/api/admin/products`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(adminToken && { 'Authorization': `Bearer ${adminToken}` })
+        },
         body: JSON.stringify(productData)
       });
 
@@ -232,17 +264,59 @@ const AdminCreateProduct = ({ showMessage }) => {
             {/* Brand */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Brand</label>
-              <select
-                name="brand"
-                value={formData.brand}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500 transition appearance-none cursor-pointer"
-              >
-                <option value="">Select Brand</option>
-                {brands.map(brand => (
-                  <option key={brand} value={brand}>{brand}</option>
-                ))}
-              </select>
+              {!showNewBrandInput ? (
+                <select
+                  name="brand"
+                  value={formData.brand}
+                  onChange={(e) => {
+                    if (e.target.value === 'add-new') {
+                      setShowNewBrandInput(true);
+                    } else {
+                      handleInputChange(e);
+                    }
+                  }}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500 transition appearance-none cursor-pointer"
+                >
+                  <option value="">Select Brand</option>
+                  {brands.map(brand => (
+                    <option key={brand} value={brand}>{brand}</option>
+                  ))}
+                  <option value="add-new" className="bg-gray-600 font-semibold">+ Add New Brand</option>
+                </select>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newBrandName}
+                      onChange={(e) => setNewBrandName(e.target.value)}
+                      placeholder="Enter new brand name"
+                      className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition"
+                      onKeyPress={(e) => e.key === 'Enter' && handleAddNewBrand()}
+                      autoFocus
+                    />
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleAddNewBrand}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition"
+                    >
+                      Add
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        setShowNewBrandInput(false);
+                        setNewBrandName('');
+                      }}
+                      className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-lg transition"
+                    >
+                      Cancel
+                    </motion.button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Product Type */}

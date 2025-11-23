@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, Tag, TrendingDown, Flame, AlertCircle } from 'lucide-react';
+import { Clock, Tag, TrendingDown, Flame, AlertCircle, ShoppingCart, Zap } from 'lucide-react';
 import { API_CONFIG } from '../config/api';
 
 // Deal rotation settings
@@ -10,8 +10,14 @@ const DEAL_STORAGE_KEY = 'dealRotationTimestamp';
 export default function Deal() {
   const navigate = useNavigate();
   const [deals, setDeals] = useState([]);
+  const [currentDealIndex, setCurrentDealIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [dealRotationTime, setDealRotationTime] = useState(null);
+  const [cart, setCart] = useState(() => {
+    const saved = localStorage.getItem('aala_cart');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [notification, setNotification] = useState('');
   
   // Initialize or check deal rotation timer
   useEffect(() => {
@@ -27,12 +33,12 @@ export default function Deal() {
       } else {
         const storedTime = parseInt(stored);
         if (now >= storedTime) {
-          // Time expired - set new rotation time
+          // Time expired - rotate to next deal
           const newRotationTime = now + (DEAL_ROTATION_HOURS * 60 * 60 * 1000);
           localStorage.setItem(DEAL_STORAGE_KEY, newRotationTime.toString());
           setDealRotationTime(newRotationTime);
-          // Trigger deals refresh
-          window.location.reload();
+          // Move to next deal
+          setCurrentDealIndex(prev => (prev + 1) % Math.max(deals.length, 1));
         } else {
           setDealRotationTime(storedTime);
         }
@@ -43,31 +49,37 @@ export default function Deal() {
     // Check every minute
     const interval = setInterval(checkRotation, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [deals.length]);
 
   useEffect(() => {
     const fetchDeals = async () => {
       setLoading(true);
       try {
         const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
-        const response = await fetch(`${base}/api/deals`);
+        const response = await fetch(`${base}/api/products?category=Deals&limit=100`);
         if (response.ok) {
           const data = await response.json();
-          const formatted = Array.isArray(data) ? data.map(d => {
+          // Handle both array and object responses
+          const productsArray = Array.isArray(data) ? data : (data.products || []);
+          const formatted = productsArray.map(d => {
             const dealId = d._id || d.id;
+            const originalPrice = typeof d.price === 'number' ? d.price : parseInt(d.price) || 0;
+            const discountPercent = 10; // Always 10% discount
+            const dealPrice = Math.round(originalPrice * 0.9); // 10% off
+            
             return {
               id: dealId,
               name: d.title || d.name || 'Unnamed Deal',
-              price: typeof d.price === 'number' ? d.price : parseInt(d.price) || 0,
-              originalPrice: d.originalPrice || d.price,
-              discount: d.discount || 0,
+              price: originalPrice,
+              originalPrice: originalPrice,
+              discount: discountPercent,
               img: d.img || d.imageUrl || (dealId ? `/api/product-image/${dealId}` : '/placeholder.svg'),
               target: d.description || d.category || 'Special Deal',
               tag: d.category || 'Deal',
               expiryDate: d.expiryDate || d.expiry,
-              dealPrice: d.dealPrice
+              dealPrice: dealPrice
             };
-          }) : [];
+          });
           setDeals(formatted);
         }
       } catch (error) {
@@ -81,8 +93,53 @@ export default function Deal() {
     fetchDeals();
   }, []);
 
+  // Save cart to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('aala_cart', JSON.stringify(cart));
+  }, [cart]);
+
+  // Add single product to cart
+  const addToCart = (deal) => {
+    const newItem = {
+      id: deal.id.toString(),
+      name: deal.name,
+      price: deal.dealPrice,
+      img: deal.img,
+      spec: deal.target || '',
+      qty: 1
+    };
+    
+    // Check if item already exists
+    const existingIndex = cart.findIndex(item => item.id === newItem.id);
+    let updatedCart;
+    
+    if (existingIndex !== -1) {
+      // Item exists, increment quantity
+      updatedCart = [...cart];
+      updatedCart[existingIndex] = {
+        ...updatedCart[existingIndex],
+        qty: (updatedCart[existingIndex].qty || 1) + 1
+      };
+    } else {
+      // New item
+      updatedCart = [...cart, newItem];
+    }
+    
+    setCart(updatedCart);
+    setNotification(`✅ ${deal.name} added to cart!`);
+    setTimeout(() => setNotification(''), 3000);
+  };
+
+
   return (
     <div className="py-12 bg-gray-900">
+      {/* Notification Toast */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg animate-pulse">
+          {notification}
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center">
           {/* Urgency Header */}
@@ -118,64 +175,72 @@ export default function Deal() {
             <p className="text-gray-500 text-sm mt-2">Check back later for amazing offers!</p>
           </div>
         ) : (
-          <div className="mt-12 grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {deals.map((deal) => (
-            <div
-              key={deal.id}
-              className="bg-gray-800 rounded-lg shadow-lg overflow-hidden hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer relative group"
-              onClick={() => navigate(`/deal/${deal.id}`)}
-            >
-              {/* Discount Badge */}
-              {deal.discount > 0 && (
-                <div className="absolute top-2 right-2 z-10 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg flex items-center gap-1">
-                  <TrendingDown className="w-4 h-4" />
-                  {deal.discount}% OFF
-                </div>
-              )}
-              
-              <div className="h-48 sm:h-56 w-full overflow-hidden bg-gray-700">
-                <img
-                  src={deal.img}
-                  alt={deal.name}
-                  loading="lazy"
-                  decoding="async"
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                  onError={(e) => { e.currentTarget.src = "/placeholder.svg"; }}
-                />
-              </div>
-              
-              <div className="p-4 sm:p-6">
-                <h3 className="text-lg sm:text-xl font-semibold text-white line-clamp-2 mb-2">{deal.name}</h3>
-                
-                {/* Price Section */}
-                <div className="flex items-center gap-2 mb-3">
-                  {deal.discount > 0 && deal.originalPrice && (
-                    <span className="text-gray-400 line-through text-sm">
-                      Rs. {deal.originalPrice.toLocaleString()}
-                    </span>
+          <div className="mt-12 flex justify-center">
+            {(() => {
+              const deal = deals[currentDealIndex % deals.length];
+              return (
+                <div className="w-full max-w-md bg-gray-800 rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 relative group">
+                  {/* Discount Badge */}
+                  {deal.discount > 0 && (
+                    <div className="absolute top-2 right-2 z-10 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg flex items-center gap-1">
+                      <TrendingDown className="w-4 h-4" />
+                      {deal.discount}% OFF
+                    </div>
                   )}
-                  <span className="text-yellow-400 font-bold text-xl">
-                    Rs. {(deal.dealPrice || deal.price).toLocaleString()}
-                  </span>
+                  
+                  <div className="h-64 w-full overflow-hidden bg-gray-700">
+                    <img
+                      src={deal.img}
+                      alt={deal.name}
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      onError={(e) => { e.currentTarget.src = "/placeholder.svg"; }}
+                    />
+                  </div>
+                  
+                  <div className="p-6">
+                    <h3 className="text-2xl font-semibold text-white mb-2">{deal.name}</h3>
+                    
+                    {/* Price Section */}
+                    <div className="flex items-center gap-2 mb-4">
+                      {deal.discount > 0 && deal.originalPrice && (
+                        <span className="text-gray-400 line-through text-lg">
+                          Rs. {deal.originalPrice.toLocaleString()}
+                        </span>
+                      )}
+                      <span className="text-yellow-400 font-bold text-3xl">
+                        Rs. {(deal.dealPrice || deal.price).toLocaleString()}
+                      </span>
+                    </div>
+                    
+                    {/* Countdown Timer */}
+                    {dealRotationTime && <GlobalCountdown expiryTime={dealRotationTime} />}
+                    
+                    <p className="mt-4 text-gray-400 text-sm">{deal.target}</p>
+                    
+                    <div className="mt-4 flex items-center justify-between mb-6">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-500 text-white">
+                        <Tag className="w-3 h-3 mr-1" />
+                        {deal.tag}
+                      </span>
+                      <span className="text-gray-400 text-sm">
+                        Deal {currentDealIndex + 1} of {deals.length}
+                      </span>
+                    </div>
+
+                    {/* Add to Cart Button */}
+                    <button
+                      onClick={() => addToCart(deal)}
+                      className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 text-lg"
+                    >
+                      <ShoppingCart className="w-5 h-5" />
+                      Add to Cart
+                    </button>
+                  </div>
                 </div>
-                
-                {/* Countdown Timer */}
-                {deal.expiryDate && <CountdownTimer expiryDate={deal.expiryDate} />}
-                
-                <p className="mt-2 text-gray-400 text-sm line-clamp-1">{deal.target}</p>
-                
-                <div className="mt-4 flex items-center justify-between">
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-500 text-white">
-                    <Tag className="w-3 h-3 mr-1" />
-                    {deal.tag}
-                  </span>
-                  <button className="text-blue-400 hover:text-blue-300 text-sm font-medium">
-                    View Deal →
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+              );
+            })()}
           </div>
         )}
       </div>

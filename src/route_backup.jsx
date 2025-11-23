@@ -196,12 +196,12 @@ export const router = createBrowserRouter([
         element: <Profile /> 
       },
       { 
-        path: 'auth', 
-        element: <AuthPage /> 
+        path: 'brand-manager',
+        element: <ErrorBoundary><BrandManager /></ErrorBoundary>
       },
-      { 
-        path: 'checkout',
-        element: <ErrorBoundary><CheckoutPage /></ErrorBoundary>
+      {
+        path: 'quick-category-update',
+        element: <ErrorBoundary><QuickCategoryUpdate /></ErrorBoundary>
       }
     ]
   },

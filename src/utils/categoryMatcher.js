@@ -155,19 +155,18 @@ export function categoriesMatch(productCategory, selectedCategory) {
     return true;
   }
   
-  // Flexible matching: check if one contains the other (for variations)
-  // e.g., "processor type" contains "processor"
-  if (prodCat.includes(selCat) || selCat.includes(prodCat)) {
+  // STRICT matching: only match if product category contains the selected category as a complete word
+  // e.g., "processor type" matches "processor" but "Dell Intel i7" does NOT match "Intel"
+  const prodWords = prodCat.split(/\s+/);
+  const selWords = selCat.split(/\s+/);
+  
+  // Check if all selected words appear in product category
+  const allWordsMatch = selWords.every(selWord => 
+    prodWords.some(prodWord => prodWord === selWord || prodWord.includes(selWord))
+  );
+  
+  if (allWordsMatch) {
     return true;
-  }
-  
-  // Check if they share a common keyword
-  const prodKeywords = CATEGORY_GROUPS[productGroup]?.keywords || [];
-  const selKeywords = CATEGORY_GROUPS[selectedGroup]?.keywords || [];
-  
-  if (prodKeywords.length > 0 && selKeywords.length > 0) {
-    const commonKeyword = prodKeywords.some(kw => selKeywords.includes(kw));
-    if (commonKeyword) return true;
   }
   
   return false;

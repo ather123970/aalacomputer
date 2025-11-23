@@ -12,6 +12,7 @@ const SimpleImage = ({
   product = null,
   className = '',
   fallback = '/placeholder.svg',
+  priority = false,
   ...props 
 }) => {
   const [imageSrc, setImageSrc] = useState(src || fallback);
@@ -29,14 +30,18 @@ const SimpleImage = ({
     setIsLoading(false);
     setHasError(true);
     
+    // Log broken image for debugging
+    console.warn(`[SimpleImage] Image failed to load: ${src}`);
+    
     // Use category-based fallback if available
     if (product?.category) {
       const categoryFallback = getFallbackImage(product.category);
+      console.log(`[SimpleImage] Using category fallback for ${product.category}`);
       setImageSrc(categoryFallback);
     } else {
       setImageSrc(fallback);
     }
-  }, [product, fallback]);
+  }, [product, fallback, src]);
 
   return (
     <div className={`relative w-full h-full ${className}`}>
@@ -51,8 +56,11 @@ const SimpleImage = ({
         alt={alt}
         onLoad={handleLoad}
         onError={handleError}
-        className="w-full h-full object-contain"
-        loading="lazy"
+        className={`w-full h-full object-contain transition-opacity duration-300 ${
+          isLoading ? 'opacity-0' : 'opacity-100'
+        }`}
+        loading={priority ? "eager" : "lazy"}
+        decoding={priority ? "sync" : "async"}
         {...props}
       />
 
