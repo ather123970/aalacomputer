@@ -5,6 +5,7 @@ import Deal from './Deal'
 import Trustcard from '../trustcard'
 import About from '../About'
 import VideoShowcase from '../components/VideoShowcase'
+import Footer from './footer'
 
 const Home = () => {
   return (
@@ -15,6 +16,7 @@ const Home = () => {
       <VideoShowcase/>
       <Deal/>
       <About/>
+      <Footer/>
     </>
   )
 }

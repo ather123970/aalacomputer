@@ -56,32 +56,40 @@ export default function Deal() {
       setLoading(true);
       try {
         const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
-        const response = await fetch(`${base}/api/products?category=Deals&limit=100`);
-        if (response.ok) {
-          const data = await response.json();
-          // Handle both array and object responses
-          const productsArray = Array.isArray(data) ? data : (data.products || []);
-          const formatted = productsArray.map(d => {
-            const dealId = d._id || d.id;
-            const originalPrice = typeof d.price === 'number' ? d.price : parseInt(d.price) || 0;
-            const discountPercent = 10; // Always 10% discount
-            const dealPrice = Math.round(originalPrice * 0.9); // 10% off
-            
-            return {
-              id: dealId,
-              name: d.title || d.name || 'Unnamed Deal',
-              price: originalPrice,
-              originalPrice: originalPrice,
-              discount: discountPercent,
-              img: d.img || d.imageUrl || (dealId ? `/api/product-image/${dealId}` : '/placeholder.svg'),
-              target: d.description || d.category || 'Special Deal',
-              tag: d.category || 'Deal',
-              expiryDate: d.expiryDate || d.expiry,
-              dealPrice: dealPrice
-            };
-          });
-          setDeals(formatted);
+        // Try to fetch from Deals category first, then fallback to all products
+        let response = await fetch(`${base}/api/products?category=Deals&limit=100`);
+        let data = await response.json();
+        let productsArray = Array.isArray(data) ? data : (data.products || []);
+        
+        // If no deals found, fetch random products to use as deals
+        if (productsArray.length === 0) {
+          response = await fetch(`${base}/api/products?limit=50&page=1`);
+          data = await response.json();
+          productsArray = Array.isArray(data) ? data : (data.products || []);
+          // Shuffle and take first 5
+          productsArray = productsArray.sort(() => Math.random() - 0.5).slice(0, 5);
         }
+        
+        const formatted = productsArray.map(d => {
+          const dealId = d._id || d.id;
+          const originalPrice = typeof d.price === 'number' ? d.price : parseInt(d.price) || 0;
+          const discountPercent = 10; // Always 10% discount
+          const dealPrice = Math.round(originalPrice * 0.9); // 10% off
+          
+          return {
+            id: dealId,
+            name: d.title || d.name || 'Unnamed Deal',
+            price: originalPrice,
+            originalPrice: originalPrice,
+            discount: discountPercent,
+            img: d.img || d.imageUrl || (dealId ? `/api/product-image/${dealId}` : '/placeholder.svg'),
+            target: d.description || d.category || 'Special Deal',
+            tag: d.category || 'Deal',
+            expiryDate: d.expiryDate || d.expiry,
+            dealPrice: dealPrice
+          };
+        });
+        setDeals(formatted);
       } catch (error) {
         console.error('Failed to fetch deals:', error);
         setDeals([]);
@@ -96,6 +104,8 @@ export default function Deal() {
   // Save cart to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('aala_cart', JSON.stringify(cart));
+    // Fire custom event to update cart count in navbar
+    window.dispatchEvent(new Event('cartUpdated'));
   }, [cart]);
 
   // Add single product to cart

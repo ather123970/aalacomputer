@@ -6,7 +6,7 @@ import { getImageFromProduct } from '../utils/simpleImageLoader';
 import { useProductContext } from '../context/ProductContext';
 import WireLoadingAnimation from './WireLoadingAnimation';
 
-export const ProductCard = ({ product, onClick, priority = false }) => {
+export const ProductCard = ({ product, onClick, priority = false, showUrgency = false, productIndex = 0 }) => {
   const { getUpdatedProduct } = useProductContext();
   
   // Check if product was updated globally
@@ -28,6 +28,7 @@ export const ProductCard = ({ product, onClick, priority = false }) => {
   const initialSrc = getImageFromProduct(displayProduct) || '/placeholder.svg';
   
   // Generate urgency data (would come from backend in production)
+  // Only show for selected products (2-4 max)
   const viewingCount = React.useMemo(() => Math.floor(Math.random() * 50) + 20, [product?.id]);
   const boughtCount = React.useMemo(() => Math.floor(Math.random() * 30) + 10, [product?.id]);
   const leftCount = React.useMemo(() => Math.floor(Math.random() * 40) + 15, [product?.id]);
@@ -54,10 +55,12 @@ export const ProductCard = ({ product, onClick, priority = false }) => {
       className="relative bg-white rounded-lg overflow-hidden shadow-lg border border-neutral-200 transition-transform hover:-translate-y-1 cursor-pointer"
       onClick={onClick}
     >
-      {/* Urgency Badge with Fire Animation */}
-      <div className={`absolute top-2 left-2 bg-gradient-to-r ${urgencyStyle.bg} backdrop-blur-sm text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1 z-10 shadow-lg animate-pulse`}>
-        <span className="font-semibold">{urgencyStyle.text}</span>
-      </div>
+      {/* Urgency Badge with Fire Animation - Only show for 2-4 products */}
+      {showUrgency && (
+        <div className={`absolute top-2 left-2 bg-gradient-to-r ${urgencyStyle.bg} backdrop-blur-sm text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1 z-10 shadow-lg animate-pulse`}>
+          <span className="font-semibold">{urgencyStyle.text}</span>
+        </div>
+      )}
 
       {/* Image Container */}
       <div className="relative aspect-square overflow-hidden bg-neutral-100">
@@ -177,6 +180,17 @@ export const ProductCard = ({ product, onClick, priority = false }) => {
 
 export const ProductGrid = ({ products }) => {
   const navigate = useNavigate();
+  
+  // Randomly select 2-4 products to show urgency badges
+  const urgencyIndices = React.useMemo(() => {
+    const count = Math.floor(Math.random() * 3) + 2; // 2-4 products
+    const indices = new Set();
+    while (indices.size < Math.min(count, products.length)) {
+      indices.add(Math.floor(Math.random() * Math.min(8, products.length)));
+    }
+    return indices;
+  }, [products.length]);
+  
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
       {products.map((product, index) => (
@@ -185,6 +199,8 @@ export const ProductGrid = ({ products }) => {
           product={product}
           onClick={() => navigate(`/products/${product._id || product.id}`)}
           priority={index < 8}
+          showUrgency={urgencyIndices.has(index)}
+          productIndex={index}
         />
       ))}
     </div>

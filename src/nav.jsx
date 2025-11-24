@@ -1,7 +1,7 @@
 // nav.jsx
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Menu, X, ChevronDown, ShoppingCart, User } from 'lucide-react';
+import { Menu, X, ChevronDown, User, ShoppingCart } from 'lucide-react';
 import { motion as FM, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { API_CONFIG } from './config/api';
@@ -72,7 +72,7 @@ export default function Navbar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
-  // Listen for cart updates from localStorage
+  // Listen for cart updates from localStorage and custom events
   useEffect(() => {
     const handleStorageChange = () => {
       try {
@@ -89,8 +89,19 @@ export default function Navbar() {
       }
     };
 
+    // Listen for storage changes
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    
+    // Listen for custom cart update event
+    window.addEventListener('cartUpdated', handleStorageChange);
+    
+    // Initial check
+    handleStorageChange();
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('cartUpdated', handleStorageChange);
+    };
   }, []);
 
   // Helper function to get API base URL
@@ -251,38 +262,54 @@ export default function Navbar() {
 
         {/* Right area desktop */}
           <div className="hidden md:flex items-center gap-4 ml-auto">
-          <button onClick={() => navigate('/cart')} className="p-2 bg-blue-50 hover:bg-blue-100 transition rounded relative" aria-label="Open cart">
-            <ShoppingCart size={22} className="text-white !text-white stroke-white" stroke="white" strokeWidth={2.5} />
-            {cartCount > 0 && <span className="absolute -top-1 -right-1 text-xs bg-red-500 rounded-full w-5 h-5 flex items-center justify-center text-white font-bold text-[11px] shadow-lg animate-pulse">{cartCount}</span>}
+          <button onClick={() => navigate('/cart')} className="relative hover:opacity-80 transition" aria-label="Open cart">
+            <div className="w-11 h-11 bg-white rounded-lg flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow">
+              <ShoppingCart size={22} style={{ color: '#000000', stroke: '#000000' }} strokeWidth={2.5} />
+            </div>
+            {cartCount > 0 && (
+              <div className="absolute -top-3 -right-3 rounded-full w-7 h-7 flex items-center justify-center font-bold shadow-lg border-2 border-white animate-bounce" style={{ backgroundColor: '#DC2626' }}>
+                <span className="text-[11px] font-extrabold leading-none" style={{ color: '#FFFFFF' }}>
+                  {cartCount > 99 ? '99+' : cartCount}
+                </span>
+              </div>
+            )}
           </button>
 
           {user ? (
               <div className="flex items-center gap-3">
-              <button onClick={() => navigate('/profile')} className="p-2 rounded bg-white/5 hover:bg-white/10 flex items-center justify-center" aria-label="Profile">
-                <User size={18} className="text-white !text-white stroke-white" stroke="white" strokeWidth={2} />
+              <button onClick={() => navigate('/profile')} className="p-2 rounded bg-white hover:bg-gray-100 flex items-center justify-center" aria-label="Profile">
+                <User size={20} style={{ color: '#000000', stroke: '#000000' }} strokeWidth={2.5} />
               </button>
-              <button onClick={handleLogout} className="px-3 py-1 rounded bg-red-600 hover:bg-red-700">Logout</button>
+              <button onClick={handleLogout} className="px-3 py-1 rounded bg-red-600 hover:bg-red-700 text-white font-semibold">Logout</button>
             </div>
           ) : (
-            <button onClick={() => navigate('/auth')} className="p-2 rounded bg-white/5 hover:bg-white/10 flex items-center justify-center" aria-label="Login">
-              <User size={18} className="text-white !text-white stroke-white" stroke="white" strokeWidth={2} />
+            <button onClick={() => navigate('/auth')} className="p-2 rounded bg-white hover:bg-gray-100 flex items-center justify-center" aria-label="Login">
+              <User size={20} style={{ color: '#000000', stroke: '#000000' }} strokeWidth={2.5} />
             </button>
           )}
         </div>
 
         {/* Mobile icons */}
-  <div className="md:hidden flex items-center gap-3 ml-auto pointer-events-auto">
-          <button onClick={() => navigate('/cart')} className="p-2 bg-blue-50 hover:bg-blue-100 transition rounded relative" aria-label="Open cart">
-            <ShoppingCart size={20} className="text-white !text-white stroke-white" stroke="white" strokeWidth={2.5} />
-            {cartCount > 0 && <span className="absolute -top-1 -right-1 text-xs bg-red-500 rounded-full w-5 h-5 flex items-center justify-center text-white font-bold text-[11px] shadow-lg animate-pulse">{cartCount}</span>}
+  <div className="md:hidden flex items-center gap-2 ml-auto pointer-events-auto">
+          <button onClick={() => navigate('/cart')} className="relative hover:opacity-80 transition" aria-label="Open cart">
+            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg">
+              <ShoppingCart size={20} style={{ color: '#000000', stroke: '#000000' }} strokeWidth={2.5} />
+            </div>
+            {cartCount > 0 && (
+              <div className="absolute -top-2 -right-2 rounded-full w-6 h-6 flex items-center justify-center font-bold shadow-lg border-2 border-white animate-bounce" style={{ backgroundColor: '#DC2626' }}>
+                <span className="text-[10px] font-extrabold leading-none" style={{ color: '#FFFFFF' }}>
+                  {cartCount > 99 ? '99+' : cartCount}
+                </span>
+              </div>
+            )}
           </button>
 
           <button
             onClick={toggleMenu}
             aria-label={isOpen ? 'Close menu' : 'Open menu'}
-            className="p-2 rounded-md bg-white/5 hover:bg-white/10 transition z-[100102] text-primary outline-none focus:outline-none"
+            className="p-2 rounded-md bg-black hover:bg-gray-800 transition z-[100102] outline-none focus:outline-none"
           >
-            {isOpen ? <X size={22} className="text-white !text-white stroke-white" stroke="white" strokeWidth={2} /> : <Menu size={22} className="text-white !text-white stroke-white" stroke="white" strokeWidth={2} />}
+            {isOpen ? <X size={24} style={{ color: '#000000', stroke: '#000000' }} strokeWidth={2.5} /> : <Menu size={24} style={{ color: '#000000', stroke: '#000000' }} strokeWidth={2.5} />}
           </button>
         </div>
       </div>

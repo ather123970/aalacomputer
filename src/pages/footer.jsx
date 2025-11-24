@@ -28,22 +28,15 @@ const Footer = () => {
   return (
     <>
       {/* Footer */}
-      <footer className="bg-gradient-to-b from-black via-gray-900 to-black text-white py-14 px-6 md:px-20 relative">
+      <footer className="bg-white text-gray-900 py-16 px-6 md:px-20 relative border-t-4 border-blue-600">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between gap-12">
           {/* Brand Section */}
           <div className="md:w-1/3 space-y-4">
-            <div className="flex items-center gap-3">
-              <img
-                src="https://seeklogo.com/images/A/Ala-logo-9A7F5A0E9F-seeklogo.com.png"
-                alt="Aala Computers Logo"
-                className="w-10 h-10 rounded-full bg-white p-1"
-              />
-              <h1 className="text-2xl font-extrabold text-blue-500">
-                Aala Computers
-              </h1>
-            </div>
+            <h1 className="text-3xl font-extrabold text-blue-600">
+              Aala Computers
+            </h1>
 
-            <p className="text-gray-400 text-sm leading-relaxed">
+            <p className="text-gray-600 text-sm leading-relaxed">
               Building your dream PCs with precision. From budget builds to
               extreme setups — we deliver performance, reliability, and design
               that stands out.
@@ -53,11 +46,11 @@ const Footer = () => {
 
           {/* Quick Links */}
           <div className="md:w-1/3">
-            <h2 className="text-xl font-semibold mb-4 text-blue-500 relative inline-block">
+            <h2 className="text-xl font-semibold mb-4 text-blue-600 relative inline-block">
               Quick Links
-              <span className="absolute left-0 -bottom-1 w-16 h-[2px] bg-blue-500"></span>
+              <span className="absolute left-0 -bottom-1 w-16 h-[2px] bg-blue-600"></span>
             </h2>
-            <ul className="space-y-2 text-gray-400">
+            <ul className="space-y-2 text-gray-700">
               {[
                 { name: "Home", href: "#home" },
                 { name: "About", href: "#about" },
@@ -67,7 +60,7 @@ const Footer = () => {
                 <li key={link.name}>
                   <a
                     href={link.href}
-                    className="hover:text-blue-400 transition-colors"
+                    className="hover:text-blue-600 transition-colors"
                   >
                     {link.name}
                   </a>
@@ -78,25 +71,25 @@ const Footer = () => {
 
           {/* Contact Info */}
           <div className="md:w-1/3 space-y-3">
-            <h2 className="text-xl font-semibold mb-2 text-blue-500 relative inline-block">
+            <h2 className="text-xl font-semibold mb-2 text-blue-600 relative inline-block">
               Contact
-              <span className="absolute left-0 -bottom-1 w-16 h-[2px] bg-blue-500"></span>
+              <span className="absolute left-0 -bottom-1 w-16 h-[2px] bg-blue-600"></span>
             </h2>
-            <p className="text-gray-400 text-sm">
+            <p className="text-gray-700 text-sm">
               123 Tech Street, Karachi, Pakistan
             </p>
-            <p className="text-gray-400 text-sm">
+            <p className="text-gray-700 text-sm">
               Email:{" "}
               <a
                 href="mailto:info@aalacomputers.com"
-                className="hover:text-blue-400"
+                className="hover:text-blue-600"
               >
                 info@aalacomputers.com
               </a>
             </p>
-            <p className="text-gray-400 text-sm">
+            <p className="text-gray-700 text-sm">
               Phone:{" "}
-              <a href="tel:+923001234567" className="hover:text-blue-400">
+              <a href="tel:+923001234567" className="hover:text-blue-600">
                 +92 300 1234567
               </a>
             </p>
@@ -104,9 +97,9 @@ const Footer = () => {
         </div>
 
         {/* Divider */}
-        <div className="border-t border-gray-700 mt-10 pt-5 text-center text-gray-500 text-sm">
+        <div className="border-t border-gray-300 mt-10 pt-5 text-center text-gray-600 text-sm">
           &copy; {new Date().getFullYear()}{" "}
-          <span className="text-blue-400 font-semibold">Aala Computers</span>.
+          <span className="text-blue-600 font-semibold">Aala Computers</span>.
           All rights reserved.
         </div>
       </footer>

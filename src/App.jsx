@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import Nav from './nav';
 import { ProductGrid, LoadingSpinner } from './components/PremiumUI';
 import { useInView } from 'react-intersection-observer';
 import { API_CONFIG } from './config/api';
@@ -25,6 +24,7 @@ const App = () => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [allProductsLoaded, setAllProductsLoaded] = useState(false);
+  const [featuredProducts, setFeaturedProducts] = useState([]);
 
   const { ref: sectionRef, inView } = useInView({
     triggerOnce: false,
@@ -48,13 +48,9 @@ const App = () => {
       const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
       const limit = isFirstPage ? 100 : 80; // Load 100 initially, then 80 per page for optimal performance
       
-      console.log(`[App] Fetching page ${pageNum} (${limit} products)...`);
       const response = await fetch(`${base}/api/products?limit=${limit}&page=${pageNum}`);
       
       if (!response.ok) {
-        if (response.status === 401) {
-          console.error('[App] 401 Unauthorized - Backend authentication issue');
-        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
@@ -67,8 +63,6 @@ const App = () => {
       } else if (data && Array.isArray(data.products)) {
         products = data.products;
       }
-      
-      console.log(`[App] Fetched ${products.length} products for page ${pageNum}`);
       
       // Format products
       const formatted = products.map(p => ({
@@ -119,6 +113,32 @@ const App = () => {
       }
     }
   }, []);
+
+  // Extract featured products in specific order (8 products)
+  useEffect(() => {
+    if (prebuilds.length > 0) {
+      const categoryOrder = ['Processors', 'Graphics Cards', 'Keyboards', 'Headsets', 'Mouse', 'RAM', 'Motherboards', 'Power Supply'];
+      const categoryMap = new Map();
+      const featured = [];
+      
+      // Group products by category
+      prebuilds.forEach(product => {
+        const category = product.category || 'Other';
+        if (!categoryMap.has(category)) {
+          categoryMap.set(category, product);
+        }
+      });
+      
+      // Add products in specific order (max 8)
+      categoryOrder.forEach(category => {
+        if (featured.length < 8 && categoryMap.has(category)) {
+          featured.push(categoryMap.get(category));
+        }
+      });
+      
+      setFeaturedProducts(featured);
+    }
+  }, [prebuilds]);
 
   // Initial load
   useEffect(() => {
@@ -197,16 +217,6 @@ const App = () => {
 
   return (
     <>
-      {/* Navigation */}
-      <Nav 
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        suggestions={suggestions}
-        onSuggestionClick={handleSuggestionClick}
-        selectedBrand={selectedBrand}
-        setSelectedBrand={setSelectedBrand}
-      />
-
       {/* Backend Error Banner */}
       {backendError && (
         <div className="bg-red-600 text-white py-3 px-4 text-center">
@@ -304,13 +314,13 @@ const App = () => {
         </div>
       </section>
 
-      {/* Featured Products Section */}
+      {/* Featured Products Section - First product from each category */}
       <section className="py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Featured Products</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Featured Products by Category</h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
-              Explore our top picks for building the perfect PC setup
+              Explore our top picks from each category - GPUs, Processors, RAM, Keyboards, and more
             </p>
           </div>
 
@@ -318,9 +328,9 @@ const App = () => {
             <div className="flex justify-center py-12">
               <LoadingSpinner />
             </div>
-          ) : prebuilds.length > 0 ? (
+          ) : featuredProducts.length > 0 ? (
             <>
-              <ProductGrid products={prebuilds.slice(0, 8)} />
+              <ProductGrid products={featuredProducts} />
               <div className="text-center mt-12">
                 <button
                   onClick={() => navigate("/products")}

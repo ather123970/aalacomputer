@@ -134,46 +134,6 @@ const About = () => {
           </FM.div>
         </div>
       </section>
-
-      {/* Footer Section */}
-      <footer className="bg-black text-white py-12 px-6 md:px-20 mt-20 border-t border-gray-700 relative z-[1]">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between gap-10">
-
-          {/* Brand / About */}
-          <div className="md:w-1/3 space-y-4">
-            <h1 className="text-2xl font-bold text-blue-500 flex items-center gap-2">
-              Aala Computers
-            </h1>
-            <p className="text-gray-400 text-sm">
-              We build your dream PCs. Pre-Built, Custom Builds, and top-quality parts for gamers, creators, and professionals.
-            </p>
-
-          </div>
-
-          {/* Quick Links */}
-          <div className="md:w-1/3">
-            <h2 className="text-xl font-semibold mb-4 text-blue-500">Quick Links</h2>
-            <ul className="space-y-2 text-gray-400">
-              <li><a href="#home" className="hover:text-blue-400">Home</a></li>
-              <li><a href="#about" className="hover:text-blue-400">About</a></li>
-              <li><a href="#contact" className="hover:text-blue-400">Contact</a></li>
-              <li><a href="#category" className="hover:text-blue-400">Category</a></li>
-            </ul>
-          </div>
-
-          {/* Contact Info */}
-          <div className="md:w-1/3 space-y-4">
-            <h2 className="text-xl font-semibold mb-2 text-blue-500">Contact</h2>
-            <p className="text-gray-400 text-sm">123 Tech Street, Karachi, Pakistan</p>
-            <p className="text-gray-400 text-sm">Email: info@aalacomputers.com</p>
-            <p className="text-gray-400 text-sm">Phone: +92 300 1234567</p>
-          </div>
-        </div>
-
-        <div className="border-t border-gray-700 mt-8 pt-4 text-center text-gray-500 text-sm">
-          &copy; {new Date().getFullYear()} Aala Computers. All rights reserved.
-        </div>
-      </footer>
     </div>
   );
 };

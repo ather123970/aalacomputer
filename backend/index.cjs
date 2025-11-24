@@ -1733,6 +1733,40 @@ app.get('/api/chatbase/search', async (req, res) => {
   }
 });
 
+// Serve broken images report
+app.get('/broken-images-report', (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const reportPath = path.join(__dirname, 'broken-images-report.json');
+    
+    if (fs.existsSync(reportPath)) {
+      res.sendFile(reportPath);
+    } else {
+      res.status(404).json({ error: 'Report not found. Run the find-broken-images.js script first.' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Serve broken images viewer HTML
+app.get('/broken-images', (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const viewerPath = path.join(__dirname, 'broken-images-viewer.html');
+    
+    if (fs.existsSync(viewerPath)) {
+      res.sendFile(viewerPath);
+    } else {
+      res.status(404).json({ error: 'Viewer not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // List all products (PUBLIC - for frontend products page) - Using testproduct collection
 app.get('/api/products', async (req, res) => {
   // Add caching headers for better performance
@@ -1740,168 +1774,167 @@ app.get('/api/products', async (req, res) => {
   
   // Get query parameters
   const page = parseInt(req.query.page) || 1;
-  let limit = parseInt(req.query.limit) || 100; // Default 100 products per page (fast loading)
+  let limit = parseInt(req.query.limit) || 2500; // Default 2500 for first load, then 3000 more
   
-  // Cap limit to 10000 to allow fetching all products (for analytics)
-  if (limit > 10000) limit = 10000;
+  // Cap limit to 5000 max per request (2500 initial + 3000 more = 5000 total per request)
+  if (limit > 5000) limit = 5000;
   
   // Validate page and limit
   if (page < 1) page = 1;
-  if (limit < 1) limit = 100;
+  if (limit < 1) limit = 2500;
   
   const skip = (page - 1) * limit;
   const category = req.query.category;
   const brand = req.query.brand;
   const search = req.query.search;
   
-  const fs = require('fs');
-  const logMsg = `[${new Date().toISOString()}] [products] Request: page=${page}, limit=${limit}, skip=${skip}\n`;
-  fs.appendFileSync('products-api.log', logMsg);
-  
   try {
     const mongoose = require('mongoose');
-    const dbReady = mongoose.connection.readyState === 1;
-    const logMsg2 = `[${new Date().toISOString()}] [products] DB ready: ${dbReady}\n`;
-    fs.appendFileSync('products-api.log', logMsg2);
     
-    if (mongoose.connection.readyState === 1) {
-      // Get product collection model
-      let ProductModel;
-      if (mongoose.models && mongoose.models.Product) {
-        ProductModel = mongoose.models.Product;
-      } else {
-        const schema = new mongoose.Schema({}, { strict: false });
-        ProductModel = mongoose.model('Product', schema, 'products');
+    // Ensure DB connection with retries
+    let connected = false;
+    let retries = 0;
+    const maxRetries = 3;
+    
+    while (!connected && retries < maxRetries) {
+      if (mongoose.connection.readyState === 1) {
+        connected = true;
+        break;
       }
       
-      // Build query based on filters
-      const query = {};
-      
-      // Category filter - EXACT match only (no cross-category pollution)
-      if (category && category !== 'All') {
-        query.category = { $regex: `^${category}$`, $options: 'i' };
-      }
-      
-      // Brand filter
-      if (brand) {
-        query.brand = { $regex: brand, $options: 'i' };
-      }
-      
-      // Search filter - search in Name, title, category, brand, and specs
-      if (search) {
-        query.$or = [
-          { Name: { $regex: search, $options: 'i' } },
-          { name: { $regex: search, $options: 'i' } },
-          { title: { $regex: search, $options: 'i' } },
-          { category: { $regex: search, $options: 'i' } },
-          { 'category.main': { $regex: search, $options: 'i' } },
-          { brand: { $regex: search, $options: 'i' } },
-          { Spec: { $regex: search, $options: 'i' } }
-        ];
-      }
-      
-      // Use Promise.all to fetch count and products in parallel
       try {
-        const [total, docs] = await Promise.all([
-          ProductModel.countDocuments(query),
-          ProductModel.find(query)
-            // Return all fields - don't restrict with .select()
-            .lean()
-            .skip(skip)
-            .limit(limit)
-            .exec()
-        ]);
+        // Connect to MongoDB Atlas
+        const MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://uni804043_db_user:2124377as@cluster0.0cy1usa.mongodb.net/aalacomputer?retryWrites=true&w=majority';
         
-        console.log(`[products] Success: page=${page}, returned ${docs.length} products, total=${total}`);
-        return res.json({
-          products: docs,
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-          hasMore: skip + docs.length < total
+        console.log(`[products] Connection attempt ${retries + 1}/${maxRetries}...`);
+        
+        await mongoose.connect(MONGO_URI, {
+          useNewUrlParser: true,
+          useUnifiedTopology: true,
+          connectTimeoutMS: 20000,
+          serverSelectionTimeoutMS: 20000,
+          socketTimeoutMS: 60000,
+          maxPoolSize: 10,
+          family: 4
         });
-      } catch (queryErr) {
-        const errMsg = `[${new Date().toISOString()}] [products] Query error: ${queryErr && (queryErr.stack || queryErr.message)}\n`;
-        fs.appendFileSync('products-api.log', errMsg);
-        throw queryErr;
+        
+        connected = true;
+        console.log('[products] ✅ Connected to MongoDB Atlas');
+      } catch (err) {
+        retries++;
+        console.error(`[products] Connection attempt ${retries} failed:`, err.message);
+        if (retries < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+        }
       }
+    }
+    
+    if (!connected) {
+      console.error('[products] ❌ Failed to connect to MongoDB after retries');
+      return res.status(503).json({ 
+        ok: false, 
+        error: 'MongoDB connection failed. Please try again.',
+        source: 'none'
+      });
+    }
+    
+    // Get product collection model
+    let ProductModel;
+    if (mongoose.models && mongoose.models.Product) {
+      ProductModel = mongoose.models.Product;
     } else {
-      const warnMsg = `[${new Date().toISOString()}] [products] DB not ready, falling back to file\n`;
-      fs.appendFileSync('products-api.log', warnMsg);
+      const schema = new mongoose.Schema({}, { strict: false });
+      ProductModel = mongoose.model('Product', schema, 'products');
+    }
+    
+    // Build query based on filters
+    const query = {};
+    
+    // Category filter - EXACT match only
+    if (category && category !== 'All') {
+      query.category = { $regex: `^${category}$`, $options: 'i' };
+    }
+    
+    // Brand filter
+    if (brand) {
+      query.brand = { $regex: brand, $options: 'i' };
+    }
+    
+    // Search filter
+    if (search) {
+      query.$or = [
+        { Name: { $regex: search, $options: 'i' } },
+        { name: { $regex: search, $options: 'i' } },
+        { title: { $regex: search, $options: 'i' } },
+        { category: { $regex: search, $options: 'i' } },
+        { brand: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    // Fetch count and products in parallel with timeout
+    const countPromise = ProductModel.countDocuments(query).maxTimeMS(30000);
+    const docsPromise = ProductModel.find(query)
+      .lean()
+      .skip(skip)
+      .limit(limit)
+      .maxTimeMS(30000)
+      .exec();
+    
+    const [total, docs] = await Promise.all([countPromise, docsPromise]);
+    
+    console.log(`[products] ✅ SUCCESS: page=${page}, limit=${limit}, returned ${docs.length}/${total} products`);
+    
+    return res.json({
+      products: docs,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      hasMore: skip + docs.length < total,
+      source: 'mongodb'
+    });
+    
+  } catch (e) { 
+    console.error('[products] ❌ Error:', e.message);
+    
+    // Try to use cached data as fallback
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const cacheFile = path.join(__dirname, 'products-cache.json');
       
-      // Fallback to JSON file
-      try {
-        const jsonPath = './data/products.json';
-        if (fs.existsSync(jsonPath)) {
-          const fileData = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-          let products = Array.isArray(fileData) ? fileData : (fileData.products || []);
-          
-          // Apply filters if needed
-          if (category && category !== 'All') {
-            products = products.filter(p => 
-              (p.category || '').toLowerCase() === category.toLowerCase()
-            );
-          }
-          
-          const total = products.length;
-          const paginatedProducts = products.slice(skip, skip + limit);
+      if (fs.existsSync(cacheFile)) {
+        console.log('[products] Using cached products from file...');
+        const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+        
+        if (cached && cached.products && Array.isArray(cached.products)) {
+          const allProds = cached.products;
+          const startIdx = skip;
+          const endIdx = skip + limit;
+          const paginated = allProds.slice(startIdx, endIdx);
           
           return res.json({
-            products: paginatedProducts,
-            total,
+            products: paginated,
+            total: allProds.length,
             page,
             limit,
-            totalPages: Math.ceil(total / limit),
-            hasMore: skip + paginatedProducts.length < total,
-            source: 'file'
+            totalPages: Math.ceil(allProds.length / limit),
+            hasMore: endIdx < allProds.length,
+            source: 'cache'
           });
         }
-      } catch (fileErr) {
-        console.error('[products] File fallback failed:', fileErr.message);
       }
-    }
-  } catch (e) { 
-    const errMsg = `[${new Date().toISOString()}] [products] DB query failed: ${e && (e.stack || e.message)}\n`;
-    fs.appendFileSync('products-api.log', errMsg);
-    console.error('[products] MongoDB query failed:', e && e.message);
-    
-    // Try file fallback on error
-    try {
-      const jsonPath = './data/products.json';
-      if (fs.existsSync(jsonPath)) {
-        const fileData = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-        let products = Array.isArray(fileData) ? fileData : (fileData.products || []);
-        
-        if (category && category !== 'All') {
-          products = products.filter(p => 
-            (p.category || '').toLowerCase() === category.toLowerCase()
-          );
-        }
-        
-        const total = products.length;
-        const paginatedProducts = products.slice(skip, skip + limit);
-        
-        return res.json({
-          products: paginatedProducts,
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-          hasMore: skip + paginatedProducts.length < total,
-          source: 'file-fallback'
-        });
-      }
-    } catch (fileErr) {
-      console.error('[products] File fallback also failed:', fileErr.message);
+    } catch (cacheErr) {
+      console.error('[products] Cache fallback failed:', cacheErr.message);
     }
     
-    return res.status(503).json({ ok: false, error: 'Database unavailable - please try again later' });
+    return res.status(503).json({ 
+      ok: false, 
+      error: 'Database error. Please check MongoDB connection and whitelist your IP in MongoDB Atlas.',
+      details: e.message,
+      source: 'none'
+    });
   }
-  
-  // If we reach here, both MongoDB and file fallback failed
-  console.error('[products] All data sources unavailable');
-  return res.status(503).json({ ok: false, error: 'Database unavailable' });
 });
 
 // List all products (PROTECTED - for admin dashboard)
@@ -1923,7 +1956,7 @@ app.get('/api/admin/products', async (req, res) => {
     
     // Validate and constrain parameters
     if (limit < 1) limit = 50;
-    if (limit > 50) limit = 50;  // Cap at 50 products per page
+    if (limit > 10000) limit = 10000;  // Cap at 10000 products to allow loading all 4k+ products
     if (page < 1) page = 1;
     
     // Calculate skip
@@ -3979,106 +4012,58 @@ async function startServer() {
       }
     });
     
-    // Get MongoDB URI from environment or use MongoDB Atlas as fallback (no local URI)
-    const MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://uni804043_db_user:2124377as@cluster0.0cy1usa.mongodb.net/aalacomputer?retryWrites=true&w=majority';
+    // Connect to MongoDB Atlas (products are stored there)
+    let MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://uni804043_db_user:2124377as@cluster0.0cy1usa.mongodb.net/aalacomputer?retryWrites=true&w=majority';
     
-    if (MONGO_URI) {
-      // Log connection attempt (safely hiding credentials)
-      const safeUri = MONGO_URI.replace(/mongodb(\+srv)?:\/\/[^@]+@/, 'mongodb$1://****:****@');
-      console.log('[db] Connecting to MongoDB...', safeUri);
-      
-      // Configure mongoose
-      mongoose.set('bufferCommands', false);
-      mongoose.set('strictQuery', false);
-      
-      // Enhanced connection monitoring
-      mongoose.connection.on('connected', () => {
-        console.log('[db] Mongoose connection established');
-      });
-      
-      mongoose.connection.on('error', (err) => {
-        console.error('[db] Mongoose connection error:', err.message);
-      });
-      
-      mongoose.connection.on('disconnected', () => {
-        console.log('[db] Mongoose connection disconnected');
-      });
-      
-      const connectWithRetry = async (retries = 3) => {
-        try {
-          console.log(`[db] Connection attempt ${4 - retries}/3...`);
-          
-          await mongoose.connect(MONGO_URI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-            connectTimeoutMS: 10000, // 10 seconds
-            serverSelectionTimeoutMS: 10000, // 10 seconds
-            socketTimeoutMS: 45000,
-            heartbeatFrequencyMS: 10000,
-            retryWrites: true,
-            w: 'majority',
-            maxPoolSize: 10,
-            family: 4, // Force IPv4 (fixes some DNS issues)
-          });
-          
-          // Verify connection by attempting a simple operation
-          await mongoose.connection.db.admin().ping();
-          console.log('[db] ✅ MongoDB connection verified with ping');
-          return true;
-        } catch (e) {
-          const errorMsg = e.message || String(e);
-          console.error(`[db] ❌ Connection attempt ${4 - retries}/3 failed:`, errorMsg);
-          
-          // Detailed error logging
-          if (errorMsg.includes('ENOTFOUND') || errorMsg.includes('getaddrinfo')) {
-            console.error('[db] DNS Resolution Error - Check:');
-            console.error('  1. Internet connection is working');
-            console.error('  2. MongoDB Atlas cluster is accessible');
-            console.error('  3. Firewall/antivirus not blocking MongoDB');
-          } else if (errorMsg.includes('ETIMEDOUT') || errorMsg.includes('timed out')) {
-            console.error('[db] Connection Timeout - Check:');
-            console.error('  1. IP address is whitelisted in MongoDB Atlas');
-            console.error('  2. Network firewall allows outbound connections');
-            console.error('  3. MongoDB Atlas cluster is running');
-          } else if (errorMsg.includes('Authentication failed') || errorMsg.includes('auth')) {
-            console.error('[db] Authentication Error - Check credentials');
-          }
-          
-          if (retries > 0) {
-            const delay = 3000; // 3 seconds between retries
-            console.log(`[db] Retrying in ${delay/1000} seconds... (${retries} retries left)`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            return connectWithRetry(retries - 1);
-          }
-          
-          console.error('[db] ⚠️ All connection attempts failed');
-          console.error('[db] Server will continue with file-based storage fallback');
-          throw e;
+    // Log connection attempt (safely hiding credentials)
+    const safeUri = MONGO_URI.replace(/mongodb(\+srv)?:\/\/[^@]+@/, 'mongodb$1://****:****@');
+    console.log('[db] Connecting to MongoDB Atlas...', safeUri);
+    
+    await mongoose.connect(MONGO_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      connectTimeoutMS: 20000,
+      serverSelectionTimeoutMS: 20000,
+      socketTimeoutMS: 60000,
+      maxPoolSize: 10,
+      family: 4
+    });
+    console.log('[db] ✅ Connected to MongoDB Atlas');
+    
+    // Configure mongoose
+    mongoose.set('bufferCommands', false);
+    mongoose.set('strictQuery', false);
+    
+    // Enhanced connection monitoring
+    mongoose.connection.on('connected', () => {
+      console.log('[db] Mongoose connection established');
+    });
+    
+    mongoose.connection.on('error', (err) => {
+      console.error('[db] Mongoose connection error:', err.message);
+    });
+    
+    mongoose.connection.on('disconnected', () => {
+      console.log('[db] Mongoose connection disconnected');
+    });
+    
+    // Verify connection by counting products
+    try {
+      const mongoose = require('mongoose');
+      if (mongoose.connection.readyState === 1) {
+        let ProductModel;
+        if (mongoose.models && mongoose.models.Product) {
+          ProductModel = mongoose.models.Product;
+        } else {
+          const schema = new mongoose.Schema({}, { strict: false });
+          ProductModel = mongoose.model('Product', schema, 'products');
         }
-      };
-      
-      try {
-        await connectWithRetry();
         
-        // Ensure Product model is available on mongoose
-        try {
-          const pm = getProductModel();
-          if (pm && mongoose.models && mongoose.models.Product) {
-            const count = await mongoose.models.Product.countDocuments();
-            console.log(`[db] Connection verified - found ${count} products`);
-          } else {
-            console.log('[db] Product model not available after connection');
-          }
-        } catch (err) {
-          console.error('[db] failed to verify product model/count', err && (err.stack || err.message));
-        }
-      } catch (e) {
-        console.error('[db] MongoDB connection failed after retries:', e.message);
-        console.error('[db] Stack trace:', e.stack);
-        // Don't exit - allow fallback to file-based storage
+        const count = await ProductModel.countDocuments();
+        console.log(`[db] ✅ Connection verified - found ${count} products`);
       }
-    } else {
-      console.warn('[db] No MONGO_URI configured; using file-based storage');
+    } catch (err) {
+      console.error('[db] Failed to verify connection:', err.message);
     }
     
     // ===== ADMIN STATISTICS ENDPOINT =====

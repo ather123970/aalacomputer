@@ -1,14 +1,18 @@
-import React, { Suspense } from 'react';
-import { createBrowserRouter, RouterProvider, Outlet, Link, useLocation } from 'react-router-dom';
-import FloatingButtons from './pages/FloatingButtons';
+import React, { Suspense, useEffect } from 'react';
+import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
 import { LoadingSpinner } from './components/PremiumUI';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
+import App from './App';
+import FloatingButtonsPage from './pages/FloatingButtons';
+import LiveViewerBadge from './components/LiveViewerBadge';
+import { initializeTracking } from './utils/visitorTracking';
 
 // Lazy load components for better performance
 const Home = React.lazy(() => import('./pages/Home'));
 const Products = React.lazy(() => import('./pages/products'));
 const ProductDetail = React.lazy(() => import('./pages/ProductDetail'));
+const AppPage = React.lazy(() => import('./App'));
 const Deal = React.lazy(() => import('./pages/Deal'));
 const About = React.lazy(() => import('./About'));
 const Cart = React.lazy(() => import('./cart'));
@@ -22,124 +26,23 @@ const AdminLogin = React.lazy(() => import('./pages/AdminLoginNew'));
 const AdminDashboard = React.lazy(() => import('./pages/AdminDashboardPro'));
 
 const Layout = () => {
-  const location = useLocation();
-  
+  useEffect(() => {
+    // Initialize visitor tracking (silently, no UI)
+    const cleanup = initializeTracking();
+    return cleanup;
+  }, []);
+
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <nav className="sticky top-0 z-50 bg-white shadow-sm border-b border-neutral-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-8">
-              <Link 
-                to="/" 
-                className={`text-sm font-medium transition-colors ${
-                  location.pathname === '/' 
-                    ? 'text-primary-600' 
-                    : 'text-neutral-600 hover:text-primary-600'
-                }`}
-              >
-                Home
-              </Link>
-              <Link 
-                to="/categories" 
-                className={`text-sm font-medium transition-colors ${
-                  location.pathname.includes('/categor') 
-                    ? 'text-primary-600' 
-                    : 'text-neutral-600 hover:text-primary-600'
-                }`}
-              >
-                Categories
-              </Link>
-              <Link 
-                to="/brands" 
-                className={`text-sm font-medium transition-colors ${
-                  location.pathname.includes('/brands') 
-                    ? 'text-primary-600' 
-                    : 'text-neutral-600 hover:text-primary-600'
-                }`}
-              >
-                Brands
-              </Link>
-              <Link 
-                to="/products" 
-                className={`text-sm font-medium transition-colors ${
-                  location.pathname.includes('/products') 
-                    ? 'text-primary-600' 
-                    : 'text-neutral-600 hover:text-primary-600'
-                }`}
-              >
-                Products
-              </Link>
-              <Link 
-                to="/deal" 
-                className={`text-sm font-medium transition-colors ${
-                  location.pathname.includes('/deal') 
-                    ? 'text-primary-600' 
-                    : 'text-neutral-600 hover:text-primary-600'
-                }`}
-              >
-                Deals
-              </Link>
-              <Link 
-                to="/prebuild" 
-                className={`text-sm font-medium transition-colors ${
-                  location.pathname.includes('/prebuild') 
-                    ? 'text-primary-600' 
-                    : 'text-neutral-600 hover:text-primary-600'
-                }`}
-              >
-                Prebuilds
-              </Link>
-              <Link 
-                to="/contact" 
-                className={`text-sm font-medium transition-colors ${
-                  location.pathname === '/contact' 
-                    ? 'text-primary-600' 
-                    : 'text-neutral-600 hover:text-primary-600'
-                }`}
-              >
-                About
-              </Link>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <Link 
-                to="/cart" 
-                className={`text-sm font-medium transition-colors ${
-                  location.pathname === '/cart' 
-                    ? 'text-primary-600' 
-                    : 'text-neutral-600 hover:text-primary-600'
-                }`}
-              >
-                Cart
-              </Link>
-              <Link 
-                to="/profile" 
-                className={`text-sm font-medium transition-colors ${
-                  location.pathname === '/profile' 
-                    ? 'text-primary-600' 
-                    : 'text-neutral-600 hover:text-primary-600'
-                }`}
-              >
-                Profile
-              </Link>
-            </div>
-          </div>
+    <>
+      <Suspense fallback={
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <LoadingSpinner />
         </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Suspense fallback={
-          <div className="flex items-center justify-center min-h-[60vh]">
-            <LoadingSpinner />
-          </div>
-        }>
-          <Outlet />
-        </Suspense>
-      </main>
-
-      <FloatingButtons />
-    </div>
+      }>
+        <Outlet />
+      </Suspense>
+      <FloatingButtonsPage />
+    </>
   );
 };
 

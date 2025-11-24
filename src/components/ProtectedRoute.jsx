@@ -17,7 +17,6 @@ const ProtectedRoute = ({ children }) => {
         const token = sessionStorage.getItem('aalacomp_admin_token');
         
         if (!token) {
-          console.log('[ProtectedRoute] No token found - redirecting to login');
           setIsAuthenticated(false);
           setLoading(false);
           return;
@@ -28,7 +27,6 @@ const ProtectedRoute = ({ children }) => {
           // Decode JWT without verifying signature (frontend only)
           const parts = token.split('.');
           if (parts.length !== 3) {
-            console.log('[ProtectedRoute] Invalid token format');
             localStorage.removeItem('aalacomp_admin_token');
             setIsAuthenticated(false);
             setLoading(false);
@@ -44,7 +42,6 @@ const ProtectedRoute = ({ children }) => {
             const currentTime = Date.now();
             
             if (currentTime > expirationTime) {
-              console.log('[ProtectedRoute] Token expired - redirecting to login');
               sessionStorage.removeItem('aalacomp_admin_token');
               setIsAuthenticated(false);
               setLoading(false);
@@ -52,15 +49,12 @@ const ProtectedRoute = ({ children }) => {
             }
           }
 
-          console.log('[ProtectedRoute] ✅ Token valid for user:', payload.sub);
           setIsAuthenticated(true);
         } catch (decodeErr) {
-          console.error('[ProtectedRoute] Failed to decode token:', decodeErr.message);
           sessionStorage.removeItem('aalacomp_admin_token');
           setIsAuthenticated(false);
         }
       } catch (error) {
-        console.error('[ProtectedRoute] Auth check error:', error);
         setIsAuthenticated(false);
       } finally {
         setLoading(false);
@@ -81,7 +75,6 @@ const ProtectedRoute = ({ children }) => {
 
   // If not authenticated, redirect to login
   if (!isAuthenticated) {
-    console.log('[ProtectedRoute] Redirecting to /admin/login');
     return <Navigate to="/admin/login" replace />;
   }
 
