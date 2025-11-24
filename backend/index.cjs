@@ -3972,24 +3972,7 @@ app.get('/api/proxy-image', async (req, res) => {
   }
 });
 
-// Catch-all handler: send back React's index.html file for client-side routing
-// Use a middleware approach that's more reliable
-app.use((req, res, next) => {
-  // Only handle non-API routes and non-static file requests
-  // Exclude: /api, /assets, /images, /uploads
-  if (!req.path.startsWith('/api') && 
-      !req.path.startsWith('/assets') && 
-      !req.path.startsWith('/images') && 
-      !req.path.startsWith('/uploads')) {
-    const indexPath = path.join(__dirname, '..', 'dist', 'index.html');
-    if (fs.existsSync(indexPath)) {
-      return res.sendFile(indexPath);
-    } else {
-      return res.status(404).json({ error: 'Frontend not built. Run npm run build first.' });
-    }
-  }
-  next();
-});
+// Catch-all handler will be added AFTER static file serving
 
 const PORT = process.env.PORT || 10000;
 
@@ -4272,6 +4255,21 @@ async function startServer() {
     } else {
       console.warn('[server] dist directory not found at:', distPath);
     }
+
+    // ===== CATCH-ALL ROUTE FOR SPA (MUST BE AFTER STATIC FILES) =====
+    // This handles client-side routing for React Router
+    app.use((req, res, next) => {
+      // Only handle non-API routes
+      if (!req.path.startsWith('/api')) {
+        const indexPath = path.join(__dirname, '..', 'dist', 'index.html');
+        if (fs.existsSync(indexPath)) {
+          return res.sendFile(indexPath);
+        } else {
+          return res.status(404).json({ error: 'Frontend not built. Run npm run build first.' });
+        }
+      }
+      next();
+    });
     
     // ensure admin exists either in DB or file
     await ensureAdminUser();
