@@ -4,6 +4,13 @@ import tailwindcss from '@tailwindcss/vite'
 import compression from 'vite-plugin-compression'
 
 export default defineConfig({
+  define: {
+    // ✅ GLOBAL API URL — works everywhere
+    'import.meta.env.VITE_API_BASE_URL': JSON.stringify(
+      process.env.VITE_API_BASE_URL || 'https://aalacomputer.com/api'
+    )
+  },
+
   plugins: [
     react(),
     tailwindcss(),
@@ -15,6 +22,7 @@ export default defineConfig({
       ext: '.gz',
     }),
   ],
+
   publicDir: 'public',
   base: '/',
 
@@ -42,7 +50,6 @@ export default defineConfig({
           'ui': ['lucide-react', 'framer-motion'],
           'utils': ['axios', 'slugify'],
         },
-        // ✅ Optimize chunk naming for better caching
         entryFileNames: 'js/[name]-[hash].js',
         chunkFileNames: 'js/[name]-[hash].js',
         assetFileNames: (assetInfo) => {
@@ -62,9 +69,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     cssCodeSplit: true,
     reportCompressedSize: false,
-    // ✅ Optimize for faster builds
     target: 'es2020',
-    // ✅ Parallel builds
     commonjsOptions: {
       transformMixedEsModules: true,
     },
@@ -82,7 +87,6 @@ export default defineConfig({
       'aalacomputer.com'
     ],
     cors: true,
-    // ✅ Optimize HMR for development
     hmr: {
       protocol: 'ws',
       host: 'localhost',
@@ -96,7 +100,6 @@ export default defineConfig({
     cors: true,
   },
 
-  // ✅ Optimize dependencies
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom', 'axios', 'lucide-react'],
     exclude: ['node_modules'],
