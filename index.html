@@ -103,6 +103,36 @@
   </head>
   <body>
     <div id="root"></div>
+    
+    <!-- CRITICAL: Fallback UI if React fails to load -->
+    <noscript>
+      <div style="padding: 20px; text-align: center; font-family: Arial, sans-serif;">
+        <h1>JavaScript Required</h1>
+        <p>This application requires JavaScript to be enabled.</p>
+      </div>
+    </noscript>
+
+    <!-- Diagnostic script for debugging blank app -->
+    <script>
+      window.__APP_DEBUG__ = {
+        htmlLoaded: true,
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        url: window.location.href
+      };
+      console.log('[HTML] Document loaded, ready for React mount');
+      console.log('[HTML] Root element exists:', !!document.getElementById('root'));
+      
+      // Show message after 5 seconds if React hasn't rendered anything
+      setTimeout(() => {
+        const root = document.getElementById('root');
+        if (root && root.children.length === 0) {
+          console.warn('[DEBUG] React not mounted after 5 seconds');
+          // Don't override - let React error boundary handle it
+        }
+      }, 5000);
+    </script>
+
     <script type="module" src="/src/main.jsx"></script>
 
     <!-- AalaAi toggle button and Chatbase AI Assistant panel -->

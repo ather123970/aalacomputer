@@ -45,10 +45,21 @@ export default defineConfig({
     },
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui': ['lucide-react', 'framer-motion'],
-          'utils': ['axios', 'slugify'],
+        manualChunks: (id) => {
+          // Only create chunks for dependencies that are actually imported
+          if (id.includes('react') && !id.includes('react-router')) {
+            return 'vendor';
+          }
+          if (id.includes('react-dom') || id.includes('react-router-dom')) {
+            return 'vendor';
+          }
+          if (id.includes('lucide-react') || id.includes('framer-motion')) {
+            return 'ui';
+          }
+          // Don't create utils chunk - let it be tree-shaken
+          // if (id.includes('axios') || id.includes('slugify')) {
+          //   return 'utils';
+          // }
         },
         entryFileNames: 'js/[name]-[hash].js',
         chunkFileNames: 'js/[name]-[hash].js',
