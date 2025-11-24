@@ -72,8 +72,62 @@ export default function Navbar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
+  // Listen for cart updates from localStorage
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        const stored = localStorage.getItem('aala_cart');
+        if (stored) {
+          const items = JSON.parse(stored);
+          setCartCount(Array.isArray(items) ? items.length : 0);
+        } else {
+          setCartCount(0);
+        }
+      } catch (e) {
+        console.warn('Failed to read cart from localStorage:', e);
+        setCartCount(0);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   // Helper function to get API base URL
   const getApiBaseUrl = () => API_CONFIG.BASE_URL;
+
+  // ✅ FIXED: Check cart expiry (24 hours)
+  useEffect(() => {
+    const checkCartExpiry = () => {
+      try {
+        const cartData = localStorage.getItem('aala_cart_data');
+        if (cartData) {
+          const { items, timestamp } = JSON.parse(cartData);
+          const now = Date.now();
+          const oneDayMs = 24 * 60 * 60 * 1000;
+          
+          // If cart is older than 24 hours, clear it
+          if (now - timestamp > oneDayMs) {
+            localStorage.removeItem('aala_cart');
+            localStorage.removeItem('aala_cart_data');
+            setCartCount(0);
+            console.log('✅ Cart expired and cleared (24 hours)');
+          } else {
+            // Cart is still valid, show count
+            const count = Array.isArray(items) ? items.length : 0;
+            setCartCount(count);
+          }
+        }
+      } catch (e) {
+        console.warn('Cart expiry check error:', e);
+      }
+    };
+
+    checkCartExpiry();
+    // Check every minute
+    const interval = setInterval(checkCartExpiry, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   // keep your original auth + cart logic intact
   useEffect(() => {
@@ -107,19 +161,19 @@ export default function Navbar() {
         } catch (e) { setUser(null); }
       });
 
-    (async () => {
-      try {
-        const r = await fetch(`${getApiBaseUrl()}/api/v1/cart`);
-        if (r.ok) {
-          const j = await r.json();
-          setCartCount(Array.isArray(j) ? j.length : 0);
-          return;
-        }
-      } catch (e) {
-        console.warn('Failed to fetch cart for nav:', e);
+    // Read cart from localStorage instead of API
+    try {
+      const stored = localStorage.getItem('aala_cart');
+      if (stored) {
+        const items = JSON.parse(stored);
+        setCartCount(Array.isArray(items) ? items.length : 0);
+      } else {
         setCartCount(0);
       }
-    })();
+    } catch (e) {
+      console.warn('Failed to read cart from localStorage:', e);
+      setCartCount(0);
+    }
 
     return () => { alive = false; };
   }, []);
@@ -148,11 +202,10 @@ export default function Navbar() {
       aria-label="Main navigation"
       tabIndex={0}
     >
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4 pointer-events-auto">
-        {/* Brand */}
-            <Link to="/" onClick={closeAll} className="text-lg font-bold text-blue-400 hover:text-blue-300 transition truncate max-w-[45%] md:max-w-[35%]">
-          <span className="inline-block align-middle mr-2">Aala</span>
-          <span className="inline-block align-middle font-normal text-sm text-muted">Computers</span>
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex items-center justify-between gap-4 pointer-events-auto">
+        {/* ✅ Brand Name Only */}
+        <Link to="/" onClick={closeAll} className="text-lg font-bold text-blue-400 hover:text-blue-300 transition">
+          Aala Computer
         </Link>
 
         {/* Desktop nav */}
@@ -198,9 +251,9 @@ export default function Navbar() {
 
         {/* Right area desktop */}
           <div className="hidden md:flex items-center gap-4 ml-auto">
-          <button onClick={() => navigate('/cart')} className="p-2 btn-accent hover:opacity-95 transition rounded relative text-white" aria-label="Open cart">
-            <ShoppingCart size={22} className="text-white" />
-            <span className="absolute -top-1 -right-1 text-xs bg-red-600 rounded-full w-4 h-4 flex items-center justify-center text-white">{cartCount}</span>
+          <button onClick={() => navigate('/cart')} className="p-2 bg-white hover:bg-gray-100 transition rounded relative" aria-label="Open cart">
+            <ShoppingCart size={22} className="text-blue-600" strokeWidth={2.5} />
+            {cartCount > 0 && <span className="absolute -top-1 -right-1 text-xs bg-red-600 rounded-full w-5 h-5 flex items-center justify-center text-white font-bold text-[11px] shadow-lg">{cartCount}</span>}
           </button>
 
           {user ? (
@@ -219,9 +272,9 @@ export default function Navbar() {
 
         {/* Mobile icons */}
   <div className="md:hidden flex items-center gap-3 ml-auto pointer-events-auto">
-          <button onClick={() => navigate('/cart')} className="p-2 btn-accent hover:opacity-95 transition relative text-white" aria-label="Open cart">
-            <ShoppingCart size={20} className="text-white" />
-            <span className="absolute -top-1 -right-1 text-xs bg-red-600 rounded-full w-4 h-4 flex items-center justify-center text-white">{cartCount}</span>
+          <button onClick={() => navigate('/cart')} className="p-2 bg-white hover:bg-gray-100 transition rounded relative" aria-label="Open cart">
+            <ShoppingCart size={20} className="text-blue-600" strokeWidth={2.5} />
+            {cartCount > 0 && <span className="absolute -top-1 -right-1 text-xs bg-red-600 rounded-full w-5 h-5 flex items-center justify-center text-white font-bold text-[11px] shadow-lg">{cartCount}</span>}
           </button>
 
           <button
@@ -274,8 +327,8 @@ export default function Navbar() {
               </li>
               <li className="pt-2 border-t border-gray-800">
                 <div className="flex gap-2">
-                  <button onClick={() => { setIsOpen(false); navigate('/cart'); }} className="flex-1 px-3 py-2 rounded bg-blue-600 hover:bg-blue-700">Cart ({cartCount})</button>
-                  {user ? <button onClick={() => { setIsOpen(false); navigate('/profile'); }} className="px-3 py-2 rounded bg-white/5 hover:bg-white/10">Profile</button> : <button onClick={() => { setIsOpen(false); navigate('/auth'); }} className="px-3 py-2 rounded bg-green-600 hover:bg-green-700">Login</button>}
+                  <button onClick={() => { setIsOpen(false); navigate('/cart'); }} className="flex-1 px-3 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold">Cart ({cartCount})</button>
+                  {user ? <button onClick={() => { setIsOpen(false); navigate('/profile'); }} className="px-3 py-2 rounded bg-white/5 hover:bg-white/10 text-white">Profile</button> : <button onClick={() => { setIsOpen(false); navigate('/auth'); }} className="px-3 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-semibold">Login</button>}
                 </div>
               </li>
             </ul>

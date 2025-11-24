@@ -16,21 +16,40 @@ const AdminLoginNew = () => {
     setError('');
     setLoading(true);
 
-    // Always use "admin" as username (field is disabled)
-    const adminUsername = 'admin';
-    
-    // Hardcoded credentials
-    if (adminUsername === 'admin' && password === 'admin123') {
-      // Set admin token
-      localStorage.setItem('adminToken', 'admin-token-' + Date.now());
-      localStorage.setItem('adminUsername', adminUsername);
+    try {
+      // Use import.meta.env for Vite (not process.env)
+      const base = import.meta.env.VITE_API_URL || 'http://localhost:10000';
       
-      // Redirect to dashboard
-      setTimeout(() => {
-        navigate('/admin/dashboard');
-      }, 500);
-    } else {
-      setError('Invalid password');
+      console.log('[AdminLogin] Attempting login with API base:', base);
+      
+      // Send login request to backend
+      const response = await fetch(`${base}/api/admin/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: 'admin',
+          password: password
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Store JWT token in sessionStorage (expires when browser closes)
+        sessionStorage.setItem('aalacomp_admin_token', data.token);
+        console.log('[AdminLogin] Token stored in sessionStorage - will expire on browser close');
+        
+        // Redirect to dashboard
+        setTimeout(() => {
+          navigate('/admin/dashboard');
+        }, 500);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Invalid credentials');
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('Connection error. Please try again.');
       setLoading(false);
     }
   };
@@ -155,19 +174,16 @@ const AdminLoginNew = () => {
             </motion.button>
           </form>
 
-          {/* Demo Credentials */}
+          {/* Info Message */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6 }}
             className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg"
           >
-            <p className="text-xs text-gray-600 mb-2 font-semibold">Demo Credentials:</p>
-            <p className="text-xs text-gray-700">
-              <span className="font-semibold">Username:</span> admin
-            </p>
-            <p className="text-xs text-gray-700">
-              <span className="font-semibold">Password:</span> admin123
+            <p className="text-xs text-gray-600 font-semibold">🔒 Secure Login</p>
+            <p className="text-xs text-gray-700 mt-2">
+              Enter your admin credentials to access the dashboard. Your session will be secured with JWT authentication.
             </p>
           </motion.div>
         </div>

@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  
+  <!-- Homepage -->
+  <url>
+    <loc>https://aalacomputer.com/</loc>
+    <lastmod>2024-11-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  
+  <!-- Main Pages -->
+  <url>
+    <loc>https://aalacomputer.com/products</loc>
+    <lastmod>2024-11-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  
+  <url>
+    <loc>https://aalacomputer.com/cart</loc>
+    <lastmod>2024-11-24</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
+    <loc>https://aalacomputer.com/checkout</loc>
+    <lastmod>2024-11-24</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <!-- Category Pages -->
+  <url>
+    <loc>https://aalacomputer.com/products?category=Processors</loc>
+    <lastmod>2024-11-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
+    <loc>https://aalacomputer.com/products?category=Graphics%20Cards</loc>
+    <lastmod>2024-11-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
+    <loc>https://aalacomputer.com/products?category=RAM</loc>
+    <lastmod>2024-11-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
+    <loc>https://aalacomputer.com/products?category=Motherboards</loc>
+    <lastmod>2024-11-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
+    <loc>https://aalacomputer.com/products?category=Storage</loc>
+    <lastmod>2024-11-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
+    <loc>https://aalacomputer.com/products?category=Power%20Supplies</loc>
+    <lastmod>2024-11-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
+    <loc>https://aalacomputer.com/products?category=Monitors</loc>
+    <lastmod>2024-11-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
+    <loc>https://aalacomputer.com/products?category=Keyboards</loc>
+    <lastmod>2024-11-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
+    <loc>https://aalacomputer.com/products?category=Mouse</loc>
+    <lastmod>2024-11-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
+    <loc>https://aalacomputer.com/products?category=Headsets</loc>
+    <lastmod>2024-11-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <!-- Brand Pages -->
+  <url>
+    <loc>https://aalacomputer.com/products?brand=ASUS</loc>
+    <lastmod>2024-11-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <url>
+    <loc>https://aalacomputer.com/products?brand=MSI</loc>
+    <lastmod>2024-11-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <url>
+    <loc>https://aalacomputer.com/products?brand=Corsair</loc>
+    <lastmod>2024-11-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <url>
+    <loc>https://aalacomputer.com/products?brand=Logitech</loc>
+    <lastmod>2024-11-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <url>
+    <loc>https://aalacomputer.com/products?brand=Razer</loc>
+    <lastmod>2024-11-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+</urlset>

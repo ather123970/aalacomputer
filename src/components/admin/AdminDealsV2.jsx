@@ -193,7 +193,7 @@ const AdminDealsV2 = ({ showMessage }) => {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('aalacomp_admin_token')}`
+          'Authorization': `Bearer ${sessionStorage.getItem('aalacomp_admin_token')}`
         },
         body: JSON.stringify(dealData)
       });
@@ -233,7 +233,7 @@ const AdminDealsV2 = ({ showMessage }) => {
       const response = await fetch(`${base}/api/admin/deals/${dealId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('aalacomp_admin_token')}`
+          'Authorization': `Bearer ${sessionStorage.getItem('aalacomp_admin_token')}`
         }
       });
 

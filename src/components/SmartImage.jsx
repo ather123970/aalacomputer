@@ -149,17 +149,17 @@ const SmartImage = ({
   }, []);
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative w-full aspect-square bg-gray-50 rounded-lg overflow-hidden flex items-center justify-center ${className}`}>
       {/* Skeleton loader - shows while image is loading */}
       {loadingState && !error && (
-        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-shimmer rounded-lg"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-shimmer"></div>
       )}
       
-      {/* Main image */}
+      {/* Main image - centered and contained */}
       <img
         src={imageSrc}
         alt={alt || product?.name || product?.title || 'Product image'}
-        className={`w-full h-full object-contain transition-opacity duration-300 ${
+        className={`w-full h-full object-contain p-2 transition-opacity duration-300 ${
           loadingState ? 'opacity-0' : 'opacity-100'
         }`}
         onError={handleError}
@@ -170,7 +170,7 @@ const SmartImage = ({
       
       {/* Loading spinner - shows if image takes too long to load */}
       {loadingState && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-70">
+        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-70 rounded-lg">
           <div className="w-6 h-6 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
         </div>
       )}

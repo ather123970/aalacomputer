@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import { API_CONFIG } from '../config/api';
 import AdminAnalytics from '../components/admin/AdminAnalytics';
 import AdminProductsTableV2 from '../components/admin/AdminProductsTableV2';
-import AdminDealsV2 from '../components/admin/AdminDealsV2';
 import AdminCreateProduct from '../components/admin/AdminCreateProduct';
 import AdminCategoriesBrands from '../components/admin/AdminCategoriesBrands';
 
@@ -15,10 +14,28 @@ const AdminDashboardPro = () => {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Check authentication
+  // Check authentication on mount and when token changes
   useEffect(() => {
-    const token = localStorage.getItem('adminToken');
+    const token = sessionStorage.getItem('aalacomp_admin_token');
     if (!token) {
+      navigate('/admin/login');
+      return;
+    }
+    
+    // Verify token is still valid (check expiration)
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const expiresAt = payload.exp * 1000;
+      const now = Date.now();
+      
+      if (now > expiresAt) {
+        // Token expired
+        sessionStorage.removeItem('aalacomp_admin_token');
+        navigate('/admin/login');
+      }
+    } catch (error) {
+      // Invalid token format
+      sessionStorage.removeItem('aalacomp_admin_token');
       navigate('/admin/login');
     }
   }, [navigate]);
@@ -47,15 +64,14 @@ const AdminDashboardPro = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('adminToken');
-    localStorage.removeItem('adminUsername');
+    sessionStorage.removeItem('aalacomp_admin_token');
+    sessionStorage.removeItem('adminUsername');
     navigate('/admin/login');
   };
 
   const tabs = [
     { id: 'analytics', label: 'Dashboard', icon: BarChart3 },
     { id: 'products', label: 'Products', icon: Package },
-    { id: 'deals', label: 'Deals', icon: '🎁' },
     { id: 'create', label: 'Create', icon: Plus },
     { id: 'categories', label: 'Settings', icon: Settings }
   ];
@@ -147,12 +163,6 @@ const AdminDashboardPro = () => {
 
             {/* Header Actions */}
             <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">
-                  {localStorage.getItem('adminUsername') || 'Admin'}
-                </p>
-                <p className="text-xs text-gray-500">Administrator</p>
-              </div>
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">
                 A
               </div>

@@ -5,6 +5,8 @@ import { ProductGrid, LoadingSpinner } from './components/PremiumUI';
 import { useInView } from 'react-intersection-observer';
 import { API_CONFIG } from './config/api';
 import { searchProducts, getSearchSuggestions, normalizeProduct } from './utils/searchUtils';
+import { detectSearchCategory, searchByCategory, formatCategorySearchResults } from './utils/categorySearchUtils';
+import CategorySearchResults from './components/CategorySearchResults';
 import SmartImage from './components/SmartImage';
 import mobileHero from '../heroimg/mobile.jpg';
 
@@ -33,7 +35,7 @@ const App = () => {
     threshold: 0.1,
   });
 
-  // Fetch products with pagination (32 per page for fast loading)
+  // Fetch products with pagination (100 initial, 80 per page for fast loading)
   const fetchProducts = useCallback(async (pageNum) => {
     const isFirstPage = pageNum === 1;
     if (isFirstPage) {
@@ -44,7 +46,7 @@ const App = () => {
 
     try {
       const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
-      const limit = 32; // Load 32 products per page for optimal performance
+      const limit = isFirstPage ? 100 : 80; // Load 100 initially, then 80 per page for optimal performance
       
       console.log(`[App] Fetching page ${pageNum} (${limit} products)...`);
       const response = await fetch(`${base}/api/products?limit=${limit}&page=${pageNum}`);
@@ -163,6 +165,30 @@ const App = () => {
     });
   }, [debouncedSearchTerm, normalizedProducts]);
 
+  // Detect search category (GPU, CPU, RAM, etc.)
+  const detectedCategory = useMemo(() => {
+    if (!debouncedSearchTerm.trim() || debouncedSearchTerm.trim().length < 1) {
+      return null;
+    }
+    return detectSearchCategory(debouncedSearchTerm);
+  }, [debouncedSearchTerm]);
+
+  // Category-specific search results
+  const categorySearchResults = useMemo(() => {
+    if (!detectedCategory || !debouncedSearchTerm.trim()) {
+      return [];
+    }
+    return searchByCategory(prebuilds, debouncedSearchTerm, detectedCategory, {
+      maxResults: 20,
+      minScore: 5
+    });
+  }, [debouncedSearchTerm, detectedCategory, prebuilds]);
+
+  // Check if current search is category-specific
+  const isCurrentSearchCategory = useMemo(() => {
+    return debouncedSearchTerm.trim().length > 0 && detectedCategory !== null;
+  }, [debouncedSearchTerm, detectedCategory]);
+
   // Handle suggestion click
   const handleSuggestionClick = useCallback((suggestion) => {
     setSearchTerm(suggestion.value);
@@ -191,6 +217,20 @@ const App = () => {
             </p>
           </div>
         </div>
+      )}
+
+      {/* Category Search Results Section */}
+      {isCurrentSearchCategory && detectedCategory && (
+        <section className="py-12 bg-gray-900 border-b border-gray-800">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <CategorySearchResults 
+              results={categorySearchResults}
+              query={debouncedSearchTerm}
+              category={detectedCategory}
+              isLoading={loading}
+            />
+          </div>
+        </section>
       )}
       
       {/* Hero Banner Section */}

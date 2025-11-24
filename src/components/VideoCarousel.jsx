@@ -1,13 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Play, Eye, Heart, Music } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ChevronLeft, ChevronRight, Play, Pause, Eye, Heart, Music, Volume2, VolumeX } from 'lucide-react';
+import { useInView } from 'react-intersection-observer';
 
 export default function VideoCarousel() {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [autoScroll, setAutoScroll] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [activeVideoId, setActiveVideoId] = useState(null);
   const scrollContainerRef = useRef(null);
   const autoScrollTimerRef = useRef(null);
+  const iframeRefs = useRef({});
+  
+  // Check if carousel is in view
+  const { ref: carouselRef, inView: isCarouselInView } = useInView({
+    threshold: 0.3,
+    triggerOnce: false
+  });
 
   // Top 3 TikTok videos from @aalacomputers - LIVE EMBEDDED
   const TIKTOK_VIDEOS = [
@@ -65,27 +75,32 @@ export default function VideoCarousel() {
     fetchVideos();
   }, []);
 
-  // Auto-scroll effect (continuous auto-running)
+  // ✅ FIXED: Auto-scroll ONLY when carousel is in view
   useEffect(() => {
-    if (videos.length === 0) return;
+    if (videos.length === 0 || !isCarouselInView || !isPlaying) return;
 
+    // Clear existing timer
+    if (autoScrollTimerRef.current) {
+      clearInterval(autoScrollTimerRef.current);
+    }
+
+    // Only auto-scroll if carousel is visible and playing
     autoScrollTimerRef.current = setInterval(() => {
       setCurrentIndex((prev) => {
         const nextIndex = prev + 1;
-        // Reset to beginning when reaching the end for infinite loop
         if (nextIndex >= videos.length) {
           return 0;
         }
         return nextIndex;
       });
-    }, 5000); // Change video every 5 seconds
+    }, 5000);
 
     return () => {
       if (autoScrollTimerRef.current) {
         clearInterval(autoScrollTimerRef.current);
       }
     };
-  }, [videos.length]);
+  }, [videos.length, isCarouselInView, isPlaying]);
 
   // Hide related videos in TikTok embeds
   useEffect(() => {
@@ -122,13 +137,41 @@ export default function VideoCarousel() {
     }
   }, [currentIndex, videos.length]);
 
-  const handlePrev = () => {
+  // ✅ FIXED: Stop previous video when changing
+  const handlePrev = useCallback(() => {
+    // Stop current video
+    if (activeVideoId && iframeRefs.current[activeVideoId]) {
+      iframeRefs.current[activeVideoId].style.display = 'none';
+    }
     setCurrentIndex((prev) => (prev === 0 ? videos.length - 1 : prev - 1));
-  };
+    setActiveVideoId(null);
+  }, [activeVideoId]);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
+    // Stop current video
+    if (activeVideoId && iframeRefs.current[activeVideoId]) {
+      iframeRefs.current[activeVideoId].style.display = 'none';
+    }
     setCurrentIndex((prev) => (prev + 1) % videos.length);
-  };
+    setActiveVideoId(null);
+  }, [activeVideoId]);
+
+  // ✅ FIXED: Toggle play/pause
+  const togglePlayPause = useCallback(() => {
+    setIsPlaying(!isPlaying);
+  }, [isPlaying]);
+
+  // ✅ FIXED: Toggle mute/unmute
+  const toggleMute = useCallback(() => {
+    setIsMuted(!isMuted);
+  }, [isMuted]);
+
+  // ✅ FIXED: Stop all videos when carousel goes out of view
+  useEffect(() => {
+    if (!isCarouselInView && isPlaying) {
+      setIsPlaying(false);
+    }
+  }, [isCarouselInView, isPlaying]);
 
   if (loading) {
     return (
@@ -146,7 +189,7 @@ export default function VideoCarousel() {
   }
 
   return (
-    <div className="w-full bg-gradient-to-b from-blue-50 to-white py-12">
+    <div ref={carouselRef} className="w-full bg-gradient-to-b from-blue-50 to-white py-12">
       <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
         <div className="text-center mb-12">
@@ -180,17 +223,24 @@ export default function VideoCarousel() {
                 style={{ scrollSnapAlign: 'start' }}
               >
                 {/* TikTok Embedded Video */}
-                <div className="relative bg-blue-100 overflow-hidden video-embed-container h-96 md:h-[600px]">
+                <div className="relative bg-blue-100 overflow-hidden video-embed-container h-96 md:h-[600px] group/video">
                   {/* Embedded TikTok Video - No Related Videos */}
                   <iframe
+                    ref={(el) => {
+                      if (el) iframeRefs.current[video.id] = el;
+                    }}
                     src={`https://www.tiktok.com/embed/v2/${video.id}?related=false`}
                     width="100%"
                     height="100%"
                     frameBorder="0"
-                    allow="autoplay; encrypted-media"
+                    allow={`autoplay ${isMuted ? '' : 'encrypted-media'}`}
                     allowFullScreen
                     className="w-full h-full"
-                    style={{ border: 'none', display: 'block' }}
+                    style={{ 
+                      border: 'none', 
+                      display: index === currentIndex ? 'block' : 'none',
+                      muted: isMuted
+                    }}
                     scrolling="no"
                   />
 
@@ -219,6 +269,37 @@ export default function VideoCarousel() {
                   {video.duration && (
                     <div className="absolute bottom-4 right-4 bg-black/80 text-white px-2 py-1 rounded text-xs font-semibold z-10">
                       {video.duration}
+                    </div>
+                  )}
+
+                  {/* ✅ FIXED: Play/Pause and Mute Controls - Show only on current video */}
+                  {index === currentIndex && (
+                    <div className="absolute inset-0 flex items-center justify-center gap-4 bg-black/20 opacity-0 group-hover/video:opacity-100 transition-opacity duration-300 z-20">
+                      {/* Play/Pause Button */}
+                      <button
+                        onClick={togglePlayPause}
+                        className="bg-white/90 hover:bg-white text-blue-600 p-4 rounded-full shadow-lg transition-all transform hover:scale-110"
+                        title={isPlaying ? 'Pause' : 'Play'}
+                      >
+                        {isPlaying ? (
+                          <Pause className="w-8 h-8" />
+                        ) : (
+                          <Play className="w-8 h-8" />
+                        )}
+                      </button>
+
+                      {/* Mute Button */}
+                      <button
+                        onClick={toggleMute}
+                        className="bg-white/90 hover:bg-white text-blue-600 p-4 rounded-full shadow-lg transition-all transform hover:scale-110"
+                        title={isMuted ? 'Unmute' : 'Mute'}
+                      >
+                        {isMuted ? (
+                          <VolumeX className="w-8 h-8" />
+                        ) : (
+                          <Volume2 className="w-8 h-8" />
+                        )}
+                      </button>
                     </div>
                   )}
                 </div>
@@ -290,15 +371,21 @@ export default function VideoCarousel() {
           ))}
         </div>
 
-        {/* Auto-scroll indicator */}
+        {/* ✅ FIXED: Status indicator showing play/pause and visibility */}
         <div className="text-center mt-6 text-blue-600 text-sm">
           <div className="flex items-center justify-center gap-2">
             <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+              <div className={`w-2 h-2 rounded-full ${isPlaying && isCarouselInView ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+              <div className={`w-2 h-2 rounded-full ${isPlaying && isCarouselInView ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} style={{ animationDelay: '0.2s' }}></div>
+              <div className={`w-2 h-2 rounded-full ${isPlaying && isCarouselInView ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} style={{ animationDelay: '0.4s' }}></div>
             </div>
-            <span className="font-semibold">Auto-running videos...</span>
+            <span className="font-semibold">
+              {isCarouselInView ? (
+                isPlaying ? '▶ Playing...' : '⏸ Paused'
+              ) : (
+                '⏹ Stopped (scroll to view)'
+              )}
+            </span>
           </div>
         </div>
       </div>

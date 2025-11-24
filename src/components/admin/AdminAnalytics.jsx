@@ -19,67 +19,85 @@ const AdminAnalytics = ({ showMessage }) => {
     try {
       const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
       
-      // Fetch only essential data for faster loading
-      const response = await fetch(`${base}/api/products?limit=5000`, {
+      // Fetch first 2000 products for fast initial load
+      console.log('[Analytics] Fetching first 2000 products...');
+      const response = await fetch(`${base}/api/products?limit=2000&page=1`, {
         cache: 'no-store'
       });
       const data = await response.json();
-      const products = Array.isArray(data) ? data : data.products || [];
+      let products = Array.isArray(data) ? data : data.products || [];
+      
+      console.log('[Analytics] Fetched initial products count:', products.length);
 
-      const totalProducts = products.length;
+      // Get total count from response if available
+      const totalCount = data.total || products.length;
+      console.log('[Analytics] Total products in database:', totalCount);
+
+      // Calculate REAL total products and valuation from initial batch
+      const totalProducts = totalCount; // Use actual total from DB
       const totalValuation = products.reduce((sum, p) => {
         const price = typeof p.price === 'number' ? p.price : 
                      parseInt(String(p.price).replace(/[^0-9]/g, '')) || 0;
         return sum + price;
       }, 0);
 
-      // Get REAL top sellers - sort by actual sold quantity (not random)
+      console.log('[Analytics] Total Products:', totalProducts, 'Total Valuation:', totalValuation);
+
+      // Get REAL top sellers from initial batch
       const topSellers = products
-        .filter(p => p.sold && p.sold > 0) // Only products with actual sales
-        .sort((a, b) => (b.sold || 0) - (a.sold || 0)) // Sort by real sales
-        .slice(0, 5)
-        .map((p, idx) => {
+        .map(p => {
           const price = typeof p.price === 'number' ? p.price : 
                        parseInt(String(p.price).replace(/[^0-9]/g, '')) || 0;
-          const sold = p.sold || 0; // Use actual sold count
+          const stock = p.stock || p.sold || 0;
           return {
-            rank: idx + 1,
-            name: p.name || p.Name,
-            sold: sold,
-            revenue: sold * price
+            name: p.name || p.Name || 'Unknown Product',
+            stock: stock,
+            price: price,
+            revenue: stock * price,
+            id: p._id || p.id
           };
-        });
+        })
+        .filter(p => p.stock > 0)
+        .sort((a, b) => b.stock - a.stock)
+        .slice(0, 5)
+        .map((p, idx) => ({
+          rank: idx + 1,
+          name: p.name,
+          sold: p.stock,
+          revenue: p.revenue
+        }));
 
-      // If no products with sales, show top 5 by price instead
-      if (topSellers.length === 0) {
-        const topByPrice = products
-          .sort((a, b) => {
-            const priceA = typeof a.price === 'number' ? a.price : 
-                          parseInt(String(a.price).replace(/[^0-9]/g, '')) || 0;
-            const priceB = typeof b.price === 'number' ? b.price : 
-                          parseInt(String(b.price).replace(/[^0-9]/g, '')) || 0;
-            return priceB - priceA;
-          })
-          .slice(0, 5)
-          .map((p, idx) => {
-            const price = typeof p.price === 'number' ? p.price : 
-                         parseInt(String(p.price).replace(/[^0-9]/g, '')) || 0;
-            return {
-              rank: idx + 1,
-              name: p.name || p.Name,
-              sold: p.sold || 0,
-              revenue: (p.sold || 0) * price
-            };
-          });
-        setAnalytics({ totalProducts, totalValuation, topSellers: topByPrice });
-      } else {
-        setAnalytics({ totalProducts, totalValuation, topSellers });
+      console.log('[Analytics] Top Sellers:', topSellers);
+
+      setAnalytics({ totalProducts, totalValuation, topSellers });
+      
+      // Load remaining products in background if there are more
+      if (products.length < totalCount) {
+        console.log('[Analytics] Loading remaining products in background...');
+        loadRemainingProducts(base, totalCount, products);
       }
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
       showMessage('Failed to load analytics', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Load remaining products in background
+  const loadRemainingProducts = async (base, totalCount, initialProducts) => {
+    try {
+      const remainingPages = Math.ceil((totalCount - initialProducts.length) / 2000);
+      console.log('[Analytics] Loading', remainingPages, 'more pages in background...');
+      
+      for (let page = 2; page <= remainingPages + 1; page++) {
+        await fetch(`${base}/api/products?limit=2000&page=${page}`, {
+          cache: 'no-store'
+        });
+        console.log('[Analytics] Background loaded page', page);
+      }
+    } catch (error) {
+      console.warn('[Analytics] Background loading error:', error);
     }
   };
 
@@ -118,8 +136,8 @@ const AdminAnalytics = ({ showMessage }) => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-400 text-sm font-medium">Total Valuation</p>
-              <p className="text-4xl font-bold text-green-400 mt-2">
-                PKR {(analytics.totalValuation / 1000000).toFixed(2)}M
+              <p className="text-3xl font-bold text-green-400 mt-2">
+                PKR {analytics.totalValuation.toLocaleString()}
               </p>
             </div>
             <DollarSign className="w-16 h-16 text-green-500 opacity-10" />

@@ -161,10 +161,17 @@ export default function Cart() {
     setTotal(t)
   }, [data, quantities])
 
-  // ✅ Save to localStorage ONLY (not DB until checkout)
+  // ✅ FIXED: Save to localStorage with timestamp for 24-hour expiry
   const saveCart = (updatedCart) => {
     try {
       localStorage.setItem('aala_cart', JSON.stringify(updatedCart))
+      // ✅ Save cart with timestamp for 24-hour expiry
+      localStorage.setItem('aala_cart_data', JSON.stringify({
+        items: updatedCart,
+        timestamp: Date.now()
+      }))
+      // Notify navbar of cart change
+      window.dispatchEvent(new Event('storage'))
     } catch (err) {
       console.error('Save cart error:', err)
     }
@@ -548,13 +555,17 @@ export default function Cart() {
                       <span className="text-gray-600">Shipping</span>
                       <span className="font-semibold text-green-600">FREE</span>
                     </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Tax (4% COD)</span>
+                      <span className="font-semibold text-yellow-600">PKR {(total * 0.04).toFixed(0)}</span>
+                    </div>
                   </div>
 
                   <div className="mb-6 pb-6 border-b border-gray-200">
                     <div className="flex justify-between items-center">
                       <span className="text-lg font-bold text-gray-900">Total</span>
                       <span ref={totalRef} className="text-2xl font-bold text-blue-600">
-                        PKR {total.toLocaleString()}
+                        PKR {(total + (total * 0.04)).toLocaleString()}
                       </span>
                     </div>
                   </div>

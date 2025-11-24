@@ -3,6 +3,7 @@ import { createBrowserRouter, RouterProvider, Outlet, Link, useLocation } from '
 import FloatingButtons from './pages/FloatingButtons';
 import { LoadingSpinner } from './components/PremiumUI';
 import ErrorBoundary from './components/ErrorBoundary';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // Lazy load components for better performance
 const Home = React.lazy(() => import('./pages/Home'));
@@ -209,9 +210,30 @@ export const router = createBrowserRouter([
     path: '/admin',
     children: [
       { path: 'login', element: <AdminLogin /> },
-      { index: true, element: <AdminDashboard /> },
-      { path: 'dashboard', element: <AdminDashboard /> },
-      { path: 'products', element: <AdminDashboard /> },
+      { 
+        index: true, 
+        element: (
+          <ProtectedRoute>
+            <AdminDashboard />
+          </ProtectedRoute>
+        ) 
+      },
+      { 
+        path: 'dashboard', 
+        element: (
+          <ProtectedRoute>
+            <AdminDashboard />
+          </ProtectedRoute>
+        ) 
+      },
+      { 
+        path: 'products', 
+        element: (
+          <ProtectedRoute>
+            <AdminDashboard />
+          </ProtectedRoute>
+        ) 
+      },
       // Image manager - shows ALL products at once
       // { path: 'images', element: <AdminImageManager /> },
       // Bulk product management

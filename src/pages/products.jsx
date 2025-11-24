@@ -146,11 +146,14 @@ const Products = () => {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [hasMoreProducts, setHasMoreProducts] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [totalProducts, setTotalProducts] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [categories, setCategories] = useState(defaultCategories);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [productsWithoutImages, setProductsWithoutImages] = useState([]);
-  
+  const [error, setError] = useState(null);
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
 
   // Load categories from database
   useEffect(() => {
@@ -204,29 +207,26 @@ const Products = () => {
     loadCategories();
   }, []);
 
-  // Load products with pagination - optimized for instant display
-  // Desktop: 500 per page (shows 10+ instantly), Mobile: 300 per page (shows 10+ instantly)
-  const [PRODUCTS_PER_PAGE, setPRODUCTS_PER_PAGE] = useState(500);
-  const [totalPages, setTotalPages] = useState(0);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const loadMoreTimeoutRef = useRef(null);
-  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
-  
-  // Detect screen size changes
+  // Handle responsive design
   useEffect(() => {
     const handleResize = () => {
-      const desktop = window.innerWidth >= 1024;
-      setIsDesktop(desktop);
-      setPRODUCTS_PER_PAGE(desktop ? 500 : 300);
+      setIsDesktop(window.innerWidth >= 1024);
     };
     
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Load products with pagination - optimized for instant display
+  // Initial load: 100 products (instant), Then load 80 per page on scroll
+  const INITIAL_LOAD = 100;  // Show first 100 instantly (ensures variety of categories)
+  const PRODUCTS_PER_PAGE = 80; // Load 80 more on each scroll
   
   useEffect(() => {
     const loadProductsPage = async (page = 1) => {
-      console.log(`[Products] Loading page ${page} (${PRODUCTS_PER_PAGE} products per page)...`);
+      // Use INITIAL_LOAD for first page, PRODUCTS_PER_PAGE for subsequent pages
+      const limit = page === 1 ? INITIAL_LOAD : PRODUCTS_PER_PAGE;
+      console.log(`[Products] Loading page ${page} (${limit} products)...`);
       
       if (page === 1) {
         setIsLoading(true);
@@ -239,7 +239,7 @@ const Products = () => {
         console.log(`[Products] API Base URL: ${base}`);
         
         // Fetch products per page from MongoDB (optimized for screen size)
-        const url = `${base}/api/products?page=${page}&limit=${PRODUCTS_PER_PAGE}`;
+        const url = `${base}/api/products?page=${page}&limit=${limit}`;
         console.log(`[Products] Fetching: ${url}`);
         
         const resp = await fetch(url);
@@ -259,12 +259,12 @@ const Products = () => {
         if (Array.isArray(json)) {
           batchData = json;
           total = json.length;
-          pages = Math.ceil(total / PRODUCTS_PER_PAGE);
+          pages = Math.ceil(total / limit);
           console.log(`[Products] Response is array with ${batchData.length} items`);
         } else if (json && Array.isArray(json.products)) {
           batchData = json.products;
           total = json.total || batchData.length;
-          pages = json.totalPages || Math.ceil(total / PRODUCTS_PER_PAGE);
+          pages = json.totalPages || Math.ceil(total / limit);
           console.log(`[Products] Response has products array with ${batchData.length} items, total: ${total}, pages: ${pages}`);
         } else {
           console.warn(`[Products] Unexpected response format:`, json);
@@ -405,9 +405,31 @@ const Products = () => {
         return matchPrice;
       }
       
-      // For specific categories, use smart category matching
-      // This handles variations like "processor type" vs "processors"
-      const matchCategory = categoriesMatch(p.category, selectedCategory);
+      // For specific categories, use VERY lenient matching
+      const normProdCat = norm(p.category);
+      const normSelCat = norm(selectedCategory);
+      
+      // Remove trailing 's' for singular/plural matching
+      const prodCatSingular = normProdCat.replace(/s$/, '');
+      const selCatSingular = normSelCat.replace(/s$/, '');
+      
+      // Match if:
+      // 1. Exact match
+      // 2. One contains the other
+      // 3. Singular forms match
+      // 4. First word matches (e.g., "processor type" matches "processor")
+      const prodWords = normProdCat.split(/\s+/);
+      const selWords = normSelCat.split(/\s+/);
+      
+      const matchCategory = normProdCat === normSelCat ||
+                           normProdCat.includes(normSelCat) ||
+                           normSelCat.includes(normProdCat) ||
+                           prodCatSingular === selCatSingular ||
+                           prodWords[0] === selWords[0];
+      
+      if (matchCategory) {
+        console.log(`[Products] Match found: "${p.category}" matches "${selectedCategory}"`);
+      }
       
       return matchCategory && matchPrice;
     });

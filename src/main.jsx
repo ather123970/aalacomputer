@@ -8,6 +8,24 @@ import ThemeProvider from './components/ThemeProvider'
 import ErrorBoundary from './components/ErrorBoundary'
 import { ProductProvider } from './context/ProductContext'
 
+// ✅ Register Service Worker for offline support and caching
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((registration) => {
+        console.log('[SW] Registered successfully:', registration);
+        
+        // Check for updates periodically
+        setInterval(() => {
+          registration.update();
+        }, 60000); // Check every minute
+      })
+      .catch((error) => {
+        console.warn('[SW] Registration failed:', error);
+      });
+  });
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>

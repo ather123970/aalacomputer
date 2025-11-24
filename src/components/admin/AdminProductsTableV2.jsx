@@ -229,8 +229,8 @@ const AdminProductsTableV2 = ({ showMessage }) => {
       const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
       const productId = editingProduct._id || editingProduct.id;
       
-      // Get admin token from localStorage
-      const adminToken = localStorage.getItem('aalacomp_admin_token');
+      // Get admin token from sessionStorage
+      const adminToken = sessionStorage.getItem('aalacomp_admin_token');
       
       // Use admin-protected endpoint for product updates
       const endpoint = `${base}/api/admin/products/${productId}`;
@@ -278,7 +278,7 @@ const AdminProductsTableV2 = ({ showMessage }) => {
 
     try {
       const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
-      const adminToken = localStorage.getItem('aalacomp_admin_token');
+      const adminToken = sessionStorage.getItem('aalacomp_admin_token');
       
       const response = await fetch(`${base}/api/admin/products/${id}`, {
         method: 'DELETE',

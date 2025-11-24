@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ShoppingCart, Phone, Mail, MapPin, User, Wallet, MessageCircle, CheckCircle, AlertCircle, Loader, ArrowLeft, Package, DollarSign, Upload, ChevronDown, Copy, Check, CreditCard, Smartphone, Building2, Eye, EyeOff } from 'lucide-react'
+import emailjs from '@emailjs/browser'
 import Navbar from '../nav'
 import SmartImage from '../components/SmartImage'
 import { API_CONFIG } from '../config/api'
+
+// Initialize EmailJS
+emailjs.init('Y_CyOsWzg0DHn4Spg')
 
 const BANK_DETAILS = [
   {
@@ -34,27 +38,6 @@ const PAYMENT_METHODS = {
   },
   ONLINE: {
     id: 'online',
-    name: 'Pay Online',
-    desc: 'Bank Transfer',
-    icon: '🏦'
-  }
-}
-
-const ONLINE_PAYMENT_METHODS = {
-  JAZZCASH: {
-    id: 'jazzcash',
-    name: 'JazzCash',
-    desc: 'Mobile wallet payment',
-    icon: '📱'
-  },
-  EASYPAISA: {
-    id: 'easypaisa',
-    name: 'EasyPaisa',
-    desc: 'Mobile wallet payment',
-    icon: '💳'
-  },
-  BANK: {
-    id: 'bank',
     name: 'Bank Transfer',
     desc: 'Direct bank transfer',
     icon: '🏦'
@@ -78,11 +61,11 @@ export default function CheckoutPage() {
     city: ''
   })
 
-  const [selectedOnlineMethod, setSelectedOnlineMethod] = useState('bank')
   const [paymentProof, setPaymentProof] = useState(null)
   const [paymentProofPreview, setPaymentProofPreview] = useState(null)
   const [formErrors, setFormErrors] = useState({})
   const [showBankDetails, setShowBankDetails] = useState(false)
+  const [emailSent, setEmailSent] = useState(false)
 
   // Load cart from localStorage
   useEffect(() => {
@@ -116,8 +99,19 @@ export default function CheckoutPage() {
     }
   }
 
-  const calculateTotal = () => {
+  const calculateSubtotal = () => {
     return cartItems.reduce((sum, item) => sum + (item.price * (item.qty || 1)), 0)
+  }
+
+  const calculateTax = () => {
+    if (selectedPayment === 'cod') {
+      return calculateSubtotal() * 0.04 // 4% tax for COD
+    }
+    return 0
+  }
+
+  const calculateTotal = () => {
+    return calculateSubtotal() + calculateTax()
   }
 
   const validateForm = () => {
@@ -145,11 +139,6 @@ export default function CheckoutPage() {
     
     if (!formData.city.trim()) {
       errors.city = 'City is required'
-    }
-
-    // Validate payment proof for online payments
-    if (selectedPayment === 'online' && !paymentProof) {
-      errors.paymentProof = 'Payment proof is required for online payments'
     }
 
     setFormErrors(errors)
@@ -184,136 +173,102 @@ export default function CheckoutPage() {
     setPaymentProofPreview(null)
   }
 
-  const formatOrderDetails = () => {
-    const total = calculateTotal()
-    const paymentMethod = PAYMENT_METHODS[selectedPayment.toUpperCase()] || PAYMENT_METHODS.COD
-    
-    let message = `*🛒 NEW ORDER FROM AALA COMPUTER*\n\n`
-    message += `*Customer Details:*\n`
-    message += `👤 Name: ${formData.fullName}\n`
-    message += `📧 Email: ${formData.email}\n`
-    message += `📱 Phone: ${formData.phone}\n`
-    message += `📍 Address: ${formData.address}, ${formData.city}\n\n`
-    
-    message += `*Order Items:*\n`
-    cartItems.forEach((item, idx) => {
-      const itemTotal = item.price * (item.qty || 1)
-      message += `${idx + 1}. ${item.name}\n`
-      message += `   💰 Price: Rs. ${item.price.toLocaleString()}\n`
-      message += `   📦 Qty: ${item.qty || 1}\n`
-      message += `   ✓ Total: Rs. ${itemTotal.toLocaleString()}\n\n`
-    })
-    
-    message += `*Order Summary:*\n`
-    message += `━━━━━━━━━━━━━━━━━━━━━━\n`
-    message += `💵 Total Amount: Rs. ${total.toLocaleString()}\n`
-    message += `💳 Payment Method: ${paymentMethod.name}\n`
-    message += `━━━━━━━━━━━━━━━━━━━━━━\n\n`
-    message += `✅ Order Status: PENDING\n`
-    message += `🕐 Timestamp: ${new Date().toLocaleString()}\n`
-    
-    return message
-  }
-
-  const sendToWhatsApp = async () => {
+  const sendOrderEmail = async () => {
     if (!validateForm()) return
 
     setSubmitting(true)
     try {
+      const subtotal = calculateSubtotal()
+      const tax = calculateTax()
       const total = calculateTotal()
-      const orderData = {
-        items: cartItems.map(item => ({
-          id: item.id,
-          name: item.name,
-          price: item.price,
-          qty: item.qty || 1,
-          image: item.img || item.image
-        })),
-        total: total,
-        customer: {
-          name: formData.fullName,
-          email: formData.email,
-          phone: formData.phone,
-          address: formData.address,
-          city: formData.city
-        },
-        paymentMethod: selectedPayment,
-        onlinePaymentMethod: selectedPayment === 'online' ? selectedOnlineMethod : null,
-        message: formatOrderDetails()
+      const paymentMethod = PAYMENT_METHODS[selectedPayment.toUpperCase()] || PAYMENT_METHODS.COD
+      
+      // Format items for email
+      const orderItemsText = cartItems.map((item, idx) => {
+        const itemTotal = item.price * (item.qty || 1)
+        return `${idx + 1}. ${item.name}\n   Price: Rs. ${item.price.toLocaleString()}\n   Qty: ${item.qty || 1}\n   Total: Rs. ${itemTotal.toLocaleString()}`
+      }).join('\n\n')
+
+      // Get first product image for email
+      const productImageURL = cartItems.length > 0 ? (cartItems[0].img || cartItems[0].image || '') : ''
+
+      // Prepare email template variables - matching your format
+      const templateParams = {
+        full_name: formData.fullName,
+        email: formData.email,
+        phone: formData.phone,
+        city: formData.city,
+        address: formData.address,
+        order_items: orderItemsText,
+        subtotal: `Rs. ${subtotal.toLocaleString()}`,
+        shipping: 'Free',
+        tax: selectedPayment === 'cod' ? `Rs. ${tax.toFixed(2)} (4% COD)` : 'Included',
+        total_amount: `Rs. ${total.toLocaleString()}`,
+        product_image: productImageURL,
+        payment_method: paymentMethod.name,
+        payment_image: ''
       }
 
-      // Send order to backend first
-      try {
-        const response = await fetch(`${API_CONFIG.BASE_URL.replace(/\/+$/, '')}/api/v1/send-whatsapp-order`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(orderData)
-        })
+      console.log('Sending email with params:', templateParams)
 
-        if (response.ok) {
-          const result = await response.json()
-          console.log('Order saved to backend:', result)
-        }
-      } catch (err) {
-        console.error('Failed to save order to backend:', err)
-      }
+      // Send email via EmailJS
+      const response = await emailjs.send(
+        'service_r03n3pg',
+        'template_7ih5zyg',
+        templateParams,
+        'Y_CyOsWzg0DHn4Spg'
+      )
 
-      // Update product stock for each item in order
-      try {
-        const base = API_CONFIG.BASE_URL.replace(/\/+$/, '')
-        for (const item of cartItems) {
-          const productId = item.id || item._id
-          const qty = item.qty || 1
-          
-          // Fetch current product
-          const productResponse = await fetch(`${base}/api/product/${productId}`, {
-            cache: 'no-store'
-          })
-          
-          if (productResponse.ok) {
-            const product = await productResponse.json()
-            const currentStock = product.stock || 0
-            const newStock = Math.max(0, currentStock - qty) // Don't go below 0
+      if (response.status === 200 || response.ok) {
+        console.log('Email sent successfully:', response)
+        
+        // Update product stock for each item in order
+        try {
+          const base = API_CONFIG.BASE_URL.replace(/\/+$/, '')
+          for (const item of cartItems) {
+            const productId = item.id || item._id
+            const qty = item.qty || 1
             
-            // Update product stock
-            await fetch(`${base}/api/products/${productId}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                stock: newStock,
-                sold: (product.sold || 0) + qty // Increment sold count
-              })
+            // Fetch current product
+            const productResponse = await fetch(`${base}/api/product/${productId}`, {
+              cache: 'no-store'
             })
             
-            console.log(`Updated stock for ${item.name}: ${currentStock} → ${newStock}`)
+            if (productResponse.ok) {
+              const product = await productResponse.json()
+              const currentStock = product.stock || 0
+              const newStock = Math.max(0, currentStock - qty)
+              
+              // Update product stock
+              await fetch(`${base}/api/products/${productId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  stock: newStock,
+                  sold: (product.sold || 0) + qty
+                })
+              })
+              
+              console.log(`Updated stock for ${item.name}: ${currentStock} → ${newStock}`)
+            }
           }
+        } catch (err) {
+          console.error('Failed to update product stock:', err)
         }
-      } catch (err) {
-        console.error('Failed to update product stock:', err)
-        // Don't fail the order if stock update fails
+
+        // Clear cart
+        localStorage.removeItem('aala_cart')
+        
+        // Show success message
+        setOrderPlaced(true)
+        
+        // Redirect after 3 seconds
+        setTimeout(() => {
+          navigate('/')
+        }, 3000)
       }
-
-      // Open WhatsApp with formatted message
-      const message = formatOrderDetails()
-      const encodedMessage = encodeURIComponent(message)
-      const whatsappUrl = `https://wa.me/${whatsappNumber.replace(/[^\d]/g, '')}?text=${encodedMessage}`
-      
-      // Open WhatsApp in new tab
-      window.open(whatsappUrl, '_blank')
-
-      // Clear cart
-      localStorage.removeItem('aala_cart')
-      
-      // Show success message
-      setOrderPlaced(true)
-      
-      // Redirect after 3 seconds
-      setTimeout(() => {
-        navigate('/')
-      }, 3000)
-
     } catch (err) {
-      console.error('Error placing order:', err)
+      console.error('Error sending email:', err)
       alert('Failed to place order. Please try again.')
     } finally {
       setSubmitting(false)
@@ -398,11 +353,11 @@ export default function CheckoutPage() {
           <p className="text-gray-600">Complete your order and choose your payment method</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           {/* Left Column - Form */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 lg:space-y-6">
             {/* Customer Information */}
-            <div className="bg-white border-2 border-blue-200 rounded-2xl p-8 shadow-sm">
+            <div className="bg-white border-2 border-blue-200 rounded-2xl p-4 md:p-8 shadow-sm">
               <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
                 <User className="w-6 h-6 text-blue-600" />
                 Customer Information
@@ -522,7 +477,7 @@ export default function CheckoutPage() {
             </div>
 
             {/* Payment Method Selection */}
-            <div className="bg-white border-2 border-blue-200 rounded-2xl p-8 shadow-sm">
+            <div className="bg-white border-2 border-blue-200 rounded-2xl p-4 md:p-8 shadow-sm">
               <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
                 <Wallet className="w-6 h-6 text-blue-600" />
                 Payment Method
@@ -532,13 +487,7 @@ export default function CheckoutPage() {
                 {Object.entries(PAYMENT_METHODS).map(([key, method]) => (
                   <button
                     key={key}
-                    onClick={() => {
-                      setSelectedPayment(method.id)
-                      if (method.id === 'cod') {
-                        setPaymentProof(null)
-                        setPaymentProofPreview(null)
-                      }
-                    }}
+                    onClick={() => setSelectedPayment(method.id)}
                     className={`p-6 rounded-xl border-2 transition-all text-left ${
                       selectedPayment === method.id
                         ? 'border-blue-600 bg-blue-50 shadow-md'
@@ -552,115 +501,35 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
-              {/* Online Payment Methods */}
+              {/* Bank Transfer Details */}
               {selectedPayment === 'online' && (
                 <div className="mt-6 p-6 bg-blue-50 border-2 border-blue-300 rounded-xl space-y-6">
-                  <div>
-                    <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                      <CreditCard className="w-5 h-5 text-blue-600" />
-                      Select Online Payment Method
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      {Object.entries(ONLINE_PAYMENT_METHODS).map(([key, method]) => (
-                        <button
-                          key={key}
-                          onClick={() => setSelectedOnlineMethod(method.id)}
-                          className={`p-4 rounded-lg border-2 transition-all text-center ${
-                            selectedOnlineMethod === method.id
-                              ? 'border-blue-600 bg-white shadow-md'
-                              : 'border-blue-200 bg-blue-50 hover:border-blue-400'
-                          }`}
-                        >
-                          <div className="text-3xl mb-2">{method.icon}</div>
-                          <h4 className="font-semibold text-gray-900 text-sm">{method.name}</h4>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Bank Details Display */}
-                  {selectedOnlineMethod === 'bank' && (
-                    <div className="space-y-4 pt-4 border-t-2 border-blue-200">
-                      <div className="bg-white p-5 rounded-lg border-2 border-blue-200">
-                        <p className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                          <Building2 className="w-5 h-5 text-blue-600" />
-                          Send your payment to these bank accounts:
-                        </p>
-                        
-                        {BANK_DETAILS.map((bank, idx) => (
-                          <div key={idx} className="mb-4 pb-4 border-b border-gray-200 last:border-b-0 last:mb-0 last:pb-0">
-                            <h4 className="font-bold text-gray-900 mb-3 text-base">{bank.bank}</h4>
-                            <div className="space-y-2 text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">
-                              <p><span className="font-semibold text-gray-900">Account Holder:</span> {bank.accountHolder}</p>
-                              <p><span className="font-semibold text-gray-900">Account Number:</span> {bank.accountNumber}</p>
-                              <p><span className="font-semibold text-gray-900">IBAN:</span> {bank.iban}</p>
-                              {bank.raast && <p><span className="font-semibold text-gray-900">RAAST:</span> {bank.raast}</p>}
-                              {bank.branchCode && <p><span className="font-semibold text-gray-900">Branch Code:</span> {bank.branchCode}</p>}
-                            </div>
-                          </div>
-                        ))}
+                  <div className="bg-white p-5 rounded-lg border-2 border-blue-200">
+                    <p className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <Building2 className="w-5 h-5 text-blue-600" />
+                      Send your payment to these bank accounts:
+                    </p>
+                    
+                    {BANK_DETAILS.map((bank, idx) => (
+                      <div key={idx} className="mb-4 pb-4 border-b border-gray-200 last:border-b-0 last:mb-0 last:pb-0">
+                        <h4 className="font-bold text-gray-900 mb-3 text-base">{bank.bank}</h4>
+                        <div className="space-y-2 text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">
+                          <p><span className="font-semibold text-gray-900">Account Holder:</span> {bank.accountHolder}</p>
+                          <p><span className="font-semibold text-gray-900">Account Number:</span> {bank.accountNumber}</p>
+                          <p><span className="font-semibold text-gray-900">IBAN:</span> {bank.iban}</p>
+                          {bank.raast && <p><span className="font-semibold text-gray-900">RAAST:</span> {bank.raast}</p>}
+                          {bank.branchCode && <p><span className="font-semibold text-gray-900">Branch Code:</span> {bank.branchCode}</p>}
+                        </div>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Payment Proof Upload */}
-                  <div className="pt-4 border-t-2 border-blue-200">
-                    <div className="p-5 bg-white rounded-lg border-2 border-dashed border-blue-400">
-                      <label className="block text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                        <Upload className="w-5 h-5 text-blue-600" />
-                        Upload Payment Proof *
-                      </label>
-                      
-                      {!paymentProofPreview ? (
-                        <div className="relative">
-                          <input
-                            type="file"
-                            accept="image/*,.pdf"
-                            onChange={handlePaymentProofUpload}
-                            className="hidden"
-                            id="payment-proof-input"
-                          />
-                          <label
-                            htmlFor="payment-proof-input"
-                            className="block w-full p-6 text-center border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors"
-                          >
-                            <p className="text-gray-700 font-medium">Click to upload or drag and drop</p>
-                            <p className="text-sm text-gray-500">PNG, JPG, PDF (Max 5MB)</p>
-                          </label>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="relative w-full h-40 bg-gray-100 rounded-lg overflow-hidden border-2 border-blue-200">
-                            {paymentProof?.type.startsWith('image/') ? (
-                              <img src={paymentProofPreview} alt="Payment proof" className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                                <span className="text-gray-600 font-semibold">PDF Document</span>
-                              </div>
-                            )}
-                          </div>
-                          <button
-                            onClick={removePaymentProof}
-                            className="w-full py-2 text-red-600 hover:text-red-700 font-semibold text-sm border-2 border-red-300 rounded-lg hover:bg-red-50 transition-colors"
-                          >
-                            Remove & Upload Different File
-                          </button>
-                        </div>
-                      )}
-                      {formErrors.paymentProof && (
-                        <p className="text-red-600 text-sm mt-3 flex items-center gap-1">
-                          <AlertCircle className="w-4 h-4" /> {formErrors.paymentProof}
-                        </p>
-                      )}
-                    </div>
+                    ))}
                   </div>
                 </div>
               )}
 
               <div className="mt-6 p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
                 <p className="text-blue-900 text-sm flex items-start gap-2">
-                  <MessageCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-blue-600" />
-                  <span>Your order details will be sent to WhatsApp. Our team will confirm and process your order shortly.</span>
+                  <Mail className="w-5 h-5 flex-shrink-0 mt-0.5 text-blue-600" />
+                  <span>Your order details will be sent to your email and our admin email. We'll confirm your order shortly.</span>
                 </p>
               </div>
             </div>
@@ -668,7 +537,7 @@ export default function CheckoutPage() {
 
           {/* Right Column - Order Summary */}
           <div className="lg:col-span-1">
-            <div className="bg-gradient-to-br from-blue-600 to-blue-500 rounded-2xl p-6 sticky top-24 shadow-lg text-white">
+            <div className="bg-gradient-to-br from-blue-600 to-blue-500 rounded-2xl p-4 lg:p-6 lg:sticky lg:top-24 shadow-lg text-white">
               <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
                 <Package className="w-6 h-6" />
                 Order Summary
@@ -707,29 +576,31 @@ export default function CheckoutPage() {
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-blue-100">
                   <span>Subtotal:</span>
-                  <span>Rs. {total.toLocaleString()}</span>
+                  <span>Rs. {calculateSubtotal().toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-blue-100">
                   <span>Shipping:</span>
                   <span className="text-green-200">Free</span>
                 </div>
-                <div className="flex justify-between text-blue-100">
-                  <span>Tax:</span>
-                  <span>Included</span>
-                </div>
+                {selectedPayment === 'cod' && (
+                  <div className="flex justify-between text-yellow-200">
+                    <span>Tax (4% COD):</span>
+                    <span>Rs. {calculateTax().toFixed(2)}</span>
+                  </div>
+                )}
               </div>
 
               {/* Grand Total */}
               <div className="bg-white/20 backdrop-blur rounded-lg p-4 mb-6 border border-white/30">
                 <div className="flex justify-between items-center">
                   <span className="text-white font-semibold">Total Amount:</span>
-                  <span className="text-2xl font-bold text-white">Rs. {total.toLocaleString()}</span>
+                  <span className="text-2xl font-bold text-white">Rs. {calculateTotal().toLocaleString()}</span>
                 </div>
               </div>
 
               {/* Place Order Button */}
               <button
-                onClick={sendToWhatsApp}
+                onClick={sendOrderEmail}
                 disabled={submitting}
                 className={`w-full py-4 rounded-lg font-bold text-white flex items-center justify-center gap-2 transition-all ${
                   submitting
@@ -744,7 +615,7 @@ export default function CheckoutPage() {
                   </>
                 ) : (
                   <>
-                    <MessageCircle className="w-5 h-5" />
+                    <Mail className="w-5 h-5" />
                     Place Order
                   </>
                 )}

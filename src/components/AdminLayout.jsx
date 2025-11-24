@@ -27,7 +27,7 @@ const AdminLayout = ({ children }) => {
 
   useEffect(() => {
     // Check if admin is logged in
-    const token = localStorage.getItem('aalacomp_admin_token');
+    const token = sessionStorage.getItem('aalacomp_admin_token');
     if (!token) {
       navigate('/admin/login');
       return;
@@ -39,7 +39,7 @@ const AdminLayout = ({ children }) => {
       setAdminUser({ email: payload.sub, role: payload.role });
     } catch (error) {
       console.error('Token decode error:', error);
-      localStorage.removeItem('aalacomp_admin_token');
+      sessionStorage.removeItem('aalacomp_admin_token');
       navigate('/admin/login');
     } finally {
       setIsLoading(false);
@@ -47,7 +47,7 @@ const AdminLayout = ({ children }) => {
   }, [navigate]);
 
   const handleLogout = () => {
-    localStorage.removeItem('aalacomp_admin_token');
+    sessionStorage.removeItem('aalacomp_admin_token');
     navigate('/admin/login');
   };
 

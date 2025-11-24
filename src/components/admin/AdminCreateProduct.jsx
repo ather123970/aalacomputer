@@ -11,7 +11,7 @@ const AdminCreateProduct = ({ showMessage }) => {
     tags: '',
     category: '',
     brand: '',
-    isPrebuild: false,
+    productType: 'normal', // 'normal', 'prebuild', 'deal'
     img: '',
     imageUrl: ''
   });
@@ -128,7 +128,7 @@ const AdminCreateProduct = ({ showMessage }) => {
     setLoading(true);
     try {
       const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
-      const adminToken = localStorage.getItem('aalacomp_admin_token');
+      const adminToken = sessionStorage.getItem('aalacomp_admin_token');
       
       const productData = {
         name: formData.name,
@@ -162,7 +162,7 @@ const AdminCreateProduct = ({ showMessage }) => {
           tags: '',
           category: '',
           brand: '',
-          isPrebuild: false,
+          productType: 'normal',
           img: '',
           imageUrl: ''
         });
@@ -320,18 +320,43 @@ const AdminCreateProduct = ({ showMessage }) => {
             </div>
 
             {/* Product Type */}
-            <div className="flex items-center gap-3 p-4 bg-gray-700 rounded-lg">
-              <input
-                type="checkbox"
-                name="isPrebuild"
-                checked={formData.isPrebuild}
-                onChange={handleInputChange}
-                id="isPrebuild"
-                className="w-5 h-5 cursor-pointer"
-              />
-              <label htmlFor="isPrebuild" className="text-white font-medium cursor-pointer flex-1">
-                This is a Prebuild PC
-              </label>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Product Type</label>
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, productType: 'normal' })}
+                  className={`px-4 py-3 rounded-lg font-medium transition ${
+                    formData.productType === 'normal'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  Normal Product
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, productType: 'prebuild' })}
+                  className={`px-4 py-3 rounded-lg font-medium transition ${
+                    formData.productType === 'prebuild'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  Prebuild PC
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, productType: 'deal' })}
+                  className={`px-4 py-3 rounded-lg font-medium transition ${
+                    formData.productType === 'deal'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  Deal
+                </button>
+              </div>
             </div>
           </div>
 

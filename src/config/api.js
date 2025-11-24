@@ -40,9 +40,9 @@ export const getApiUrl = (endpoint) => {
   return `${API_CONFIG.BASE_URL}${endpoint}`;
 };
 
-// Helper function to get admin token
+// Helper function to get admin token (from sessionStorage - expires on browser close)
 export const getAdminToken = () => {
-  return localStorage.getItem('aalacomp_admin_token');
+  return sessionStorage.getItem('aalacomp_admin_token');
 };
 
 // Helper function to make authenticated API calls
@@ -52,6 +52,26 @@ export const apiCall = async (endpoint, options = {}) => {
   
   console.log(`[API] Making ${options.method || 'GET'} request to: ${url}`);
   console.log(`[API] Token present: ${!!token}`);
+  
+  // Check if token is expired before making request
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const expiresAt = payload.exp * 1000;
+      const now = Date.now();
+      
+      if (now > expiresAt) {
+        // Token expired
+        console.log('[API] Token expired - removing and redirecting to login');
+        sessionStorage.removeItem('aalacomp_admin_token');
+        window.location.href = '/admin/login';
+        throw new Error('Session expired. Please login again.');
+      }
+    } catch (error) {
+      if (error.message.includes('Session expired')) throw error;
+      console.warn('[API] Could not verify token expiration:', error);
+    }
+  }
   
   const defaultOptions = {
     headers: {
@@ -70,13 +90,13 @@ export const apiCall = async (endpoint, options = {}) => {
     if (response.status === 401) {
       // Token expired or invalid
       console.log('[API] 401 Unauthorized - removing token and redirecting');
-      localStorage.removeItem('aalacomp_admin_token');
-      // Use history API instead of direct window.location to avoid full page reload
+      sessionStorage.removeItem('aalacomp_admin_token');
+      // Redirect to login
       const currentPath = window.location.pathname;
       if (!currentPath.includes('/admin/login')) {
         window.location.href = '/admin/login';
       }
-      throw new Error('Please login again to continue');
+      throw new Error('Session expired. Please login again.');
     }
     
     // Try to get error message from response

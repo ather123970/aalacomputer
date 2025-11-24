@@ -43,7 +43,42 @@ app.use(compression({
   level: 6 // Compression level (0-9, 6 is default)
 }));
 
-// CORS Configuration - Allow localhost for development, specific domains for production
+// ✅ CACHING HEADERS MIDDLEWARE - Optimize browser caching
+app.use((req, res, next) => {
+  // Static assets - cache for 1 year
+  if (/\.(js|css|woff|woff2|ttf|eot|svg|png|jpg|jpeg|gif)$/i.test(req.path)) {
+    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+  }
+  // HTML files - cache for 1 hour (to allow updates)
+  else if (req.path.endsWith('.html') || req.path === '/') {
+    res.set('Cache-Control', 'public, max-age=3600, must-revalidate');
+  }
+  // API responses - cache based on endpoint
+  else if (req.path.startsWith('/api/')) {
+    // Product data - cache for 5 minutes
+    if (req.path.includes('/api/products') || req.path.includes('/api/categories')) {
+      res.set('Cache-Control', 'public, max-age=300');
+    }
+    // Other API - no cache
+    else {
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  }
+  // Default - no cache
+  else {
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  }
+  
+  // ✅ SECURITY HEADERS
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('X-Frame-Options', 'SAMEORIGIN');
+  res.set('X-XSS-Protection', '1; mode=block');
+  res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  
+  next();
+});
+
+// ✅ CORS Configuration - Allow localhost, local network, and production domains
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
@@ -51,9 +86,13 @@ const allowedOrigins = [
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
   'http://127.0.0.1:3000',
-  // Allow proxy URLs from IDE preview
+  // ✅ Allow proxy URLs from IDE preview
   /^http:\/\/127\.0\.0\.1:\d+$/, // Match any port on 127.0.0.1
   /^http:\/\/localhost:\d+$/, // Match any port on localhost
+  // ✅ Allow local network IPs (192.168.x.x, 10.x.x.x)
+  /^http:\/\/192\.168\.\d+\.\d+:\d+$/, // Match any 192.168.x.x IP with any port
+  /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/, // Match any 10.x.x.x IP with any port
+  /^http:\/\/172\.(1[6-9]|2[0-9]|3[01])\.\d+\.\d+:\d+$/, // Match 172.16-31.x.x IP with any port
   'https://aalacomputer.com',
   'https://www.aalacomputer.com',
   'https://aalacomputerkarachi.vercel.app',
@@ -1171,7 +1210,16 @@ try {
 
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET || 'dev_jwt_secret_change_this';
+
+// ✅ FIXED: Use consistent JWT_SECRET - generate once at startup
+let JWT_SECRET = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET || 'dev_jwt_secret_change_this_in_production';
+console.log('[jwt] JWT_SECRET initialized:', JWT_SECRET === 'dev_jwt_secret_change_this_in_production' ? 'DEFAULT (CHANGE IN PRODUCTION)' : 'FROM ENV');
+
+// Ensure JWT_SECRET is never empty
+if (!JWT_SECRET || JWT_SECRET.trim().length === 0) {
+  JWT_SECRET = 'dev_jwt_secret_change_this_in_production';
+  console.warn('[jwt] ⚠️ JWT_SECRET was empty, using default');
+}
 
 // helper: read/write admin file fallback
 function readAdminFile() {
@@ -1267,23 +1315,34 @@ app.post('/api/admin/login', async (req, res) => {
 function requireAdmin(req) {
   const auth = req.headers.authorization || '';
   if (!auth) {
-    console.log('[admin] no authorization header');
+    console.log('[admin] ❌ no authorization header');
     return false;
   }
   
   const parts = String(auth || '').split(' ');
   const token = parts.length === 2 ? parts[1] : parts[0];
   if (!token) {
-    console.log('[admin] no token found in authorization header');
+    console.log('[admin] ❌ no token found in authorization header');
     return false;
   }
   
   try {
+    // ✅ FIXED: Ensure JWT_SECRET is consistent
     const decoded = jwt.verify(token, JWT_SECRET);
-    console.log('[admin] token verified for:', decoded.sub);
+    console.log('[admin] ✅ token verified for:', decoded.sub);
     return decoded; // truthy admin payload
   } catch (e) {
-    console.log('[admin] token verification failed:', e.message);
+    console.error('[admin] ❌ token verification failed:', e.message);
+    console.error('[admin] Token:', token.substring(0, 20) + '...');
+    console.error('[admin] JWT_SECRET length:', JWT_SECRET.length);
+    
+    // Check if it's an expiration issue
+    if (e.name === 'TokenExpiredError') {
+      console.log('[admin] ⚠️ Token has expired');
+    } else if (e.name === 'JsonWebTokenError') {
+      console.log('[admin] ⚠️ Invalid token format');
+    }
+    
     return false;
   }
 }
@@ -1681,10 +1740,14 @@ app.get('/api/products', async (req, res) => {
   
   // Get query parameters
   const page = parseInt(req.query.page) || 1;
-  let limit = parseInt(req.query.limit) || 32; // Default 32 products per page
+  let limit = parseInt(req.query.limit) || 100; // Default 100 products per page (fast loading)
   
-  // Cap limit to 5000 to allow fetching all products
-  if (limit > 5000) limit = 5000;
+  // Cap limit to 10000 to allow fetching all products (for analytics)
+  if (limit > 10000) limit = 10000;
+  
+  // Validate page and limit
+  if (page < 1) page = 1;
+  if (limit < 1) limit = 100;
   
   const skip = (page - 1) * limit;
   const category = req.query.category;
@@ -1766,17 +1829,78 @@ app.get('/api/products', async (req, res) => {
     } else {
       const warnMsg = `[${new Date().toISOString()}] [products] DB not ready, falling back to file\n`;
       fs.appendFileSync('products-api.log', warnMsg);
+      
+      // Fallback to JSON file
+      try {
+        const jsonPath = './data/products.json';
+        if (fs.existsSync(jsonPath)) {
+          const fileData = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+          let products = Array.isArray(fileData) ? fileData : (fileData.products || []);
+          
+          // Apply filters if needed
+          if (category && category !== 'All') {
+            products = products.filter(p => 
+              (p.category || '').toLowerCase() === category.toLowerCase()
+            );
+          }
+          
+          const total = products.length;
+          const paginatedProducts = products.slice(skip, skip + limit);
+          
+          return res.json({
+            products: paginatedProducts,
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+            hasMore: skip + paginatedProducts.length < total,
+            source: 'file'
+          });
+        }
+      } catch (fileErr) {
+        console.error('[products] File fallback failed:', fileErr.message);
+      }
     }
   } catch (e) { 
     const errMsg = `[${new Date().toISOString()}] [products] DB query failed: ${e && (e.stack || e.message)}\n`;
     fs.appendFileSync('products-api.log', errMsg);
-    console.error('[products] MongoDB query failed - no file fallback available:', e && e.message);
+    console.error('[products] MongoDB query failed:', e && e.message);
+    
+    // Try file fallback on error
+    try {
+      const jsonPath = './data/products.json';
+      if (fs.existsSync(jsonPath)) {
+        const fileData = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+        let products = Array.isArray(fileData) ? fileData : (fileData.products || []);
+        
+        if (category && category !== 'All') {
+          products = products.filter(p => 
+            (p.category || '').toLowerCase() === category.toLowerCase()
+          );
+        }
+        
+        const total = products.length;
+        const paginatedProducts = products.slice(skip, skip + limit);
+        
+        return res.json({
+          products: paginatedProducts,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+          hasMore: skip + paginatedProducts.length < total,
+          source: 'file-fallback'
+        });
+      }
+    } catch (fileErr) {
+      console.error('[products] File fallback also failed:', fileErr.message);
+    }
+    
     return res.status(503).json({ ok: false, error: 'Database unavailable - please try again later' });
   }
   
-  // MongoDB only - no file fallback
-  // If we reach here, MongoDB is not connected and we cannot serve products
-  console.error('[products] MongoDB not connected and no fallback available');
+  // If we reach here, both MongoDB and file fallback failed
+  console.error('[products] All data sources unavailable');
   return res.status(503).json({ ok: false, error: 'Database unavailable' });
 });
 
@@ -4188,6 +4312,76 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('[global] unhandledRejection promise:', promise);
   // Don't exit the process for unhandled rejections to prevent 502 errors
   // process.exit(1);
+});
+
+// ✅ SEO Metadata Endpoint
+app.get('/api/seo/product/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const mongoose = require('mongoose');
+    const ProductModel = getProductModel();
+    
+    if (!ProductModel || mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ ok: false, error: 'Database not connected' });
+    }
+    
+    const product = await ProductModel.findById(id).lean();
+    if (!product) {
+      return res.status(404).json({ ok: false, error: 'Product not found' });
+    }
+    
+    // Generate SEO metadata
+    const title = `${product.name || product.title} | Aala Computer Pakistan`;
+    const description = `${product.name || product.title} - Best price in Pakistan. ${product.description?.substring(0, 100) || 'High-quality PC hardware'}. Free shipping. ✓ Authentic ✓ Warranty`;
+    
+    res.json({
+      ok: true,
+      seo: {
+        title: title.substring(0, 60),
+        description: description.substring(0, 160),
+        keywords: `${product.name}, ${product.brand || ''}, ${product.category || ''}, price Pakistan`,
+        image: product.imageUrl || product.img || '/placeholder.svg'
+      }
+    });
+  } catch (e) {
+    console.error('[seo] Error:', e.message);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+// ✅ SEO Category Metadata Endpoint
+app.get('/api/seo/category/:category', async (req, res) => {
+  try {
+    const { category } = req.params;
+    
+    const categoryDescriptions = {
+      'Graphics Cards': 'Best Graphics Cards in Pakistan | GPUs, RTX, Radeon | Aala Computer',
+      'Processors': 'Best CPUs in Pakistan | Intel, AMD Processors | Aala Computer',
+      'RAM': 'Best RAM in Pakistan | DDR5, DDR4 Memory | Aala Computer',
+      'Motherboards': 'Best Motherboards in Pakistan | ASUS, MSI, Gigabyte | Aala Computer',
+      'Storage': 'Best Storage in Pakistan | SSD, HDD, NVMe | Aala Computer',
+      'Laptops': 'Best Gaming Laptops in Pakistan | ASUS, MSI, Dell | Aala Computer',
+      'Monitors': 'Best Gaming Monitors in Pakistan | 144Hz, 4K | Aala Computer',
+      'Keyboards': 'Best Gaming Keyboards in Pakistan | Mechanical | Aala Computer',
+      'Mouse': 'Best Gaming Mouse in Pakistan | High DPI | Aala Computer',
+      'Headsets': 'Best Gaming Headsets in Pakistan | 7.1 Surround | Aala Computer'
+    };
+    
+    const title = categoryDescriptions[category] || `${category} | Aala Computer Pakistan`;
+    const description = `Shop ${category.toLowerCase()} online in Pakistan. Best prices, authentic products, free delivery. ✓ Warranty ✓ Support`;
+    
+    res.json({
+      ok: true,
+      seo: {
+        title: title.substring(0, 60),
+        description: description.substring(0, 160),
+        keywords: `${category}, ${category.toLowerCase()} Pakistan, buy ${category.toLowerCase()}, price`
+      }
+    });
+  } catch (e) {
+    console.error('[seo] Category error:', e.message);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
 });
 
 // Start server only when run directly. When imported (e.g. by serverless wrapper), export the app.
