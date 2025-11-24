@@ -195,7 +195,7 @@ export default function Navbar() {
       initial={{ y: 60, opacity: 1 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.28, ease: 'easeInOut' }}
-  className="bg-panel text-primary fixed top-0 left-0 w-full shadow-sm"
+  className="bg-panel text-primary fixed top-0 left-0 w-full shadow-sm [&_svg]:text-white [&_svg]:!text-white [&_svg]:stroke-white"
     // ensure header sits above most floating widgets but below UI debug overlays
   style={{ transform: 'none', pointerEvents: 'auto', zIndex: 200000 }}
       role="navigation"
@@ -251,30 +251,30 @@ export default function Navbar() {
 
         {/* Right area desktop */}
           <div className="hidden md:flex items-center gap-4 ml-auto">
-          <button onClick={() => navigate('/cart')} className="p-2 bg-white hover:bg-gray-100 transition rounded relative" aria-label="Open cart">
-            <ShoppingCart size={22} className="text-blue-600" strokeWidth={2.5} />
-            {cartCount > 0 && <span className="absolute -top-1 -right-1 text-xs bg-red-600 rounded-full w-5 h-5 flex items-center justify-center text-white font-bold text-[11px] shadow-lg">{cartCount}</span>}
+          <button onClick={() => navigate('/cart')} className="p-2 bg-blue-50 hover:bg-blue-100 transition rounded relative" aria-label="Open cart">
+            <ShoppingCart size={22} className="text-white !text-white stroke-white" stroke="white" strokeWidth={2.5} />
+            {cartCount > 0 && <span className="absolute -top-1 -right-1 text-xs bg-red-500 rounded-full w-5 h-5 flex items-center justify-center text-white font-bold text-[11px] shadow-lg animate-pulse">{cartCount}</span>}
           </button>
 
           {user ? (
               <div className="flex items-center gap-3">
               <button onClick={() => navigate('/profile')} className="p-2 rounded bg-white/5 hover:bg-white/10 flex items-center justify-center" aria-label="Profile">
-                <User size={18} />
+                <User size={18} className="text-white !text-white stroke-white" stroke="white" strokeWidth={2} />
               </button>
               <button onClick={handleLogout} className="px-3 py-1 rounded bg-red-600 hover:bg-red-700">Logout</button>
             </div>
           ) : (
             <button onClick={() => navigate('/auth')} className="p-2 rounded bg-white/5 hover:bg-white/10 flex items-center justify-center" aria-label="Login">
-              <User size={18} />
+              <User size={18} className="text-white !text-white stroke-white" stroke="white" strokeWidth={2} />
             </button>
           )}
         </div>
 
         {/* Mobile icons */}
   <div className="md:hidden flex items-center gap-3 ml-auto pointer-events-auto">
-          <button onClick={() => navigate('/cart')} className="p-2 bg-white hover:bg-gray-100 transition rounded relative" aria-label="Open cart">
-            <ShoppingCart size={20} className="text-blue-600" strokeWidth={2.5} />
-            {cartCount > 0 && <span className="absolute -top-1 -right-1 text-xs bg-red-600 rounded-full w-5 h-5 flex items-center justify-center text-white font-bold text-[11px] shadow-lg">{cartCount}</span>}
+          <button onClick={() => navigate('/cart')} className="p-2 bg-blue-50 hover:bg-blue-100 transition rounded relative" aria-label="Open cart">
+            <ShoppingCart size={20} className="text-white !text-white stroke-white" stroke="white" strokeWidth={2.5} />
+            {cartCount > 0 && <span className="absolute -top-1 -right-1 text-xs bg-red-500 rounded-full w-5 h-5 flex items-center justify-center text-white font-bold text-[11px] shadow-lg animate-pulse">{cartCount}</span>}
           </button>
 
           <button
@@ -282,7 +282,7 @@ export default function Navbar() {
             aria-label={isOpen ? 'Close menu' : 'Open menu'}
             className="p-2 rounded-md bg-white/5 hover:bg-white/10 transition z-[100102] text-primary outline-none focus:outline-none"
           >
-            {isOpen ? <X size={22} /> : <Menu size={22} />}
+            {isOpen ? <X size={22} className="text-white !text-white stroke-white" stroke="white" strokeWidth={2} /> : <Menu size={22} className="text-white !text-white stroke-white" stroke="white" strokeWidth={2} />}
           </button>
         </div>
       </div>

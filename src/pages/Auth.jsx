@@ -139,7 +139,7 @@ export default function AuthPage() {
               onClick={() => setMode("login")}
               className={`px-4 py-2 rounded-full font-semibold transition ${
                 mode === "login"
-                  ? "bg-blue-500 text-black shadow-md"
+                  ? "bg-blue-500 text-white shadow-md"
                   : "bg-transparent text-gray-300 border border-gray-800 hover:bg-white/5"
               }`}
             >
@@ -149,7 +149,7 @@ export default function AuthPage() {
               onClick={() => setMode("register")}
               className={`px-4 py-2 rounded-full font-semibold transition ${
                 mode === "register"
-                  ? "bg-blue-500 text-black shadow-md"
+                  ? "bg-blue-500 text-white shadow-md"
                   : "bg-transparent text-gray-300 border border-gray-800 hover:bg-white/5"
               }`}
             >
@@ -252,7 +252,7 @@ export default function AuthPage() {
           <button
             type="submit"
             disabled={loading}
-            className="mt-3 bg-blue-500 hover:bg-blue-600 text-black font-semibold py-2 rounded-lg shadow-md transition disabled:opacity-60"
+            className="mt-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 rounded-lg shadow-md transition disabled:opacity-60"
           >
             {loading
               ? mode === "login"

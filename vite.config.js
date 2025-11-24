@@ -5,11 +5,7 @@ import compression from 'vite-plugin-compression'
 
 export default defineConfig({
   plugins: [
-    react({
-      babel: {
-        plugins: ['@babel/plugin-syntax-dynamic-import'],
-      },
-    }),
+    react(),
     tailwindcss(),
     compression({
       verbose: true,
@@ -35,7 +31,7 @@ export default defineConfig({
         passes: 2,
       },
       mangle: true,
-      output: {
+      format: {
         comments: false,
       },
     },

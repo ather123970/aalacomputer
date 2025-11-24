@@ -495,8 +495,12 @@ export default function CheckoutPage() {
                     }`}
                   >
                     <div className="text-4xl mb-3">{method.icon}</div>
-                    <h3 className="font-bold text-gray-900 mb-1 text-lg">{method.name}</h3>
-                    <p className="text-sm text-gray-600">{method.desc}</p>
+                    <h3 className={`font-bold mb-1 text-lg ${
+                      selectedPayment === method.id ? 'text-blue-900' : 'text-gray-900'
+                    }`}>{method.name}</h3>
+                    <p className={`text-sm ${
+                      selectedPayment === method.id ? 'text-blue-700' : 'text-gray-600'
+                    }`}>{method.desc}</p>
                   </button>
                 ))}
               </div>
@@ -505,20 +509,20 @@ export default function CheckoutPage() {
               {selectedPayment === 'online' && (
                 <div className="mt-6 p-6 bg-blue-50 border-2 border-blue-300 rounded-xl space-y-6">
                   <div className="bg-white p-5 rounded-lg border-2 border-blue-200">
-                    <p className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                      <Building2 className="w-5 h-5 text-blue-600" />
+                    <p className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                      <Building2 className="w-5 h-5 text-white" />
                       Send your payment to these bank accounts:
                     </p>
                     
                     {BANK_DETAILS.map((bank, idx) => (
                       <div key={idx} className="mb-4 pb-4 border-b border-gray-200 last:border-b-0 last:mb-0 last:pb-0">
-                        <h4 className="font-bold text-gray-900 mb-3 text-base">{bank.bank}</h4>
-                        <div className="space-y-2 text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">
-                          <p><span className="font-semibold text-gray-900">Account Holder:</span> {bank.accountHolder}</p>
-                          <p><span className="font-semibold text-gray-900">Account Number:</span> {bank.accountNumber}</p>
-                          <p><span className="font-semibold text-gray-900">IBAN:</span> {bank.iban}</p>
-                          {bank.raast && <p><span className="font-semibold text-gray-900">RAAST:</span> {bank.raast}</p>}
-                          {bank.branchCode && <p><span className="font-semibold text-gray-900">Branch Code:</span> {bank.branchCode}</p>}
+                        <h4 className="font-bold text-white mb-3 text-base">{bank.bank}</h4>
+                        <div className="space-y-2 text-sm text-white bg-blue-600 bg-opacity-30 p-3 rounded-lg">
+                          <p><span className="font-semibold text-white">Account Holder:</span> {bank.accountHolder}</p>
+                          <p><span className="font-semibold text-white">Account Number:</span> {bank.accountNumber}</p>
+                          <p><span className="font-semibold text-white">IBAN:</span> {bank.iban}</p>
+                          {bank.raast && <p><span className="font-semibold text-white">RAAST:</span> {bank.raast}</p>}
+                          {bank.branchCode && <p><span className="font-semibold text-white">Branch Code:</span> {bank.branchCode}</p>}
                         </div>
                       </div>
                     ))}
@@ -527,8 +531,8 @@ export default function CheckoutPage() {
               )}
 
               <div className="mt-6 p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
-                <p className="text-blue-900 text-sm flex items-start gap-2">
-                  <Mail className="w-5 h-5 flex-shrink-0 mt-0.5 text-blue-600" />
+                <p className="text-white text-sm flex items-start gap-2">
+                  <Mail className="w-5 h-5 flex-shrink-0 mt-0.5 text-white" />
                   <span>Your order details will be sent to your email and our admin email. We'll confirm your order shortly.</span>
                 </p>
               </div>
