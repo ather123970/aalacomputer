@@ -96,7 +96,8 @@ const allowedOrigins = [
   'https://aalacomputer.com',
   'https://www.aalacomputer.com',
   'https://aalacomputerkarachi.vercel.app',
-  'https://aalacomputer.onrender.com'
+  'https://aalacomputer.onrender.com',
+  'https://aalacomputer-0uuf.onrender.com'
 ];
 
 app.use(cors({
