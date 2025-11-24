@@ -41,7 +41,15 @@ export default function FloatingButtonsPage() {
           ? "http://localhost:10000"
           : window.location.origin;
 
-        const res = await fetch(`${baseURL}/api/v1/config`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+        const res = await fetch(`${baseURL}/api/v1/config`, {
+          signal: controller.signal,
+          credentials: 'include'
+        });
+        clearTimeout(timeoutId);
+        
         if (!res.ok) return;
 
         const j = await res.json();

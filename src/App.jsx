@@ -48,7 +48,17 @@ const App = () => {
       const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
       const limit = isFirstPage ? 100 : 80; // Load 100 initially, then 80 per page for optimal performance
       
-      const response = await fetch(`${base}/api/products?limit=${limit}&page=${pageNum}`);
+      console.log('[App] Fetching from:', `${base}/api/products?limit=${limit}&page=${pageNum}`);
+      
+      // Add timeout to fetch request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
+      const response = await fetch(`${base}/api/products?limit=${limit}&page=${pageNum}`, {
+        signal: controller.signal,
+        credentials: 'include'
+      });
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -97,6 +107,7 @@ const App = () => {
         console.log(`[App] All products loaded (total: ${isFirstPage ? products.length : prebuilds.length + products.length})`);
       }
       
+      console.log('[App] Products fetched successfully:', formatted.length);
       setBackendError(false);
     } catch (error) {
       console.error('[App] Failed to fetch products:', error.message);
@@ -143,6 +154,14 @@ const App = () => {
   // Initial load
   useEffect(() => {
     fetchProducts(1);
+    
+    // Fallback timeout - force show content after 10 seconds even if loading
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+      console.warn('[App] Loading timeout - forcing render');
+    }, 10000);
+    
+    return () => clearTimeout(timeoutId);
   }, [fetchProducts]);
 
   // Load more when scrolled to bottom

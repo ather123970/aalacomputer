@@ -28,8 +28,13 @@ const AdminDashboard = React.lazy(() => import('./pages/AdminDashboardPro'));
 const Layout = () => {
   useEffect(() => {
     // Initialize visitor tracking (silently, no UI)
-    const cleanup = initializeTracking();
-    return cleanup;
+    try {
+      const cleanup = initializeTracking();
+      return cleanup;
+    } catch (error) {
+      console.error('[Layout] Error initializing tracking:', error);
+      return () => {};
+    }
   }, []);
 
   return (
