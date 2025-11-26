@@ -28,11 +28,6 @@ const ProductDetail = () => {
   const [product, setProduct] = useState(null);
   const [imageError, setImageError] = useState(false);
 
-  // Generate random urgency data (in production, this would come from backend)
-  const viewingCount = Math.floor(Math.random() * 50) + 20;
-  const boughtCount = Math.floor(Math.random() * 30) + 10;
-  const leftCount = Math.floor(Math.random() * 40) + 15;
-
   useEffect(() => {
     const fetchProduct = async () => {
       setLoading(true);
@@ -214,24 +209,9 @@ const ProductDetail = () => {
                   </h1>
                 </div>
 
-                {/* Urgency Indicator */}
-                <div className="mb-4 bg-gradient-to-r from-red-500/20 to-orange-500/20 border border-red-500/30 backdrop-blur-sm text-white px-4 py-3 rounded-xl flex items-center gap-2 shadow-lg">
-                  <svg className="w-5 h-5 text-red-500 animate-pulse flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clipRule="evenodd" />
-                  </svg>
-                  <div className="flex-1">
-                    <p className="font-semibold text-sm sm:text-base text-red-100">
-                      <span className="text-red-300">{viewingCount} people</span> are viewing this • 
-                      <span className="text-orange-300"> {boughtCount} bought today</span> • 
-                      <span className="text-yellow-300"> Only {leftCount} left in stock!</span>
-                    </p>
-                  </div>
-                </div>
-
                 <p className="text-2xl font-semibold text-blue-400 mb-4">
                   PKR {parsePrice(product.price).toLocaleString()}
                 </p>
-
 
                 <h2 className="text-xl font-semibold mb-3">Specifications</h2>
                 <ul className="space-y-2 text-muted mb-8">

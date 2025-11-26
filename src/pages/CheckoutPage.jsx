@@ -288,21 +288,47 @@ export default function CheckoutPage() {
 
   if (orderPlaced) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-white">
+      <div className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-white flex items-center justify-center">
         <Navbar />
         <div className="max-w-2xl mx-auto px-4 py-20">
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-500 rounded-2xl p-8 text-center shadow-lg">
-            <CheckCircle className="w-20 h-20 text-green-600 mx-auto mb-6 animate-bounce" />
-            <h1 className="text-4xl font-bold text-green-700 mb-4">Order Placed Successfully! ✅</h1>
-            <p className="text-xl text-gray-700 mb-4">
-              Your order has been sent to WhatsApp. Our team will contact you shortly to confirm.
+          <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-500 rounded-2xl p-8 text-center shadow-2xl">
+            {/* Animated checkmark */}
+            <div className="mb-6 flex justify-center">
+              <div className="relative w-24 h-24">
+                <div className="absolute inset-0 bg-green-200 rounded-full animate-ping opacity-75"></div>
+                <div className="relative w-24 h-24 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-16 h-16 text-green-600 animate-bounce" />
+                </div>
+              </div>
+            </div>
+            
+            {/* Main heading with animation */}
+            <h1 className="text-4xl md:text-5xl font-bold text-green-700 mb-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+              Order Placed Successfully! ✅
+            </h1>
+            
+            {/* Subheading */}
+            <p className="text-xl text-gray-700 mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
+              Thank you for your purchase!
             </p>
-            <p className="text-lg text-gray-600 mb-8">
+            
+            {/* Order confirmation details */}
+            <div className="bg-white/60 backdrop-blur-sm rounded-xl p-6 mb-8 border border-green-200 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
+              <p className="text-gray-700 font-semibold mb-2">Order Confirmation</p>
+              <p className="text-sm text-gray-600">
+                Your order has been successfully placed and saved. You will receive an email confirmation shortly.
+              </p>
+            </div>
+            
+            {/* Redirect message */}
+            <p className="text-lg text-gray-600 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
               Redirecting to home page in 3 seconds...
             </p>
+            
+            {/* Button */}
             <button
               onClick={() => navigate('/')}
-              className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold py-3 px-8 rounded-lg transition-all shadow-md"
+              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-3 px-8 rounded-lg transition-all shadow-md hover:shadow-lg transform hover:scale-105 active:scale-95 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-400"
             >
               Back to Home
             </button>

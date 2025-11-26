@@ -55,12 +55,6 @@ export const ProductCard = ({ product, onClick, priority = false, showUrgency = 
       className="relative bg-white rounded-lg overflow-hidden shadow-lg border border-neutral-200 transition-transform hover:-translate-y-1 cursor-pointer"
       onClick={onClick}
     >
-      {/* Urgency Badge with Fire Animation - Only show for 2-4 products */}
-      {showUrgency && (
-        <div className={`absolute top-2 left-2 bg-gradient-to-r ${urgencyStyle.bg} backdrop-blur-sm text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1 z-10 shadow-lg animate-pulse`}>
-          <span className="font-semibold">{urgencyStyle.text}</span>
-        </div>
-      )}
 
       {/* Image Container */}
       <div className="relative aspect-square overflow-hidden bg-neutral-100">
@@ -96,19 +90,6 @@ export const ProductCard = ({ product, onClick, priority = false, showUrgency = 
           <span className="text-gray-500 text-xs ml-1">(4.{Math.floor(Math.random() * 9) + 1})</span>
         </div>
         
-        {/* Enhanced Urgency Indicators */}
-        <div className="flex items-center gap-2 mb-3 text-xs">
-          <span className="bg-red-100 text-red-700 px-2 py-1 rounded-full flex items-center gap-1">
-            👁️ {viewingCount} viewing
-          </span>
-          <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full flex items-center gap-1">
-            🛒 {boughtCount} bought
-          </span>
-        </div>
-        
-        <div className="text-xs text-orange-600 font-medium mb-3">
-          ⚡ Only {leftCount} left in stock!
-        </div>
         
         {/* Price Section */}
         <div className="flex items-baseline gap-2 mb-3">

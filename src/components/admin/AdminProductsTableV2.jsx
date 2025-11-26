@@ -10,8 +10,6 @@ const AdminProductsTableV2 = ({ showMessage }) => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [categories, setCategories] = useState([]);
   const [editingProduct, setEditingProduct] = useState(null);
   const [editData, setEditData] = useState({});
   const [savingEdit, setSavingEdit] = useState(false);
@@ -40,10 +38,6 @@ const AdminProductsTableV2 = ({ showMessage }) => {
       const allProds = Array.isArray(data) ? data : data.products || [];
       
       setAllProducts(allProds);
-      
-      // Extract unique categories
-      const uniqueCats = [...new Set(allProds.map(p => p.category).filter(Boolean))];
-      setCategories(uniqueCats.sort());
       
       // Load first page
       loadPage(1, allProds);
@@ -122,14 +116,8 @@ const AdminProductsTableV2 = ({ showMessage }) => {
   };
 
   const getFilteredProducts = useCallback(() => {
-    let filtered = allProducts;
-
-    if (selectedCategory) {
-      filtered = filtered.filter(p => p.category === selectedCategory);
-    }
-
-    return filtered;
-  }, [allProducts, selectedCategory]);
+    return allProducts;
+  }, [allProducts]);
 
   const loadPage = (pageNum, sourceProducts = null) => {
     const filtered = sourceProducts ? sourceProducts : getFilteredProducts();
@@ -147,10 +135,6 @@ const AdminProductsTableV2 = ({ showMessage }) => {
     setHasMore(end < filtered.length);
   };
 
-  // Handle category filter
-  useEffect(() => {
-    loadPage(1);
-  }, [selectedCategory]);
 
   const loadMore = () => {
     if (hasMore && !loading) {
@@ -344,27 +328,6 @@ Stock: ${product.stock || 0}`;
                 <X size={20} />
               </button>
             )}
-          </div>
-
-          {/* Category Filter */}
-          <div className="relative min-w-[200px]">
-            <Filter className="absolute left-3 top-3 text-blue-500" size={20} />
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-blue-200 rounded-lg text-gray-900 focus:outline-none focus:border-blue-500 transition appearance-none cursor-pointer"
-            >
-              <option value="">All Categories ({getFilteredProducts().length})</option>
-              {categories.map(cat => {
-                const count = allProducts.filter(p => p.category === cat).length;
-                return (
-                  <option key={cat} value={cat}>
-                    {cat} ({count})
-                  </option>
-                );
-              })}
-            </select>
-            <ChevronDown className="absolute right-3 top-3 text-blue-500 pointer-events-none" size={20} />
           </div>
         </div>
 

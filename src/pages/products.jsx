@@ -906,14 +906,6 @@ const ProductCard = ({ product, onClick, priority = false, onMissingImage, categ
   const imageUrl = getImageFromProduct(product) || '/placeholder.svg';
   const [hasNoImage, setHasNoImage] = useState(false);
 
-  // Generate random urgency data (in production, this would come from backend)
-  const viewingCount = Math.floor(Math.random() * 50) + 20;
-  const boughtCount = Math.floor(Math.random() * 30) + 10;
-  const leftCount = Math.floor(Math.random() * 40) + 15;
-  
-  // Show urgency indicator on only ~33% of products to look more realistic
-  const showUrgency = Math.random() < 0.33;
-
   // Handle image load error
   const handleImageError = useCallback(() => {
     setHasNoImage(true);
@@ -936,16 +928,6 @@ const ProductCard = ({ product, onClick, priority = false, onMissingImage, categ
             <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
           </svg>
           <span className="font-semibold">No Image</span>
-        </div>
-      )}
-
-      {/* Urgency Indicator - Only show on ~33% of products */}
-      {showUrgency && !hasNoImage && (
-        <div className="absolute top-2 left-2 bg-gradient-to-r from-red-500/90 to-orange-500/90 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 z-10 shadow-lg">
-          <svg className="w-3 h-3 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clipRule="evenodd" />
-          </svg>
-          <span className="font-semibold">{viewingCount} viewing • {boughtCount} bought • {leftCount} left</span>
         </div>
       )}
 

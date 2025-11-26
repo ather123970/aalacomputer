@@ -21,6 +21,7 @@ const AdminLoginNew = () => {
       const base = import.meta.env.VITE_API_URL || 'http://localhost:10000';
       
       console.log('[AdminLogin] Attempting login with API base:', base);
+      console.log('[AdminLogin] Username: admin, Password length:', password.length);
       
       // Send login request to backend
       const response = await fetch(`${base}/api/admin/login`, {
@@ -32,8 +33,12 @@ const AdminLoginNew = () => {
         })
       });
 
+      console.log('[AdminLogin] Response status:', response.status);
+      console.log('[AdminLogin] Response headers:', response.headers);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('[AdminLogin] Login successful, token received');
         // Store JWT token in sessionStorage (expires when browser closes)
         sessionStorage.setItem('aalacomp_admin_token', data.token);
         console.log('[AdminLogin] Token stored in sessionStorage - will expire on browser close');
@@ -44,12 +49,26 @@ const AdminLoginNew = () => {
         }, 500);
       } else {
         const errorData = await response.json();
+        console.log('[AdminLogin] Login failed:', errorData);
         setError(errorData.error || 'Invalid credentials');
         setLoading(false);
       }
     } catch (error) {
-      console.error('Login error:', error);
-      setError('Connection error. Please try again.');
+      console.error('Login error - Full error object:', error);
+      console.error('Login error - Message:', error?.message);
+      console.error('Login error - Stack:', error?.stack);
+      console.error('Login error - Type:', typeof error);
+      console.error('Login error - Constructor:', error?.constructor?.name);
+      
+      // Provide more specific error messages
+      let errorMsg = 'Connection error. Please try again.';
+      if (error?.message?.includes('Failed to fetch')) {
+        errorMsg = 'Cannot connect to backend. Make sure the server is running.';
+      } else if (error?.message) {
+        errorMsg = error.message;
+      }
+      
+      setError(errorMsg);
       setLoading(false);
     }
   };
