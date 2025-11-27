@@ -7,6 +7,7 @@ import { ArrowLeft, ShoppingCart, Tag, Plus, Check, X, Search } from "lucide-rea
 import SmartImage from '../components/SmartImage';
 import Nav from '../nav';
 import { useProductContext } from '../context/ProductContext';
+import { updateSEO } from '../utils/seoUtils';
 
 function parsePrice(price) {
   if (typeof price === "number") return price;
@@ -34,20 +35,20 @@ const ProductDetail = () => {
       try {
         const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
         console.log(`[ProductDetail] Fetching product with ID: ${id}`);
-        
+
         // Fetch product by ID directly from backend
         const response = await fetch(`${base}/api/product/${id}`, {
           cache: 'no-store'
         });
-        
+
         if (response.ok) {
           const foundProduct = await response.json();
           console.log('[ProductDetail] Product found:', foundProduct.name || foundProduct.Name);
           console.log('[ProductDetail] Image URL:', foundProduct.img || foundProduct.imageUrl);
-          
+
           // Use img or imageUrl - whichever has a value
           const imageUrl = foundProduct.img || foundProduct.imageUrl || foundProduct.image;
-          
+
           const productData = {
             id: foundProduct._id || foundProduct.id,
             _id: foundProduct._id || foundProduct.id,
@@ -62,7 +63,7 @@ const ProductDetail = () => {
             category: foundProduct.category,
             brand: foundProduct.brand
           };
-          
+
           setProduct(productData);
         } else {
           console.error('[ProductDetail] Failed to fetch product:', response.status);
@@ -78,6 +79,18 @@ const ProductDetail = () => {
 
     fetchProduct();
   }, [id, updateProduct]);
+
+  // Update SEO when product changes
+  useEffect(() => {
+    if (product) {
+      updateSEO({
+        title: `${product.Name} | Aala Computer`,
+        description: product.description || `Buy ${product.Name} at Aala Computer. Best price in Pakistan - PKR ${parsePrice(product.price).toLocaleString()}`,
+        image: product.imageUrl || product.img,
+        url: window.location.href
+      });
+    }
+  }, [product]);
 
   const handleImageError = (e) => {
     if (!imageError) {
@@ -109,7 +122,7 @@ const ProductDetail = () => {
 
       if (!res.ok) {
         let errMsg = `Server returned ${res.status}`
-        try { const j = await res.json(); if (j && (j.error || j.message)) errMsg = j.error || j.message } catch(e){}
+        try { const j = await res.json(); if (j && (j.error || j.message)) errMsg = j.error || j.message } catch (e) { }
         throw new Error(errMsg)
       }
       await res.json();
