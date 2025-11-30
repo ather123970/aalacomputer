@@ -22,8 +22,11 @@ const Checkout = React.lazy(() => import('./pages/Checkout'));
 const CheckoutPage = React.lazy(() => import('./pages/CheckoutPage'));
 const DealDetail = React.lazy(() => import('./pages/Dealdetail'));
 const Prebuilds = React.lazy(() => import('./pages/Prebuilds'));
+const OrderTracking = React.lazy(() => import('./pages/OrderTracking'));
 const AdminLogin = React.lazy(() => import('./pages/AdminLoginNew'));
 const AdminDashboard = React.lazy(() => import('./pages/AdminDashboardPro'));
+const AdminOrders = React.lazy(() => import('./pages/AdminOrders'));
+
 
 const Layout = () => {
   useEffect(() => {
@@ -33,7 +36,7 @@ const Layout = () => {
       return cleanup;
     } catch (error) {
       console.error('[Layout] Error initializing tracking:', error);
-      return () => {};
+      return () => { };
     }
   }, []);
 
@@ -56,91 +59,104 @@ export const router = createBrowserRouter([
     path: '/',
     element: <Layout />,
     children: [
-      { 
-        index: true, 
+      {
+        index: true,
         element: <ErrorBoundary><Home /></ErrorBoundary>
       },
-      { 
+      {
         path: 'categories',
         element: <ErrorBoundary><Products /></ErrorBoundary>
       },
-      { 
+      {
         path: 'category/:slug',
         element: <ErrorBoundary><Products /></ErrorBoundary>
       },
-      { 
+      {
         path: 'products',
         children: [
-          { 
-            index: true, 
+          {
+            index: true,
             element: <ErrorBoundary><Products /></ErrorBoundary>
           },
-          { 
-            path: ':id', 
+          {
+            path: ':id',
             element: <ErrorBoundary><ProductDetail /></ErrorBoundary>
           }
         ]
       },
-      { 
+      {
         path: 'deal',
         children: [
           { index: true, element: <ErrorBoundary><Deal /></ErrorBoundary> },
           { path: ':id', element: <ErrorBoundary><DealDetail /></ErrorBoundary> }
         ]
       },
-      { 
-        path: 'prebuild', 
-        element: <ErrorBoundary><Prebuilds /></ErrorBoundary> 
+      {
+        path: 'prebuild',
+        element: <ErrorBoundary><Prebuilds /></ErrorBoundary>
       },
-      { 
-        path: 'contact', 
-        element: <About /> 
+      {
+        path: 'contact',
+        element: <About />
       },
-      { 
-        path: 'cart', 
-        element: <Cart /> 
+      {
+        path: 'cart',
+        element: <Cart />
       },
-      { 
-        path: 'profile', 
-        element: <Profile /> 
+      {
+        path: 'profile',
+        element: <Profile />
       },
-      { 
-        path: 'auth', 
-        element: <AuthPage /> 
+      {
+        path: 'auth',
+        element: <AuthPage />
       },
-      { 
+      {
         path: 'checkout',
         element: <ErrorBoundary><CheckoutPage /></ErrorBoundary>
-      }
+      },
+      {
+        path: 'track-order',
+        element: <ErrorBoundary><OrderTracking /></ErrorBoundary>
+      },
+
     ]
   },
   {
     path: '/admin',
     children: [
       { path: 'login', element: <AdminLogin /> },
-      { 
-        index: true, 
+      {
+        index: true,
         element: (
           <ProtectedRoute>
             <AdminDashboard />
           </ProtectedRoute>
-        ) 
+        )
       },
-      { 
-        path: 'dashboard', 
+      {
+        path: 'dashboard',
         element: (
           <ProtectedRoute>
             <AdminDashboard />
           </ProtectedRoute>
-        ) 
+        )
       },
-      { 
-        path: 'products', 
+      {
+        path: 'products',
         element: (
           <ProtectedRoute>
             <AdminDashboard />
           </ProtectedRoute>
-        ) 
+        )
+      },
+      {
+        path: 'orders',
+        element: (
+          <ProtectedRoute>
+            <AdminOrders />
+          </ProtectedRoute>
+        )
       },
       // Image manager - shows ALL products at once
       // { path: 'images', element: <AdminImageManager /> },

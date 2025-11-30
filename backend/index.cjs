@@ -28,7 +28,7 @@ const path = require('path');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const compression = require('compression');
-const app=express()
+const app = express()
 // Trust proxy so req.protocol/hostname respect X-Forwarded-* when behind load balancers/proxies
 app.set('trust proxy', true);
 
@@ -68,13 +68,13 @@ app.use((req, res, next) => {
   else {
     res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   }
-  
+
   // ✅ SECURITY HEADERS
   res.set('X-Content-Type-Options', 'nosniff');
   res.set('X-Frame-Options', 'SAMEORIGIN');
   res.set('X-XSS-Protection', '1; mode=block');
   res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  
+
   next();
 });
 
@@ -107,13 +107,13 @@ app.use(cors({
       callback(null, true);
       return;
     }
-    
+
     // Check if origin is in allowed list (string match)
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
       return;
     }
-    
+
     // Check if origin matches any regex pattern
     for (const pattern of allowedOrigins) {
       if (pattern instanceof RegExp && pattern.test(origin)) {
@@ -121,7 +121,7 @@ app.use(cors({
         return;
       }
     }
-    
+
     // Origin not allowed
     callback(new Error('CORS not allowed for this origin: ' + origin));
   },
@@ -172,7 +172,7 @@ function parseBudget(text) {
   }
   if (!m) return null;
   let n = Number(String(m[2]).replace(/[,]/g, '')) || 0;
-  const mult = (m[3] || '').toLowerCase() === 'k' ? 1000 : ( (m[3] || '').toLowerCase() === 'm' ? 1000000 : 1 );
+  const mult = (m[3] || '').toLowerCase() === 'k' ? 1000 : ((m[3] || '').toLowerCase() === 'm' ? 1000000 : 1);
   return Math.round(n * mult);
 }
 
@@ -507,7 +507,7 @@ if (fs.existsSync(uploadsPath)) {
 // Test endpoint to check available images
 app.get('/api/test-images', (req, res) => {
   const imageDirectories = [];
-  
+
   if (fs.existsSync(zahImagesPath)) {
     const files = fs.readdirSync(zahImagesPath).slice(0, 10);
     const totalCount = fs.readdirSync(zahImagesPath).length;
@@ -526,7 +526,7 @@ app.get('/api/test-images', (req, res) => {
       error: 'Directory not found'
     });
   }
-  
+
   if (fs.existsSync(imagesPath)) {
     const files = fs.readdirSync(imagesPath).slice(0, 10);
     const totalCount = fs.readdirSync(imagesPath).length;
@@ -545,7 +545,7 @@ app.get('/api/test-images', (req, res) => {
       error: 'Directory not found'
     });
   }
-  
+
   if (fs.existsSync(publicPath)) {
     imageDirectories.push({
       path: '/public',
@@ -554,7 +554,7 @@ app.get('/api/test-images', (req, res) => {
       note: 'Static assets served from public/'
     });
   }
-  
+
   if (fs.existsSync(uploadsPath)) {
     const files = fs.readdirSync(uploadsPath).slice(0, 10);
     const totalCount = fs.readdirSync(uploadsPath).length;
@@ -566,11 +566,11 @@ app.get('/api/test-images', (req, res) => {
       sampleFiles: files.map(f => `/uploads/${f}`)
     });
   }
-  
+
   // Check if dist directory exists
   const distPath = path.join(__dirname, '..', 'dist');
   const distExists = fs.existsSync(distPath);
-  
+
   res.json({
     ok: true,
     message: 'Image serving status in production',
@@ -616,6 +616,20 @@ try {
   console.warn('[server] failed to mount orders router', e && e.message);
 }
 
+// Try to mount order tracking router (for tracking ID system)
+try {
+  const orderTrackingPath = path.join(__dirname, 'orderTracking.js');
+  if (fs.existsSync(orderTrackingPath)) {
+    const orderTrackingRouter = require('./orderTracking.js');
+    if (orderTrackingRouter && typeof orderTrackingRouter === 'function') {
+      app.use('/api/order-tracking', orderTrackingRouter);
+      console.log('[server] mounted /api/order-tracking routes from orderTracking.js');
+    }
+  }
+} catch (e) {
+  console.warn('[server] failed to mount order tracking router', e && e.message);
+}
+
 // in-memory cart (dev)
 const CART = [];
 
@@ -624,14 +638,14 @@ app.get('/api/ping', (req, res) => res.json({ ok: true, ts: Date.now() }));
 // Image proxy endpoint to handle external images with proper headers
 app.get('/api/image-proxy', async (req, res) => {
   const imageUrl = req.query.url;
-  
+
   if (!imageUrl) {
     return res.status(400).json({ error: 'URL parameter is required' });
   }
-  
+
   try {
     console.log('[image-proxy] Fetching:', imageUrl);
-    
+
     const fetch = (await import('node-fetch')).default;
     const response = await fetch(imageUrl, {
       headers: {
@@ -642,25 +656,25 @@ app.get('/api/image-proxy', async (req, res) => {
         'Cache-Control': 'no-cache'
       }
     });
-    
+
     if (!response.ok) {
       console.log('[image-proxy] Failed to fetch:', response.status, response.statusText);
       return res.status(404).json({ error: 'Image not found' });
     }
-    
+
     const contentType = response.headers.get('content-type');
     const buffer = await response.buffer();
-    
+
     // Set appropriate headers
     res.set({
       'Content-Type': contentType || 'image/jpeg',
       'Cache-Control': 'public, max-age=3600', // Cache for 1 hour (faster updates)
       'Access-Control-Allow-Origin': '*'
     });
-    
+
     console.log('[image-proxy] Successfully proxied image, size:', buffer.length);
     res.send(buffer);
-    
+
   } catch (error) {
     console.error('[image-proxy] Error:', error.message);
     res.status(500).json({ error: 'Failed to fetch image' });
@@ -681,44 +695,44 @@ app.get('/api/deployment-version', (req, res) => {
 // Helper function to find local image by product name
 function findLocalImageForProduct(productName) {
   if (!productName) return null;
-  
+
   const zahImagesPath = path.join(__dirname, '..', 'zah_images');
   const distImagesPath = path.join(__dirname, '..', 'dist', 'images');
-  
+
   const normalizeText = (text) => text.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
   const normalizedProductName = normalizeText(productName);
-  
+
   // Check both directories
   const searchDirs = [distImagesPath, zahImagesPath].filter(dir => fs.existsSync(dir));
-  
+
   for (const dir of searchDirs) {
     try {
-      const files = fs.readdirSync(dir).filter(f => 
+      const files = fs.readdirSync(dir).filter(f =>
         f.endsWith('.jpg') || f.endsWith('.jpeg') || f.endsWith('.png') || f.endsWith('.webp')
       );
-      
+
       // Try exact match first
       for (const file of files) {
         const fileNameWithoutExt = file.replace(/\.(jpg|jpeg|png|webp)$/i, '');
         const normalizedFileName = normalizeText(fileNameWithoutExt);
-        
+
         if (normalizedFileName === normalizedProductName) {
           return path.join(dir, file);
         }
       }
-      
+
       // Try partial match (60% of words match)
       for (const file of files) {
         const fileNameWithoutExt = file.replace(/\.(jpg|jpeg|png|webp)$/i, '');
         const normalizedFileName = normalizeText(fileNameWithoutExt);
-        
+
         const fileWords = normalizedFileName.split(' ').filter(w => w.length > 3);
         const productWords = normalizedProductName.split(' ').filter(w => w.length > 3);
-        
-        const matchingWords = fileWords.filter(word => 
+
+        const matchingWords = fileWords.filter(word =>
           productWords.some(pw => pw.includes(word) || word.includes(pw))
         );
-        
+
         if (matchingWords.length >= Math.floor(fileWords.length * 0.6) && matchingWords.length >= 2) {
           return path.join(dir, file);
         }
@@ -727,14 +741,14 @@ function findLocalImageForProduct(productName) {
       continue;
     }
   }
-  
+
   return null;
 }
 
 // Simple image proxy - fetches image from DB URL and serves it
 app.get('/api/product-image/:productId', async (req, res) => {
   const { productId } = req.params;
-  
+
   // CORS + cache headers (1 hour for faster updates)
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -744,7 +758,7 @@ app.get('/api/product-image/:productId', async (req, res) => {
   try {
     const mongoose = require('mongoose');
     const ProductModel = getProductModel();
-    
+
     // Try to find product in MongoDB
     if (ProductModel && mongoose.connection.readyState === 1) {
       const product = await ProductModel.findOne({
@@ -753,38 +767,38 @@ app.get('/api/product-image/:productId', async (req, res) => {
           { id: productId }
         ]
       }).select('img imageUrl images Name name title').lean();
-      
+
       if (product) {
         const productName = product.Name || product.name || product.title;
-        
+
         // STEP 1: Check database URL (imageUrl takes priority over img field)
         let imageUrl = product.imageUrl || product.img;
-        
+
         // Try images array if available
         if (!imageUrl && Array.isArray(product.images) && product.images.length > 0) {
           imageUrl = product.images[0].url || product.images[0];
         }
-        
+
         console.log(`[product-image] Product: ${productName}, imageUrl: ${imageUrl}`);
-        
+
         // STEP 2: If it's an EXTERNAL URL (http/https), redirect to proxy
         if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
           console.log(`[product-image] ✅ Redirecting to proxy for: ${imageUrl}`);
           return res.redirect(302, `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`);
         }
-        
+
         // STEP 3: If it's a local path (starts with /images/ or just filename), serve it
         if (imageUrl && !imageUrl.startsWith('http')) {
-          const fileName = imageUrl.startsWith('/images/') 
-            ? imageUrl.replace('/images/', '') 
+          const fileName = imageUrl.startsWith('/images/')
+            ? imageUrl.replace('/images/', '')
             : imageUrl.replace(/^\//, '');
-            
+
           const localPaths = [
             path.join(__dirname, '..', 'dist', 'images', fileName),
             path.join(__dirname, '..', 'zah_images', fileName),
             path.join(__dirname, '..', 'images', fileName)
           ];
-          
+
           for (const localPath of localPaths) {
             if (fs.existsSync(localPath)) {
               console.log(`[product-image] ✅ Serving local file from path: ${fileName}`);
@@ -796,16 +810,16 @@ app.get('/api/product-image/:productId', async (req, res) => {
                 '.webp': 'image/webp',
                 '.svg': 'image/svg+xml'
               }[ext] || 'image/jpeg';
-              
+
               res.set('Content-Type', contentType);
               return fs.createReadStream(localPath).pipe(res);
             }
           }
-          
+
           // If local path doesn't exist, try finding by product name
           console.log(`[product-image] Local path not found, trying by product name: ${productName}`);
         }
-        
+
         // STEP 4: Try to find local image by product name (for products with no URL or path not found)
         if (!imageUrl || (imageUrl && !imageUrl.startsWith('http'))) {
           console.log(`[product-image] No URL in database, checking for local image by name: ${productName}`);
@@ -819,7 +833,7 @@ app.get('/api/product-image/:productId', async (req, res) => {
               '.png': 'image/png',
               '.webp': 'image/webp'
             }[ext] || 'image/jpeg';
-            
+
             res.set('Content-Type', contentType);
             return fs.createReadStream(localImagePath).pipe(res);
           }
@@ -844,8 +858,8 @@ app.get('/api/product-image/:productId', async (req, res) => {
       res.set('Content-Type', 'image/svg+xml');
       return fs.createReadStream(svg).pipe(res);
     }
-  } catch (e) {}
-  
+  } catch (e) { }
+
   return res.status(200).end();
 });
 
@@ -862,7 +876,7 @@ app.get('/api/proxy-image', async (req, res) => {
     // Use weserv.nl as a reliable image proxy CDN
     // It handles image fetching, caching, and optimization
     const weservUrl = `https://images.weserv.nl/?url=${encodeURIComponent(originalUrl.replace(/^https?:\/\//, ''))}&output=webp&q=80`;
-    
+
     console.log(`[proxy-image] Redirecting to weserv for: ${originalUrl.substring(0, 60)}...`);
     return res.redirect(301, weservUrl);
 
@@ -931,11 +945,11 @@ app.get('/api/v1/config', (req, res) => {
 app.get('/api/v1/auth/me', (req, res) => {
   // Check for auth token in cookie or Authorization header
   const token = req.cookies.token || (req.headers.authorization && req.headers.authorization.replace(/^Bearer\s+/i, ''));
-  
+
   if (!token) {
     return res.status(401).json({ ok: false, error: 'not authenticated' });
   }
-  
+
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     return res.json({ ok: true, user: decoded });
@@ -961,7 +975,7 @@ app.get('/api/v1/cart', (req, res) => {
 app.get('/api/v1/products', async (req, res) => {
   // Add caching headers for better performance
   res.setHeader('Cache-Control', 'public, max-age=300'); // Cache for 5 minutes
-  
+
   // Get query parameters
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 32;
@@ -969,14 +983,14 @@ app.get('/api/v1/products', async (req, res) => {
   const category = req.query.category;
   const brand = req.query.brand;
   const search = req.query.search;
-  
+
   try {
     const mongoose = require('mongoose');
     const ProductModel = getProductModel();
     if (ProductModel && mongoose.connection.readyState === 1) {
       // Build query based on filters
       const query = {};
-      
+
       // Category filter
       if (category && category !== 'All') {
         query.$or = [
@@ -986,12 +1000,12 @@ app.get('/api/v1/products', async (req, res) => {
           { name: { $regex: category, $options: 'i' } }
         ];
       }
-      
+
       // Brand filter
       if (brand) {
         query.brand = { $regex: brand, $options: 'i' };
       }
-      
+
       // Search filter
       if (search) {
         query.$or = [
@@ -1003,10 +1017,10 @@ app.get('/api/v1/products', async (req, res) => {
           { Spec: { $regex: search, $options: 'i' } }
         ];
       }
-      
+
       // Count total documents for pagination
       const total = await ProductModel.countDocuments(query);
-      
+
       // Fetch products with pagination
       const docs = await ProductModel.find(query)
         .select('id Name name title price img imageUrl category brand description WARRANTY link Spec type')
@@ -1014,7 +1028,7 @@ app.get('/api/v1/products', async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit);
-      
+
       // Return paginated response
       return res.json({
         products: docs,
@@ -1024,13 +1038,13 @@ app.get('/api/v1/products', async (req, res) => {
         hasMore: skip + docs.length < total
       });
     }
-  } catch (e) { 
+  } catch (e) {
     console.warn('[v1/products] DB query failed, using file fallback', e && e.message);
   }
-  
+
   // Fallback to file with filtering
   let prods = readDataFile('products.json') || [];
-  
+
   // Apply filters
   if (category && category !== 'All') {
     prods = prods.filter(p => {
@@ -1040,7 +1054,7 @@ app.get('/api/v1/products', async (req, res) => {
       return productCategory.includes(selectedCat) || productName.includes(selectedCat);
     });
   }
-  
+
   if (brand) {
     const brandLower = brand.toLowerCase();
     prods = prods.filter(p => {
@@ -1049,7 +1063,7 @@ app.get('/api/v1/products', async (req, res) => {
       return productBrand.includes(brandLower) || productName.includes(brandLower);
     });
   }
-  
+
   if (search) {
     const searchLower = search.toLowerCase();
     prods = prods.filter(p => {
@@ -1058,11 +1072,11 @@ app.get('/api/v1/products', async (req, res) => {
       return productName.includes(searchLower) || productCategory.includes(searchLower);
     });
   }
-  
+
   // Implement pagination for file-based data
   const total = prods.length;
   const paginatedProds = prods.slice(skip, skip + limit);
-  
+
   res.json({
     products: paginatedProds,
     total,
@@ -1077,17 +1091,17 @@ app.get('/api/admin/stats', async (req, res) => {
   try {
     const mongoose = require('mongoose');
     const ProductModel = getProductModel();
-    
+
     if (ProductModel && mongoose.connection.readyState === 1) {
       // Get actual stats from database
       const totalProducts = await ProductModel.countDocuments();
-      const lowStockProducts = await ProductModel.countDocuments({ 
+      const lowStockProducts = await ProductModel.countDocuments({
         $or: [
           { stock: { $exists: true, $lt: 10 } },
           { stock: { $exists: false } }
         ]
       });
-      
+
       return res.json({
         ok: true,
         totalProducts,
@@ -1095,7 +1109,7 @@ app.get('/api/admin/stats', async (req, res) => {
         timestamp: new Date().toISOString()
       });
     }
-    
+
     // Fallback to file-based data
     const products = readDataFile('products.json') || [];
     return res.json({
@@ -1154,7 +1168,7 @@ function getProductModel() {
     // If model already created on mongoose, return it
     if (mongoose.models && mongoose.models.Product) return mongoose.models.Product;
     // Build schema with strict:false to allow additional fields from database
-    const schema = new mongoose.Schema(ProductSchemaDef, { 
+    const schema = new mongoose.Schema(ProductSchemaDef, {
       timestamps: false,
       strict: false // Allow additional fields from database
     });
@@ -1173,7 +1187,7 @@ function getPrebuildModel() {
     // If model already created on mongoose, return it
     if (mongoose.models && mongoose.models.Prebuild) return mongoose.models.Prebuild;
     // Build schema using same structure as Product
-    const schema = new mongoose.Schema(ProductSchemaDef, { 
+    const schema = new mongoose.Schema(ProductSchemaDef, {
       timestamps: false,
       strict: false
     });
@@ -1239,7 +1253,7 @@ async function ensureAdminUser() {
       // Delete ALL existing admins
       await AdminModel.deleteMany({});
       console.log('[admin] Removed all existing admin users');
-      
+
       // Create only the required admin
       const hash = await bcrypt.hash(password, 10);
       await new AdminModel({ username, passwordHash: hash, name: 'Site Admin', role: 'admin' }).save();
@@ -1319,14 +1333,14 @@ function requireAdmin(req) {
     console.log('[admin] ❌ no authorization header');
     return false;
   }
-  
+
   const parts = String(auth || '').split(' ');
   const token = parts.length === 2 ? parts[1] : parts[0];
   if (!token) {
     console.log('[admin] ❌ no token found in authorization header');
     return false;
   }
-  
+
   try {
     // ✅ FIXED: Ensure JWT_SECRET is consistent
     const decoded = jwt.verify(token, JWT_SECRET);
@@ -1336,14 +1350,14 @@ function requireAdmin(req) {
     console.error('[admin] ❌ token verification failed:', e.message);
     console.error('[admin] Token:', token.substring(0, 20) + '...');
     console.error('[admin] JWT_SECRET length:', JWT_SECRET.length);
-    
+
     // Check if it's an expiration issue
     if (e.name === 'TokenExpiredError') {
       console.log('[admin] ⚠️ Token has expired');
     } else if (e.name === 'JsonWebTokenError') {
       console.log('[admin] ⚠️ Invalid token format');
     }
-    
+
     return false;
   }
 }
@@ -1360,35 +1374,35 @@ app.put('/api/admin/products/:id', async (req, res) => {
   console.log(`  - imageUrl: ${payload.imageUrl || 'N/A'}`);
   console.log(`  - image: ${payload.image || 'N/A'}`);
   console.log(`[products UPDATE] Other fields: name=${payload.name || payload.title}, price=${payload.price}`);
-  
+
   try {
     const mongoose = require('mongoose');
     const ProductModel = getProductModel();
-    
+
     // Check MongoDB connection
     console.log(`[products UPDATE] MongoDB readyState: ${mongoose.connection.readyState}`);
     if (mongoose.connection.readyState !== 1) {
       console.error('[products UPDATE] MongoDB NOT CONNECTED! State:', mongoose.connection.readyState);
       return res.status(500).json({ ok: false, error: 'Database not connected' });
     }
-    
+
     if (!ProductModel) {
       console.error('[products UPDATE] ProductModel is NULL!');
       return res.status(500).json({ ok: false, error: 'Product model not initialized' });
     }
-    
+
     console.log('[products UPDATE] MongoDB Connected - Attempting update...');
-    
+
     // Try multiple approaches to find and update
     let doc = null;
     let method = '';
-    
+
     // Approach 1: Try with _id (MongoDB ObjectId)
     try {
       console.log(`[products UPDATE] Trying findByIdAndUpdate with id: ${id}`);
       doc = await ProductModel.findByIdAndUpdate(
-        id, 
-        { $set: { ...payload, updatedAt: new Date() } }, 
+        id,
+        { $set: { ...payload, updatedAt: new Date() } },
         { new: true, runValidators: false }
       );
       if (doc) {
@@ -1398,7 +1412,7 @@ app.put('/api/admin/products/:id', async (req, res) => {
     } catch (err) {
       console.log('[products UPDATE] findByIdAndUpdate failed:', err.message);
     }
-    
+
     // Approach 2: Try with custom id field
     if (!doc) {
       console.log(`[products UPDATE] Trying findOneAndUpdate with id field`);
@@ -1412,7 +1426,7 @@ app.put('/api/admin/products/:id', async (req, res) => {
         console.log('[products UPDATE] ✓ SUCCESS with findOneAndUpdate (id field)');
       }
     }
-    
+
     // Approach 3: Try with _id as string
     if (!doc) {
       console.log(`[products UPDATE] Trying findOneAndUpdate with _id field`);
@@ -1426,16 +1440,16 @@ app.put('/api/admin/products/:id', async (req, res) => {
         console.log('[products UPDATE] ✓ SUCCESS with findOneAndUpdate (_id field)');
       }
     }
-    
+
     if (!doc) {
       console.error(`[products UPDATE] ✗ PRODUCT NOT FOUND in MongoDB with ID: ${id}`);
       console.error('[products UPDATE] Database is connected but product does not exist');
       return res.status(404).json({ ok: false, error: 'Product not found in database' });
     }
-    
+
     console.log(`[products UPDATE] ✓✓✓ SUCCESS! Updated via ${method}`);
     console.log(`[products UPDATE] Updated product:`, doc._id, doc.title || doc.name || doc.Name);
-    
+
     // Verify the update by re-fetching from database
     const verifyDoc = await ProductModel.findById(doc._id).lean();
     if (verifyDoc) {
@@ -1445,7 +1459,7 @@ app.put('/api/admin/products/:id', async (req, res) => {
       console.log(`  - imageUrl: ${verifyDoc.imageUrl || 'N/A'}`);
       console.log(`  - image: ${verifyDoc.image || 'N/A'}`);
       console.log(`[products UPDATE] Name in DB: ${verifyDoc.Name || verifyDoc.name || verifyDoc.title}`);
-      
+
       // Check if all image fields are synced
       const imgFields = [verifyDoc.img, verifyDoc.imageUrl, verifyDoc.image].filter(Boolean);
       const allSynced = imgFields.length > 0 && imgFields.every(f => f === imgFields[0]);
@@ -1454,22 +1468,22 @@ app.put('/api/admin/products/:id', async (req, res) => {
       console.log(`[products UPDATE] ⚠️ WARNING: Could not verify update`);
     }
     console.log(`[products UPDATE] ========================================`);
-    
+
     // Clear cache headers to force image refresh on client
     res.set({
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Pragma': 'no-cache',
       'Expires': '0'
     });
-    
-    return res.json({ 
-      ok: true, 
-      product: doc, 
+
+    return res.json({
+      ok: true,
+      product: doc,
       message: `Updated via ${method}`,
       timestamp: Date.now(), // Help client bust image cache
       verified: !!verifyDoc
     });
-    
+
   } catch (err) {
     console.error('[products UPDATE] ✗✗✗ FATAL ERROR:', err);
     console.error('[products UPDATE] Stack:', err.stack);
@@ -1512,7 +1526,7 @@ app.post('/api/admin/products', async (req, res) => {
       if (ProductModel && mongoose.connection.readyState === 1) {
         // Generate unique ID
         const id = payload.id || `p_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        
+
         // Create product document
         const doc = new ProductModel({
           id,
@@ -1544,7 +1558,7 @@ app.post('/api/admin/products', async (req, res) => {
       console.log('[product] Falling back to file storage');
       const prods = readDataFile('products.json') || [];
       const id = payload.id || `p_${Date.now()}`;
-      const newProd = { 
+      const newProd = {
         id,
         ...payload,
         createdAt: new Date().toISOString(),
@@ -1571,7 +1585,7 @@ app.post('/api/admin/products', async (req, res) => {
 // Delete product
 app.delete('/api/admin/products/:id', async (req, res) => {
   if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
-  
+
   const id = req.params.id;
   if (!id) return res.status(400).json({ ok: false, error: 'product id is required' });
 
@@ -1597,14 +1611,14 @@ app.delete('/api/admin/products/:id', async (req, res) => {
     if (!result) {
       result = await ProductModel.findOneAndDelete({ id: String(id) });
     }
-    
+
     if (!result) {
       console.error(`[product] Product ${id} not found in database`);
       return res.status(404).json({ ok: false, error: 'product not found' });
     }
 
     console.log(`[product] Successfully deleted product ${id} from database`);
-    
+
     // Also remove from local file if it exists (for backward compatibility)
     try {
       const prods = readDataFile('products.json');
@@ -1636,40 +1650,40 @@ app.get('/api/chatbase/search', async (req, res) => {
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Content-Type', 'application/json');
-    
+
     // Optional: API key security (uncomment to enable)
     // const apiKey = req.headers['authorization']?.replace('Bearer ', '');
     // const CHATBASE_API_KEY = process.env.CHATBASE_API_KEY || 'your-secret-key';
     // if (apiKey !== CHATBASE_API_KEY) {
     //   return res.status(401).json({ error: 'Unauthorized' });
     // }
-    
+
     // Get search query
     const query = req.query.q || '';
-    
+
     if (!query || query.trim().length === 0) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Query parameter "q" is required',
         example: '/api/chatbase/search?q=RGB+8GB+RAM'
       });
     }
-    
+
     console.log(`[chatbase-search] Query: "${query}"`);
-    
+
     // Get MongoDB connection
     const mongoose = require('mongoose');
     const ProductModel = getProductModel();
-    
+
     if (!ProductModel || mongoose.connection.readyState !== 1) {
       return res.status(503).json({ error: 'Database not connected' });
     }
-    
+
     // Build search query - search across multiple fields
     const searchTerms = query.trim().split(/\s+/).filter(Boolean);
-    
+
     // Create regex patterns for each search term (case-insensitive)
     const regexPatterns = searchTerms.map(term => new RegExp(term, 'i'));
-    
+
     // Search in name, title, category, brand, description, specs
     const searchQuery = {
       $or: [
@@ -1685,16 +1699,16 @@ app.get('/api/chatbase/search', async (req, res) => {
         { $and: searchTerms.map(term => ({ title: new RegExp(term, 'i') })) }
       ]
     };
-    
+
     // Execute search with limit of 20 results
     const results = await ProductModel
       .find(searchQuery)
       .select('_id id name title category brand price img imageUrl description')
       .limit(20)
       .lean();
-    
+
     console.log(`[chatbase-search] Found ${results.length} results for "${query}"`);
-    
+
     // Format results for Chatbase
     const formattedResults = results.map(product => {
       const productId = product._id || product.id;
@@ -1704,7 +1718,7 @@ app.get('/api/chatbase/search', async (req, res) => {
       const productUrl = `https://www.aalacomputer.com/products/${productId}`;
       const productImage = product.imageUrl || product.img || '';
       const productBrand = product.brand || '';
-      
+
       return {
         id: String(productId),
         name: productName,
@@ -1716,7 +1730,7 @@ app.get('/api/chatbase/search', async (req, res) => {
         description: product.description ? product.description.substring(0, 200) : ''
       };
     });
-    
+
     // Return results
     return res.json({
       success: true,
@@ -1724,12 +1738,12 @@ app.get('/api/chatbase/search', async (req, res) => {
       count: formattedResults.length,
       results: formattedResults
     });
-    
+
   } catch (error) {
     console.error('[chatbase-search] Error:', error.message);
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: 'Search failed',
-      message: error.message 
+      message: error.message
     });
   }
 });
@@ -1740,7 +1754,7 @@ app.get('/broken-images-report', (req, res) => {
     const fs = require('fs');
     const path = require('path');
     const reportPath = path.join(__dirname, 'broken-images-report.json');
-    
+
     if (fs.existsSync(reportPath)) {
       res.sendFile(reportPath);
     } else {
@@ -1757,7 +1771,7 @@ app.get('/broken-images', (req, res) => {
     const fs = require('fs');
     const path = require('path');
     const viewerPath = path.join(__dirname, 'broken-images-viewer.html');
-    
+
     if (fs.existsSync(viewerPath)) {
       res.sendFile(viewerPath);
     } else {
@@ -1772,43 +1786,43 @@ app.get('/broken-images', (req, res) => {
 app.get('/api/products', async (req, res) => {
   // Add caching headers for better performance
   res.setHeader('Cache-Control', 'public, max-age=300'); // Cache for 5 minutes
-  
+
   // Get query parameters
   const page = parseInt(req.query.page) || 1;
   let limit = parseInt(req.query.limit) || 2500; // Default 2500 for first load, then 3000 more
-  
+
   // Cap limit to 5000 max per request (2500 initial + 3000 more = 5000 total per request)
   if (limit > 5000) limit = 5000;
-  
+
   // Validate page and limit
   if (page < 1) page = 1;
   if (limit < 1) limit = 2500;
-  
+
   const skip = (page - 1) * limit;
   const category = req.query.category;
   const brand = req.query.brand;
   const search = req.query.search;
-  
+
   try {
     const mongoose = require('mongoose');
-    
+
     // Ensure DB connection with retries
     let connected = false;
     let retries = 0;
     const maxRetries = 3;
-    
+
     while (!connected && retries < maxRetries) {
       if (mongoose.connection.readyState === 1) {
         connected = true;
         break;
       }
-      
+
       try {
         // Connect to MongoDB Atlas
         const MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://uni804043_db_user:2124377as@cluster0.0cy1usa.mongodb.net/aalacomputer?retryWrites=true&w=majority';
-        
+
         console.log(`[products] Connection attempt ${retries + 1}/${maxRetries}...`);
-        
+
         await mongoose.connect(MONGO_URI, {
           useNewUrlParser: true,
           useUnifiedTopology: true,
@@ -1818,7 +1832,7 @@ app.get('/api/products', async (req, res) => {
           maxPoolSize: 10,
           family: 4
         });
-        
+
         connected = true;
         console.log('[products] ✅ Connected to MongoDB Atlas');
       } catch (err) {
@@ -1829,16 +1843,16 @@ app.get('/api/products', async (req, res) => {
         }
       }
     }
-    
+
     if (!connected) {
       console.error('[products] ❌ Failed to connect to MongoDB after retries');
-      return res.status(503).json({ 
-        ok: false, 
+      return res.status(503).json({
+        ok: false,
         error: 'MongoDB connection failed. Please try again.',
         source: 'none'
       });
     }
-    
+
     // Get product collection model
     let ProductModel;
     if (mongoose.models && mongoose.models.Product) {
@@ -1847,20 +1861,20 @@ app.get('/api/products', async (req, res) => {
       const schema = new mongoose.Schema({}, { strict: false });
       ProductModel = mongoose.model('Product', schema, 'products');
     }
-    
+
     // Build query based on filters
     const query = {};
-    
+
     // Category filter - EXACT match only
     if (category && category !== 'All') {
       query.category = { $regex: `^${category}$`, $options: 'i' };
     }
-    
+
     // Brand filter
     if (brand) {
       query.brand = { $regex: brand, $options: 'i' };
     }
-    
+
     // Search filter
     if (search) {
       query.$or = [
@@ -1871,7 +1885,7 @@ app.get('/api/products', async (req, res) => {
         { brand: { $regex: search, $options: 'i' } }
       ];
     }
-    
+
     // Fetch count and products in parallel with timeout
     const countPromise = ProductModel.countDocuments(query).maxTimeMS(30000);
     const docsPromise = ProductModel.find(query)
@@ -1880,11 +1894,11 @@ app.get('/api/products', async (req, res) => {
       .limit(limit)
       .maxTimeMS(30000)
       .exec();
-    
+
     const [total, docs] = await Promise.all([countPromise, docsPromise]);
-    
+
     console.log(`[products] ✅ SUCCESS: page=${page}, limit=${limit}, returned ${docs.length}/${total} products`);
-    
+
     return res.json({
       products: docs,
       total,
@@ -1894,26 +1908,26 @@ app.get('/api/products', async (req, res) => {
       hasMore: skip + docs.length < total,
       source: 'mongodb'
     });
-    
-  } catch (e) { 
+
+  } catch (e) {
     console.error('[products] ❌ Error:', e.message);
-    
+
     // Try to use cached data as fallback
     try {
       const fs = require('fs');
       const path = require('path');
       const cacheFile = path.join(__dirname, 'products-cache.json');
-      
+
       if (fs.existsSync(cacheFile)) {
         console.log('[products] Using cached products from file...');
         const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
-        
+
         if (cached && cached.products && Array.isArray(cached.products)) {
           const allProds = cached.products;
           const startIdx = skip;
           const endIdx = skip + limit;
           const paginated = allProds.slice(startIdx, endIdx);
-          
+
           return res.json({
             products: paginated,
             total: allProds.length,
@@ -1928,9 +1942,9 @@ app.get('/api/products', async (req, res) => {
     } catch (cacheErr) {
       console.error('[products] Cache fallback failed:', cacheErr.message);
     }
-    
-    return res.status(503).json({ 
-      ok: false, 
+
+    return res.status(503).json({
+      ok: false,
       error: 'Database error. Please check MongoDB connection and whitelist your IP in MongoDB Atlas.',
       details: e.message,
       source: 'none'
@@ -1942,7 +1956,7 @@ app.get('/api/products', async (req, res) => {
 app.get('/api/admin/products', async (req, res) => {
   try {
     console.log('[admin/products] Request received');
-    
+
     // Check authentication first
     if (!requireAdmin(req)) {
       console.log('[admin/products] Unauthorized request');
@@ -1954,15 +1968,15 @@ app.get('/api/admin/products', async (req, res) => {
     let page = parseInt(req.query.page) || 1;
     const search = req.query.search || req.query.q || ''; // Support both 'search' and 'q' parameters
     const fetchAll = req.query.fetchAll === 'true'; // Fetch all products flag
-    
+
     // Validate and constrain parameters
     if (limit < 1) limit = 50;
     if (limit > 10000) limit = 10000;  // Cap at 10000 products to allow loading all 4k+ products
     if (page < 1) page = 1;
-    
+
     // Calculate skip
     const skip = (page - 1) * limit;
-    
+
     console.log(`[admin/products] limit=${limit}, page=${page}, skip=${skip}, search="${search}", fetchAll=${fetchAll}`);
     console.log(`[admin/products] 📊 Will return products ${skip + 1} to ${skip + limit}`);
 
@@ -1970,12 +1984,12 @@ app.get('/api/admin/products', async (req, res) => {
     try {
       console.log('[admin/products] Checking database connection');
       const mongoose = require('mongoose');
-      
+
       // Check MongoDB connection
       if (!mongoose.connection.readyState) {
         console.log('[admin/products] MongoDB not connected, attempting connection...');
         const MONGO_URI = process.env.MONGODB_URI;
-        
+
         if (!MONGO_URI) {
           console.log('[admin/products] MONGO_URI not configured, falling back to file storage');
           const prods = readDataFile('products.json') || [];
@@ -2003,12 +2017,12 @@ app.get('/api/admin/products', async (req, res) => {
       if (ProductModel && mongoose.connection.readyState === 1) {
         // Build query
         let query = {};
-        
+
         // Category filter with smart filtering
         const category = req.query.category || req.query.cat || '';
         if (category && category !== 'All' && category !== '') {
           console.log(`[admin/products] Filtering by category: "${category}"`);
-          
+
           // Smart filtering for Processor category
           if (category.toLowerCase() === 'processor') {
             // Only show actual CPUs (Intel/AMD), not GPUs with those names
@@ -2041,20 +2055,20 @@ app.get('/api/admin/products', async (req, res) => {
             ];
           }
         }
-        
+
         // Search across multiple fields - improved flexible matching with fallback
         if (search) {
           const searchTerm = search.trim();
           console.log(`[admin/products] Searching for: "${searchTerm}" (length: ${searchTerm.length})`);
-          
+
           // For very long search terms (100+ chars), split into key words
           let searchQueries = [];
-          
+
           if (searchTerm.length > 100) {
             // Split long search into key words (first 3-4 words)
             const words = searchTerm.split(/\s+/).slice(0, 4).join(' ');
             console.log(`[admin/products] Long search term detected, using key words: "${words}"`);
-            
+
             // Try with key words first
             searchQueries.push({
               $or: [
@@ -2064,7 +2078,7 @@ app.get('/api/admin/products', async (req, res) => {
               ]
             });
           }
-          
+
           // Also try full phrase match
           searchQueries.push({
             $or: [
@@ -2078,10 +2092,10 @@ app.get('/api/admin/products', async (req, res) => {
               { Spec: { $regex: searchTerm, $options: 'i' } }
             ]
           });
-          
+
           // Use $or to try multiple search strategies
           const searchQuery = { $or: searchQueries };
-          
+
           // Combine category filter with search filter
           if (query.$or) {
             // If category filter exists, combine with search using $and
@@ -2095,21 +2109,21 @@ app.get('/api/admin/products', async (req, res) => {
             // No category filter, just use search
             query = searchQuery;
           }
-          
+
           console.log(`[admin/products] Search query: Multi-strategy matching (${searchQueries.length} strategies)`);
         }
-        
+
         // Get total count
         console.log(`[admin/products] Counting documents with query...`);
         const total = await ProductModel.countDocuments(query);
         console.log(`[admin/products] Total documents found: ${total}`);
-        
+
         // Fetch products with pagination (ALWAYS paginate, even with search)
         let docs;
         const skip = (page - 1) * limit;
-        
+
         console.log(`[admin/products] Skip: ${skip}, Limit: ${limit}, Page: ${page}`);
-        
+
         if (fetchAll && !search) {
           // Only fetch all if explicitly requested AND no search term
           console.log(`[admin/products] Fetching ALL products (fetchAll mode)...`);
@@ -2129,29 +2143,29 @@ app.get('/api/admin/products', async (req, res) => {
             .exec();
           console.log(`[admin/products] ✅ Fetched ${docs.length} of ${total} products (page ${page}, search: ${!!search})`);
         }
-        
+
         // Validate and mark products with missing/failed images - ONLY on fetched docs
         docs = docs.map(doc => {
           const primaryUrl = doc.imageUrl || doc.img || doc.image || '';
           const url = String(primaryUrl).trim();
-          
+
           // Check if image is missing or invalid
-          const hasMissingImage = !url || 
-            url === 'undefined' || 
-            url === 'null' || 
-            url === '/placeholder.svg' || 
-            url.startsWith('/fallback/') || 
+          const hasMissingImage = !url ||
+            url === 'undefined' ||
+            url === 'null' ||
+            url === '/placeholder.svg' ||
+            url.startsWith('/fallback/') ||
             url.startsWith('data:image/svg+xml');
-          
+
           return {
             ...doc,
             _hasMissingImage: hasMissingImage
           };
         });
-        
-        return res.json({ 
-          ok: true, 
-          products: docs, 
+
+        return res.json({
+          ok: true,
+          products: docs,
           total: total,
           page: page,
           limit: limit,
@@ -2173,8 +2187,8 @@ app.get('/api/admin/products', async (req, res) => {
   } catch (e) {
     console.error('[admin/products] Fatal error:', e.message);
     console.error(e.stack);
-    return res.status(500).json({ 
-      ok: false, 
+    return res.status(500).json({
+      ok: false,
       error: 'Internal server error',
       details: process.env.NODE_ENV === 'development' ? e.message : undefined
     });
@@ -2191,14 +2205,14 @@ app.get('/api/admin/products-missing-images', async (req, res) => {
     console.log('[admin/products-missing-images] Fetching products with missing/placeholder images');
 
     const mongoose = require('mongoose');
-    
+
     if (mongoose.connection.readyState !== 1) {
       console.log('[admin/products-missing-images] MongoDB not connected');
       return res.status(500).json({ ok: false, error: 'Database not connected' });
     }
 
     const ProductModel = getProductModel();
-    
+
     // Query for products with missing or placeholder images
     const missingImageProducts = await ProductModel.find({
       $or: [
@@ -2216,9 +2230,9 @@ app.get('/api/admin/products-missing-images', async (req, res) => {
         { image: { $regex: '/images/placeholder|/assets/placeholder|/img/default|/public/placeholder', $options: 'i' } }
       ]
     })
-    .select('_id name title img imageUrl image category price')
-    .limit(1000)
-    .lean();
+      .select('_id name title img imageUrl image category price')
+      .limit(1000)
+      .lean();
 
     console.log(`[admin/products-missing-images] Found ${missingImageProducts.length} products with missing/placeholder images`);
 
@@ -2226,8 +2240,8 @@ app.get('/api/admin/products-missing-images', async (req, res) => {
 
   } catch (err) {
     console.error('[admin/products-missing-images] Error:', err.message);
-    return res.status(500).json({ 
-      ok: false, 
+    return res.status(500).json({
+      ok: false,
       error: 'Failed to fetch products with missing images'
     });
   }
@@ -2237,9 +2251,9 @@ app.get('/api/admin/products-missing-images', async (req, res) => {
 // Helper function to extract image from Bing
 const extractImageFromBing = async (searchQuery) => {
   const axios = require('axios');
-  
+
   const bingSearchUrl = `https://www.bing.com/images/search?q=${encodeURIComponent(searchQuery)}&form=HDRSC2&first=1&tsc=ImageBasicHover`;
-  
+
   const response = await axios.get(bingSearchUrl, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -2254,7 +2268,7 @@ const extractImageFromBing = async (searchQuery) => {
 
   const html = response.data;
   const imageUrls = [];
-  
+
   // Method 1: Look for murl in the m attribute (Bing's format)
   const mMatches = html.match(/m="([^"]+)"/g);
   if (mMatches) {
@@ -2278,7 +2292,7 @@ const extractImageFromBing = async (searchQuery) => {
       }
     }
   }
-  
+
   // Method 2: Direct image URL extraction
   if (imageUrls.length === 0) {
     const directMatches = html.match(/https?:\/\/[^\s"'`<>&]+\.(jpg|jpeg|png|gif|webp)/gi);
@@ -2286,14 +2300,14 @@ const extractImageFromBing = async (searchQuery) => {
       imageUrls.push(...directMatches);
     }
   }
-  
+
   // Filter and return the first valid image
   for (const url of imageUrls) {
     if (url.length > 50 && !url.includes('bing.com') && !url.includes('gstatic.com')) {
       return url;
     }
   }
-  
+
   return null;
 };
 
@@ -2304,16 +2318,16 @@ const simplifyProductName = (fullName) => {
   // "Apple MacBook 14 inch blue color" -> "Apple MacBook"
   // "SteelSeries Arctis Nova 3P Wireless Multi-Platform Gaming Headset – White" -> "SteelSeries Arctis Nova"
   // "MSI MAG PANO M100R PZ Premium Mid-Tower Gaming PC Case – White" -> "MSI MAG PANO"
-  
+
   // Remove common color words
   let simplified = fullName.replace(/\b(blue|black|white|red|green|silver|gold|gray|grey|pink|purple|yellow|orange|brown|beige|transparent|matte|glossy|metallic)\b/gi, '');
-  
+
   // Remove common descriptors
   simplified = simplified.replace(/\b(inch|color|style|version|edition|model|variant|pro|max|plus|lite|standard|premium|deluxe|ultimate|professional)\b/gi, '');
-  
+
   // Remove special characters and extra spaces
   simplified = simplified.replace(/[–\-—]/g, ' ').replace(/\s+/g, ' ').trim();
-  
+
   // Take first 2-3 words (usually brand + product type)
   const words = simplified.split(' ').filter(w => w.length > 0);
   return words.slice(0, 3).join(' ');
@@ -2326,7 +2340,7 @@ app.post('/api/admin/extract-image', async (req, res) => {
     }
 
     const { productName } = req.body;
-    
+
     if (!productName) {
       return res.status(400).json({ ok: false, error: 'Product name required' });
     }
@@ -2337,66 +2351,66 @@ app.post('/api/admin/extract-image', async (req, res) => {
       // Try 1: Search with full product name
       console.log('[extract-image] 📍 Attempt 1: Full product name search');
       let imageUrl = await extractImageFromBing(productName);
-      
+
       if (imageUrl) {
         console.log('[extract-image] ✅ Found with full name:', imageUrl);
-        return res.json({ 
-          ok: true, 
+        return res.json({
+          ok: true,
           imageUrl: imageUrl,
           source: 'bing-images',
           searchType: 'full-name'
         });
       }
-      
+
       // Try 2: Search with simplified name (brand + product type only)
       const simplifiedName = simplifyProductName(productName);
       if (simplifiedName !== productName) {
         console.log('[extract-image] 📍 Attempt 2: Simplified search -', simplifiedName);
         imageUrl = await extractImageFromBing(simplifiedName);
-        
+
         if (imageUrl) {
           console.log('[extract-image] ✅ Found with simplified name:', imageUrl);
-          return res.json({ 
-            ok: true, 
+          return res.json({
+            ok: true,
             imageUrl: imageUrl,
             source: 'bing-images',
             searchType: 'simplified-name'
           });
         }
       }
-      
+
       // Try 3: Search with just the brand name
       const brandName = productName.split(' ')[0];
       if (brandName && brandName.length > 2) {
         console.log('[extract-image] 📍 Attempt 3: Brand only search -', brandName);
         imageUrl = await extractImageFromBing(brandName);
-        
+
         if (imageUrl) {
           console.log('[extract-image] ✅ Found with brand name:', imageUrl);
-          return res.json({ 
-            ok: true, 
+          return res.json({
+            ok: true,
             imageUrl: imageUrl,
             source: 'bing-images',
             searchType: 'brand-only'
           });
         }
       }
-      
+
       console.log('[extract-image] ❌ No image found after all attempts');
       return res.status(404).json({ ok: false, error: 'No image found' });
 
     } catch (error) {
       console.error('[extract-image] Error:', error.message);
-      return res.status(500).json({ 
-        ok: false, 
+      return res.status(500).json({
+        ok: false,
         error: 'Failed to extract image'
       });
     }
 
   } catch (err) {
     console.error('[extract-image] Error:', err.message);
-    return res.status(500).json({ 
-      ok: false, 
+    return res.status(500).json({
+      ok: false,
       error: 'Internal server error'
     });
   }
@@ -2406,12 +2420,12 @@ app.post('/api/admin/extract-image', async (req, res) => {
 app.get('/api/product/:id', (req, res) => {
   // Short cache to show admin updates quickly
   res.setHeader('Cache-Control', 'public, max-age=30, must-revalidate'); // Cache for 30 seconds only
-  
+
   const id = req.params.id;
   try {
     const mongoose = require('mongoose');
     const ProductModel = getProductModel();
-    
+
     if (ProductModel && mongoose.connection.readyState === 1) {
       // OPTIMIZED: Direct findById or findOne with lean() for faster reads
       ProductModel.findOne({
@@ -2420,19 +2434,19 @@ app.get('/api/product/:id', (req, res) => {
           { id: String(id) }
         ]
       })
-      .select('id Name name title price img imageUrl image category category_id brand description WARRANTY link Spec type inStock')
-      .lean() // Much faster than full Mongoose documents
-      .then((doc) => {
-        if (!doc) return res.status(404).json({ ok: false, error: 'product not found' });
-        return res.json(doc);
-      })
-      .catch(err => {
-        console.error('[product/:id] product get failed', err && (err.stack || err.message));
-        res.status(500).json({ ok: false, error: 'db error' });
-      });
+        .select('id Name name title price img imageUrl image category category_id brand description WARRANTY link Spec type inStock')
+        .lean() // Much faster than full Mongoose documents
+        .then((doc) => {
+          if (!doc) return res.status(404).json({ ok: false, error: 'product not found' });
+          return res.json(doc);
+        })
+        .catch(err => {
+          console.error('[product/:id] product get failed', err && (err.stack || err.message));
+          res.status(500).json({ ok: false, error: 'db error' });
+        });
       return;
     }
-    
+
     // Fallback to file
     const prods = readDataFile('products.json') || [];
     const product = prods.find(p => String(p.id) === String(id) || String(p._id) === String(id));
@@ -2477,12 +2491,12 @@ app.get('/api/products/:id', (req, res) => {
 // Products stats summary endpoint (protected)
 app.get('/api/products/stats/summary', (req, res) => {
   if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
-  (async function(){
+  (async function () {
     try {
       const mongoose = require('mongoose');
       let total = 0;
       let topProducts = [];
-      
+
       const ProductModel = getProductModel();
       if (ProductModel && mongoose.connection.readyState === 1) {
         total = await ProductModel.countDocuments();
@@ -2509,7 +2523,7 @@ app.get('/api/products/stats/summary', (req, res) => {
           .sort((a, b) => b.sold - a.sold)
           .slice(0, 5);
       }
-      
+
       res.json({ total, top: topProducts });
     } catch (err) {
       console.error('stats summary error', err && err.message);
@@ -2554,13 +2568,13 @@ app.get('/api/deals', (req, res) => {
       DealModel.find({}).lean().sort({ createdAt: -1 }).then((docs) => {
         res.setHeader('Content-Type', 'application/json');
         res.json(docs || []);
-      }).catch(err => { 
-        console.error('[deals] list failed', err && (err.stack || err.message)); 
-        res.status(500).json({ ok: false, error: 'db error' }); 
+      }).catch(err => {
+        console.error('[deals] list failed', err && (err.stack || err.message));
+        res.status(500).json({ ok: false, error: 'db error' });
       });
       return;
     }
-  } catch (e) { 
+  } catch (e) {
     console.error('[deals] error:', e);
   }
   const deals = readDataFile('deals.json') || [];
@@ -2571,7 +2585,7 @@ app.get('/api/deals', (req, res) => {
 // PROTECTED: Create deal
 app.post('/api/admin/deals', async (req, res) => {
   if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
-  
+
   const payload = req.body || {};
   if (!payload.name && !payload.title) {
     return res.status(400).json({ ok: false, error: 'Product name or title is required' });
@@ -2602,7 +2616,7 @@ app.post('/api/admin/deals', async (req, res) => {
       console.log(`[deal] Created new deal: ${id}`);
       return res.json({ ok: true, product: doc.toObject() });
     }
-    
+
     const deals = readDataFile('deals.json') || [];
     const id = payload.id || `d_${Date.now()}`;
     const newDeal = { id, ...payload, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
@@ -2621,9 +2635,9 @@ app.get('/api/prebuilds', (req, res) => {
     const mongoose = require('mongoose');
     const PrebuildModel = getPrebuildModel();
     if (PrebuildModel && mongoose.connection.readyState === 1) {
-      PrebuildModel.find({}).lean().sort({ createdAt: -1 }).then((docs) => res.json(docs)).catch(err => { 
-        console.error('[prebuilds] list failed', err && (err.stack || err.message)); 
-        res.status(500).json({ ok: false, error: 'db error' }); 
+      PrebuildModel.find({}).lean().sort({ createdAt: -1 }).then((docs) => res.json(docs)).catch(err => {
+        console.error('[prebuilds] list failed', err && (err.stack || err.message));
+        res.status(500).json({ ok: false, error: 'db error' });
       });
       return;
     }
@@ -2636,14 +2650,14 @@ app.get('/api/prebuilds', (req, res) => {
 app.get('/api/videos', (req, res) => {
   try {
     const videos = safeLoadJSON('videos.json') || [];
-    res.json({ 
+    res.json({
       success: true,
       videos: videos,
       total: videos.length
     });
   } catch (err) {
     console.error('[videos] Error fetching videos:', err.message);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Failed to fetch videos'
     });
@@ -2655,10 +2669,10 @@ app.get('/api/tiktok/videos', async (req, res) => {
   try {
     const username = req.query.username || 'aalacomputers';
     const apiKey = process.env.TIKTOK_API_KEY || process.env.RAPIDAPI_KEY;
-    
+
     if (!apiKey) {
       console.warn('[tiktok] No API key configured, returning mock data');
-      return res.json({ 
+      return res.json({
         videos: getMockTikTokVideos(),
         source: 'mock'
       });
@@ -2682,7 +2696,7 @@ app.get('/api/tiktok/videos', async (req, res) => {
     }
 
     const data = await response.json();
-    
+
     if (data.user && data.user.pinnedVideos && data.user.pinnedVideos.length > 0) {
       const videos = data.user.pinnedVideos.slice(0, 3).map(video => ({
         id: video.id,
@@ -2695,12 +2709,12 @@ app.get('/api/tiktok/videos', async (req, res) => {
         author: data.user.nickname || 'Aala Computers',
         authorAvatar: data.user.avatarLarger || '/placeholder.svg'
       }));
-      
+
       console.log(`[tiktok] Fetched ${videos.length} videos for @${username}`);
       return res.json({ videos, source: 'tiktok' });
     } else {
       console.warn('[tiktok] No pinned videos found, returning mock data');
-      return res.json({ 
+      return res.json({
         videos: getMockTikTokVideos(),
         source: 'mock'
       });
@@ -2708,7 +2722,7 @@ app.get('/api/tiktok/videos', async (req, res) => {
   } catch (err) {
     console.error('[tiktok] Error fetching videos:', err.message);
     // Return mock data as fallback
-    res.json({ 
+    res.json({
       videos: getMockTikTokVideos(),
       source: 'mock',
       error: err.message
@@ -2758,7 +2772,7 @@ function getMockTikTokVideos() {
 // PROTECTED: Create prebuild
 app.post('/api/admin/prebuilds', async (req, res) => {
   if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
-  
+
   const payload = req.body || {};
   if (!payload.name && !payload.title) {
     return res.status(400).json({ ok: false, error: 'Product name or title is required' });
@@ -2789,7 +2803,7 @@ app.post('/api/admin/prebuilds', async (req, res) => {
       console.log(`[prebuild] Created new prebuild: ${id}`);
       return res.json({ ok: true, product: doc.toObject() });
     }
-    
+
     const prebuilds = readDataFile('prebuilds.json') || [];
     const id = payload.id || `pb_${Date.now()}`;
     const newPrebuild = { id, ...payload, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
@@ -2805,7 +2819,7 @@ app.post('/api/admin/prebuilds', async (req, res) => {
 // PROTECTED: Update prebuild
 app.put('/api/admin/prebuilds/:id', async (req, res) => {
   if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
-  
+
   const { id } = req.params;
   const payload = req.body || {};
 
@@ -2817,7 +2831,7 @@ app.put('/api/admin/prebuilds/:id', async (req, res) => {
       if (!doc) {
         return res.status(404).json({ ok: false, error: 'Prebuild not found' });
       }
-      
+
       if (payload.name) doc.name = payload.name;
       if (payload.title) doc.title = payload.title;
       if (typeof payload.price !== 'undefined') doc.price = Number(payload.price);
@@ -2829,18 +2843,18 @@ app.put('/api/admin/prebuilds/:id', async (req, res) => {
       if (Array.isArray(payload.tags)) doc.tags = payload.tags;
       if (typeof payload.stock !== 'undefined') doc.stock = Number(payload.stock);
       doc.updatedAt = new Date();
-      
+
       await doc.save();
       console.log(`[prebuild] Updated prebuild: ${id}`);
       return res.json({ ok: true, product: doc.toObject() });
     }
-    
+
     const prebuilds = readDataFile('prebuilds.json') || [];
     const idx = prebuilds.findIndex(p => p._id === id || p.id === id);
     if (idx === -1) {
       return res.status(404).json({ ok: false, error: 'Prebuild not found' });
     }
-    
+
     prebuilds[idx] = { ...prebuilds[idx], ...payload, updatedAt: new Date().toISOString() };
     writeDataFile('prebuilds.json', prebuilds);
     return res.json({ ok: true, product: prebuilds[idx] });
@@ -2853,37 +2867,37 @@ app.put('/api/admin/prebuilds/:id', async (req, res) => {
 // PROTECTED: Delete prebuild
 app.delete('/api/admin/prebuilds/:id', async (req, res) => {
   if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
-  
+
   const { id } = req.params;
   console.log(`[prebuild] DELETE request for ID: ${id}`);
 
   try {
     const mongoose = require('mongoose');
     const PrebuildModel = getPrebuildModel();
-    
+
     if (PrebuildModel && mongoose.connection.readyState === 1) {
       console.log('[prebuild] Using MongoDB for deletion');
-      
+
       // Try multiple approaches to find and delete
       let result = null;
-      
+
       // Approach 1: Direct findByIdAndDelete
       try {
         result = await PrebuildModel.findByIdAndDelete(id);
       } catch (err) {
         console.log('[prebuild] findByIdAndDelete failed, trying findOne:', err.message);
       }
-      
+
       // Approach 2: Find by _id string match
       if (!result) {
         result = await PrebuildModel.findOneAndDelete({ _id: id });
       }
-      
+
       // Approach 3: Find by id field
       if (!result) {
         result = await PrebuildModel.findOneAndDelete({ id: id });
       }
-      
+
       if (!result) {
         console.log(`[prebuild] Not found in MongoDB, trying JSON file`);
         // Fall through to JSON file handling
@@ -2892,23 +2906,23 @@ app.delete('/api/admin/prebuilds/:id', async (req, res) => {
         return res.json({ ok: true, message: 'Prebuild deleted' });
       }
     }
-    
+
     // JSON file fallback
     console.log('[prebuild] Using JSON file for deletion');
     const prebuilds = readDataFile('prebuilds.json') || [];
     console.log(`[prebuild] Found ${prebuilds.length} prebuilds in file`);
-    
+
     const idx = prebuilds.findIndex(p => {
       const match = String(p._id) === String(id) || String(p.id) === String(id);
       if (match) console.log(`[prebuild] Match found at index ${idx}`);
       return match;
     });
-    
+
     if (idx === -1) {
       console.log('[prebuild] Prebuild not found in file either');
       return res.status(404).json({ ok: false, error: 'Prebuild not found' });
     }
-    
+
     const deleted = prebuilds.splice(idx, 1);
     writeDataFile('prebuilds.json', prebuilds);
     console.log(`[prebuild] Deleted from file:`, deleted[0]);
@@ -2942,7 +2956,7 @@ app.get('/api/db-status', (req, res) => {
 // Admin stats: total products, total sales (from data/orders.json or fallback), top-selling
 app.get('/api/admin/stats', (req, res) => {
   if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
-  (async function(){
+  (async function () {
     try {
       const mongoose = require('mongoose');
       let totalProducts = 0;
@@ -2974,7 +2988,7 @@ app.get('/api/admin/stats', (req, res) => {
               totalSales += (it.qty || 1);
             }
           }
-          topSelling = Object.keys(salesCount).map(k => ({ id: k, sold: salesCount[k] })).sort((a,b) => b.sold - a.sold).slice(0,10);
+          topSelling = Object.keys(salesCount).map(k => ({ id: k, sold: salesCount[k] })).sort((a, b) => b.sold - a.sold).slice(0, 10);
         } else {
           const orders = readDataFile('orders.json') || [];
           totalOrders = orders.length;
@@ -2988,7 +3002,7 @@ app.get('/api/admin/stats', (req, res) => {
               totalSales += (it.qty || 1);
             }
           }
-          topSelling = Object.keys(salesCount).map(k => ({ id: k, sold: salesCount[k] })).sort((a,b) => b.sold - a.sold).slice(0,10);
+          topSelling = Object.keys(salesCount).map(k => ({ id: k, sold: salesCount[k] })).sort((a, b) => b.sold - a.sold).slice(0, 10);
         }
       } catch (e) {
         const orders = readDataFile('orders.json') || [];
@@ -3003,7 +3017,7 @@ app.get('/api/admin/stats', (req, res) => {
             totalSales += (it.qty || 1);
           }
         }
-        topSelling = Object.keys(salesCount).map(k => ({ id: k, sold: salesCount[k] })).sort((a,b) => b.sold - a.sold).slice(0,10);
+        topSelling = Object.keys(salesCount).map(k => ({ id: k, sold: salesCount[k] })).sort((a, b) => b.sold - a.sold).slice(0, 10);
       }
 
       res.json({ ok: true, totalProducts, totalOrders, totalSales, topSelling });
@@ -3021,34 +3035,35 @@ app.get('/api/categories', async (req, res) => {
   try {
     const ProductModel = getProductModel();
     let categories = [];
-    
+
     if (ProductModel && mongoose && mongoose.connection.readyState === 1) {
       // Get categories from actual products in DB
       const dbCategories = await ProductModel.aggregate([
         { $match: { is_active: { $ne: false } } },
-        { $group: { 
+        {
+          $group: {
             _id: '$category',
             count: { $sum: 1 },
             brands: { $addToSet: '$brand' }
-          } 
+          }
         },
         { $match: { _id: { $ne: null, $ne: '' } } },
         { $sort: { _id: 1 } }
       ]);
-      
+
       // Load Pakistan categories for metadata
       const { PAKISTAN_CATEGORIES } = require('./data/pakistanCategories');
-      
+
       categories = dbCategories.map((cat, idx) => {
         const categoryName = cat._id;
         const slug = categoryName.toLowerCase().replace(/\s+/g, '-');
-        
+
         const pakistanCat = PAKISTAN_CATEGORIES.find(
-          pc => pc.name === categoryName || 
-                pc.slug === slug ||
-                (pc.alternativeNames && pc.alternativeNames.includes(categoryName))
+          pc => pc.name === categoryName ||
+            pc.slug === slug ||
+            (pc.alternativeNames && pc.alternativeNames.includes(categoryName))
         );
-        
+
         return {
           _id: categoryName,
           id: categoryName,
@@ -3060,14 +3075,14 @@ app.get('/api/categories', async (req, res) => {
           productCount: cat.count
         };
       });
-      
+
       console.log(`[/api/categories] Returning ${categories.length} categories from DB`);
     } else {
       // Fallback to file
       categories = readDataFile('categories.json') || [];
       console.log('[/api/categories] Using file-based fallback');
     }
-    
+
     res.setHeader('Cache-Control', 'public, max-age=300');
     res.json(categories);
   } catch (err) {
@@ -3082,30 +3097,31 @@ app.get('/api/admin/categories', async (req, res) => {
   try {
     const ProductModel = getProductModel();
     let categories = [];
-    
+
     if (ProductModel && mongoose && mongoose.connection.readyState === 1) {
       // Get all unique categories from products
       const dbCategories = await ProductModel.aggregate([
-        { $group: { 
+        {
+          $group: {
             _id: '$category',
             count: { $sum: 1 },
             brands: { $addToSet: '$brand' }
-          } 
+          }
         },
         { $match: { _id: { $ne: null, $ne: '' } } },
         { $sort: { _id: 1 } }
       ]);
-      
+
       const { PAKISTAN_CATEGORIES } = require('./data/pakistanCategories');
-      
+
       categories = dbCategories.map(cat => {
         const categoryName = cat._id;
         const slug = categoryName.toLowerCase().replace(/\s+/g, '-');
-        
+
         const pakistanCat = PAKISTAN_CATEGORIES.find(
           pc => pc.name === categoryName || pc.slug === slug
         );
-        
+
         return {
           _id: categoryName,
           id: categoryName,
@@ -3119,7 +3135,7 @@ app.get('/api/admin/categories', async (req, res) => {
     } else {
       categories = readDataFile('categories.json') || [];
     }
-    
+
     res.json({ ok: true, categories });
   } catch (err) {
     console.error('[admin/categories] Error:', err);
@@ -3153,7 +3169,7 @@ app.put('/api/admin/categories/:id', (req, res) => {
     const categories = readDataFile('categories.json') || [];
     const idx = categories.findIndex(c => String(c._id) === String(req.params.id) || String(c.id) === String(req.params.id));
     if (idx === -1) return res.status(404).json({ ok: false, error: 'Category not found' });
-    
+
     categories[idx] = { ...categories[idx], ...req.body, updatedAt: new Date() };
     writeDataFile('categories.json', categories);
     res.json({ ok: true, category: categories[idx] });
@@ -3169,7 +3185,7 @@ app.delete('/api/admin/categories/:id', (req, res) => {
     const categories = readDataFile('categories.json') || [];
     const idx = categories.findIndex(c => String(c._id) === String(req.params.id) || String(c.id) === String(req.params.id));
     if (idx === -1) return res.status(404).json({ ok: false, error: 'Category not found' });
-    
+
     categories.splice(idx, 1);
     writeDataFile('categories.json', categories);
     res.json({ ok: true, message: 'Category deleted' });
@@ -3189,161 +3205,161 @@ function intelligentProductMatch(product, categorySlug, categoryName) {
   const productCategory = (product.category || '').toLowerCase();
   const productBrand = (product.brand || '').toLowerCase();
   const productDesc = (product.description || '').toLowerCase();
-  
+
   const slug = categorySlug.toLowerCase();
   const catName = categoryName.toLowerCase();
-  
+
   // 1. EXACT CATEGORY MATCH (highest priority)
   if (productCategory === slug || productCategory === catName) {
     return { match: true, score: 100 };
   }
-  
+
   // 2. CATEGORY SPECIFIC RULES with strict boundaries
-  
+
   // PROCESSORS: SUPER STRICT - Only Intel/AMD CPUs, NO laptops, NO other brands
   if (slug === 'processors' || catName === 'processors' || slug === 'cpu' || catName === 'cpu') {
     // EXCLUDE IMMEDIATELY if it's a laptop or prebuilt
-    const isLaptop = productName.includes('laptop') || productName.includes('notebook') || 
-                     productName.includes('gaming laptop') || productName.includes('ultrabook') ||
-                     productName.includes('legion') || productName.includes('ideapad') ||
-                     productName.includes('thinkpad') || productName.includes('thinkbook') ||
-                     productName.includes('victus') || productName.includes('pavilion') ||
-                     productName.includes('elitebook') || productName.includes('probook') ||
-                     productName.includes('vivobook') || productName.includes('zenbook') ||
-                     productName.includes('tuf gaming') || productName.includes('rog strix') ||
-                     productCategory.includes('laptop') || productCategory.includes('notebook');
-    
+    const isLaptop = productName.includes('laptop') || productName.includes('notebook') ||
+      productName.includes('gaming laptop') || productName.includes('ultrabook') ||
+      productName.includes('legion') || productName.includes('ideapad') ||
+      productName.includes('thinkpad') || productName.includes('thinkbook') ||
+      productName.includes('victus') || productName.includes('pavilion') ||
+      productName.includes('elitebook') || productName.includes('probook') ||
+      productName.includes('vivobook') || productName.includes('zenbook') ||
+      productName.includes('tuf gaming') || productName.includes('rog strix') ||
+      productCategory.includes('laptop') || productCategory.includes('notebook');
+
     if (isLaptop) return { match: false, score: 0 };
-    
+
     // ONLY ALLOW Intel and AMD brands
     const isIntelAMD = productBrand.includes('intel') || productBrand.includes('amd') ||
-                       productName.includes('intel') || productName.includes('amd');
-    
+      productName.includes('intel') || productName.includes('amd');
+
     if (!isIntelAMD) return { match: false, score: 0 }; // Reject if not Intel/AMD
-    
+
     // Intel processor patterns - must be desktop CPU
-    const intelPatterns = ['i3', 'i5', 'i7', 'i9', 'core i3', 'core i5', 'core i7', 'core i9', 
-                          'pentium', 'celeron', 'xeon', 'intel core'];
+    const intelPatterns = ['i3', 'i5', 'i7', 'i9', 'core i3', 'core i5', 'core i7', 'core i9',
+      'pentium', 'celeron', 'xeon', 'intel core'];
     const hasIntel = intelPatterns.some(kw => productName.includes(kw));
-    
+
     // AMD processor patterns - must be desktop CPU
-    const amdPatterns = ['ryzen', 'ryzen 3', 'ryzen 5', 'ryzen 7', 'ryzen 9', 'threadripper', 
-                        'athlon', 'fx-', 'a4-', 'a6-', 'a8-', 'a10-', 'a12-'];
+    const amdPatterns = ['ryzen', 'ryzen 3', 'ryzen 5', 'ryzen 7', 'ryzen 9', 'threadripper',
+      'athlon', 'fx-', 'a4-', 'a6-', 'a8-', 'a10-', 'a12-'];
     const hasAMD = amdPatterns.some(kw => productName.includes(kw));
-    
+
     // Additional exclusion: if name contains screen size or "gen" with number (laptop indicator)
     const hasScreenSize = /\d{2,3}(\.\d)?\s*inch|\d{2,3}(\.\d)?"/i.test(productName);
     const hasGenIndicator = /\d{1,2}th\s*gen/i.test(productName) && !productName.toLowerCase().startsWith('intel') && !productName.toLowerCase().startsWith('amd');
-    
+
     if (hasScreenSize || hasGenIndicator) {
       return { match: false, score: 0 };
     }
-    
+
     // Must have Intel OR AMD keywords AND must not be a laptop
     if ((hasIntel || hasAMD) && !isLaptop) {
       // Priority scoring: Products starting with Intel/AMD get higher score
-      const startsWithIntelAMD = productName.toLowerCase().startsWith('intel') || 
-                                  productName.toLowerCase().startsWith('amd');
+      const startsWithIntelAMD = productName.toLowerCase().startsWith('intel') ||
+        productName.toLowerCase().startsWith('amd');
       return { match: true, score: startsWithIntelAMD ? 100 : 95 };
     }
-    
+
     return { match: false, score: 0 };
   }
-  
+
   // LAPTOPS: Must explicitly contain laptop/notebook
   if (slug === 'laptops' || catName === 'laptops') {
     const isLaptop = productName.includes('laptop') || productName.includes('notebook');
     if (isLaptop) return { match: true, score: 95 };
     return { match: false, score: 0 };
   }
-  
+
   // GRAPHICS CARDS: GPU/Graphics keywords, not monitors
   if (slug === 'graphics-cards' || catName === 'graphics cards' || slug === 'gpu') {
     const isMonitor = productName.includes('monitor') || productName.includes('display') || productName.includes('screen');
     if (isMonitor) return { match: false, score: 0 };
-    
+
     // Enhanced GPU detection for various naming patterns
     const gpuKeywords = ['rtx', 'gtx', 'radeon', 'rx', 'graphics card', 'gpu', 'video card', 'geforce'];
     const gpuBrands = ['nvidia', 'amd radeon', 'asus', 'msi', 'gigabyte', 'zotac', 'palit', 'evga', 'sapphire', 'xfx', 'powercolor'];
     const gpuModels = ['rtx 50', 'rtx 40', 'rtx 30', 'rtx 20', 'gtx 16', 'gtx 10', 'rx 7', 'rx 6', 'rx 5'];
-    
+
     const hasGPU = gpuKeywords.some(kw => productName.includes(kw) || productCategory.includes(kw));
     const hasGPUBrand = gpuBrands.some(brand => productName.includes(brand) || productBrand.includes(brand));
     const hasGPUModel = gpuModels.some(model => productName.includes(model));
-    
+
     // Match if has GPU keyword OR (GPU brand AND GPU model)
     if (hasGPU || (hasGPUBrand && hasGPUModel)) {
       return { match: true, score: 95 };
     }
   }
-  
+
   // MONITORS: Must contain monitor/display keywords
   if (slug === 'monitors' || catName === 'monitors') {
     const monitorKeywords = ['monitor', 'display', 'screen', 'lcd', 'led'];
     const hasMonitor = monitorKeywords.some(kw => productName.includes(kw));
     if (hasMonitor) return { match: true, score: 95 };
   }
-  
+
   // MOTHERBOARDS
   if (slug === 'motherboards' || catName === 'motherboards') {
     const mbKeywords = ['motherboard', 'mobo', 'mainboard', 'b550', 'b650', 'x570', 'z690', 'z790'];
     const hasMB = mbKeywords.some(kw => productName.includes(kw));
     if (hasMB) return { match: true, score: 90 };
   }
-  
+
   // RAM/MEMORY
   if (slug === 'ram' || catName === 'ram' || slug === 'memory') {
     const ramKeywords = ['ram', 'memory', 'ddr4', 'ddr5', 'dimm'];
     const hasRAM = ramKeywords.some(kw => productName.includes(kw));
     if (hasRAM) return { match: true, score: 90 };
   }
-  
+
   // STORAGE
   if (slug === 'storage' || catName === 'storage') {
     const storageKeywords = ['ssd', 'hdd', 'nvme', 'm.2', 'hard drive', 'drive'];
     const hasStorage = storageKeywords.some(kw => productName.includes(kw));
     if (hasStorage) return { match: true, score: 90 };
   }
-  
+
   // KEYBOARDS
   if (slug === 'keyboards' || catName === 'keyboards') {
     const kbKeywords = ['keyboard', 'mechanical'];
     const hasKB = kbKeywords.some(kw => productName.includes(kw));
     if (hasKB) return { match: true, score: 90 };
   }
-  
+
   // MOUSE
   if (slug === 'mouse' || catName === 'mouse') {
     const mouseKeywords = ['mouse', 'mice'];
     const hasMouse = mouseKeywords.some(kw => productName.includes(kw));
     if (hasMouse) return { match: true, score: 90 };
   }
-  
+
   // HEADSETS
   if (slug === 'headsets' || catName === 'headsets' || slug === 'headphones') {
     const headsetKeywords = ['headset', 'headphone', 'earphone'];
     const hasHeadset = headsetKeywords.some(kw => productName.includes(kw));
     if (hasHeadset) return { match: true, score: 90 };
   }
-  
+
   // CONTROLLERS / GAMEPADS
   if (slug === 'controllers' || catName === 'controllers' || slug === 'gamepad' || slug === 'controller') {
-    const controllerKeywords = ['controller', 'gamepad', 'joystick', 'dualsense', 'dualshock', 
-                                'xbox controller', 'ps5 controller', 'ps4 controller', 'game controller'];
+    const controllerKeywords = ['controller', 'gamepad', 'joystick', 'dualsense', 'dualshock',
+      'xbox controller', 'ps5 controller', 'ps4 controller', 'game controller'];
     const hasController = controllerKeywords.some(kw => productName.includes(kw) || productCategory.includes(kw));
     if (hasController) return { match: true, score: 90 };
   }
-  
+
   // 3. BRAND MATCHING (fallback)
   if (productBrand && (productName.includes(catName) || productBrand.includes(catName))) {
     return { match: true, score: 60 };
   }
-  
+
   // 4. PARTIAL CATEGORY NAME MATCH (weak signal)
   if (productCategory.includes(slug) || slug.includes(productCategory)) {
     return { match: true, score: 50 };
   }
-  
+
   return { match: false, score: 0 };
 }
 
@@ -3354,43 +3370,44 @@ app.get('/api/categories/dynamic', async (req, res) => {
     if (categoryCache.data && (Date.now() - categoryCache.timestamp) < categoryCache.ttl) {
       return res.json(categoryCache.data);
     }
-    
+
     const ProductModel = getProductModel();
     let categories = [];
-    
+
     if (ProductModel && mongoose && mongoose.connection.readyState === 1) {
       // Get unique categories with their brands from products
       const dbCategories = await ProductModel.aggregate([
         { $match: { is_active: { $ne: false } } },
-        { $group: { 
+        {
+          $group: {
             _id: '$category',
             count: { $sum: 1 },
             brands: { $addToSet: '$brand' }
-          } 
+          }
         },
         { $match: { _id: { $ne: null, $ne: '' } } },
         { $sort: { count: -1 } }
       ]);
-      
+
       // Load Pakistan categories for additional metadata
       const { PAKISTAN_CATEGORIES } = require('./data/pakistanCategories');
-      
+
       // Build categories list with enhanced metadata
       categories = dbCategories.map((cat, idx) => {
         const categoryName = cat._id;
         const slug = categoryName.toLowerCase().replace(/\s+/g, '-');
-        
+
         // Find matching Pakistan category for official brands
         const pakistanCat = PAKISTAN_CATEGORIES.find(
-          pc => pc.name === categoryName || 
-                pc.slug === slug ||
-                (pc.alternativeNames && pc.alternativeNames.includes(categoryName))
+          pc => pc.name === categoryName ||
+            pc.slug === slug ||
+            (pc.alternativeNames && pc.alternativeNames.includes(categoryName))
         );
-        
+
         // Filter out null/empty brands and use official brands if available
         const activeBrands = cat.brands.filter(b => b && b.trim());
         const officialBrands = pakistanCat ? pakistanCat.brands : [];
-        
+
         return {
           _id: categoryName,
           id: categoryName,
@@ -3405,19 +3422,19 @@ app.get('/api/categories/dynamic', async (req, res) => {
           sortOrder: idx
         };
       });
-      
+
       console.log(`[categories/dynamic] Built ${categories.length} categories from DB`);
-      
+
     } else {
       // Fallback to file-based categories
       categories = readDataFile('categories.json') || [];
       console.log('[categories/dynamic] Using file-based fallback');
     }
-    
+
     // Cache the result
     categoryCache.data = categories;
     categoryCache.timestamp = Date.now();
-    
+
     res.setHeader('Cache-Control', 'public, max-age=300'); // Cache for 5 minutes
     res.json(categories);
   } catch (err) {
@@ -3438,27 +3455,27 @@ app.get('/api/categories/:slug/products', async (req, res) => {
     const skip = (page - 1) * limit;
     const brand = req.query.brand;
     const sortBy = req.query.sortBy || 'featured';
-    
+
     console.log(`[categories/${slug}/products] START: slug="${slug}", page=${page}, brand="${brand || 'all'}"`);
-    
+
     const ProductModel = getProductModel();
-    
+
     if (ProductModel && mongoose && mongoose.connection.readyState === 1) {
       // Load category detector for keyword-based matching
       const { detectCategory } = require('./utils/categoryDetector');
       const { PAKISTAN_CATEGORIES } = require('./data/pakistanCategories');
-      
+
       // Find category info
       const pakistanCategory = PAKISTAN_CATEGORIES.find(
         c => c.slug === slug || c.name.toLowerCase() === slug.toLowerCase()
       );
-      
+
       const categoryVariations = pakistanCategory ? [
         pakistanCategory.name,
         pakistanCategory.slug,
         ...(pakistanCategory.alternativeNames || [])
       ] : [slug];
-      
+
       // Build OPTIMIZED database query - filter at DB level, not in memory
       const query = {
         $or: categoryVariations.map(name => ({
@@ -3466,12 +3483,12 @@ app.get('/api/categories/:slug/products', async (req, res) => {
         })),
         is_active: { $ne: false }
       };
-      
+
       // Add brand filter at DB level
       if (brand && brand !== 'All') {
         query.brand = { $regex: new RegExp(brand, 'i') };
       }
-      
+
       // Build sort criteria
       let sort = {};
       switch (sortBy) {
@@ -3487,7 +3504,7 @@ app.get('/api/categories/:slug/products', async (req, res) => {
         default:
           sort = { createdAt: -1 }; // Featured/newest first
       }
-      
+
       // Execute OPTIMIZED query with pagination at DB level
       const [products, total] = await Promise.all([
         ProductModel.find(query)
@@ -3498,18 +3515,18 @@ app.get('/api/categories/:slug/products', async (req, res) => {
           .select('-__v'), // Exclude version key
         ProductModel.countDocuments(query)
       ]);
-      
+
       const elapsed = Date.now() - startTime;
       console.log(`[categories/${slug}/products] Found ${products.length} of ${total} total products (${elapsed}ms, DB-level filtering)`);
-      
+
       // Apply keyword-based validation and auto-correct if needed
       const validatedProducts = products.map(product => {
         const detectedCat = detectCategory(product);
-        
+
         // If detected category doesn't match current, flag for auto-correction
         if (detectedCat && detectedCat.toLowerCase() !== (product.category || '').toLowerCase()) {
           console.log(`  ⚠️  Auto-correct candidate: "${product.name}" (${product.category} → ${detectedCat})`);
-          
+
           // Optionally auto-correct in background (non-blocking)
           if (process.env.AUTO_CORRECT_CATEGORIES === 'true') {
             ProductModel.updateOne(
@@ -3518,10 +3535,10 @@ app.get('/api/categories/:slug/products', async (req, res) => {
             ).catch(err => console.error('Auto-correct error:', err));
           }
         }
-        
+
         return product;
       });
-      
+
       res.setHeader('Cache-Control', 'public, max-age=120'); // Cache for 2 minutes
       res.json({
         products: validatedProducts,
@@ -3531,23 +3548,23 @@ app.get('/api/categories/:slug/products', async (req, res) => {
         totalPages: Math.ceil(total / limit),
         hasMore: skip + products.length < total
       });
-      
+
     } else {
       // Fallback to file-based products
       console.log(`[categories/${slug}/products] Using JSON fallback (MongoDB not connected)`);
       const fileProducts = readDataFile('products.json') || [];
       const category = (readDataFile('categories.json') || []).find(c => c.slug === slug);
       const categoryName = category ? category.name : slug;
-      
+
       const filtered = fileProducts.filter(p => {
         const result = intelligentProductMatch(p, slug, categoryName);
         return result.match;
       });
-      
+
       const paginatedProducts = filtered.slice(skip, skip + limit);
       const elapsed = Date.now() - startTime;
       console.log(`[categories/${slug}/products] JSON fallback: Found ${paginatedProducts.length} of ${filtered.length} (${elapsed}ms)`);
-      
+
       res.json({
         products: paginatedProducts,
         total: filtered.length,
@@ -3557,7 +3574,7 @@ app.get('/api/categories/:slug/products', async (req, res) => {
         hasMore: skip + paginatedProducts.length < filtered.length
       });
     }
-    
+
   } catch (err) {
     console.error('[categories/:slug/products] Error:', err);
     res.status(500).json({ error: 'Failed to fetch category products' });
@@ -3588,23 +3605,23 @@ app.get('/api/category/:categoryId/products', async (req, res) => {
     const limit = parseInt(req.query.limit) || 32;
     const page = parseInt(req.query.page) || 1;
     const brand = req.query.brand;
-    
+
     console.log(`[category/${categoryId}/products] STRICT filtering for category_id=${categoryId}`);
-    
+
     const ProductModel = getProductModel();
-    
+
     if (ProductModel && mongoose && mongoose.connection.readyState === 1) {
       // Build strict query
       const query = {
         category_id: categoryId,
         is_active: { $ne: false }
       };
-      
+
       // Add brand filter if specified
       if (brand) {
         query.brand = { $regex: new RegExp(brand, 'i') };
       }
-      
+
       // Execute query with pagination
       const skip = (page - 1) * limit;
       const [products, total] = await Promise.all([
@@ -3616,9 +3633,9 @@ app.get('/api/category/:categoryId/products', async (req, res) => {
           .limit(limit),
         ProductModel.countDocuments(query)
       ]);
-      
+
       console.log(`[category/${categoryId}/products] Found ${products.length} products (total: ${total})`);
-      
+
       res.setHeader('Cache-Control', 'public, max-age=180'); // Cache for 3 minutes
       res.json({
         ok: true,
@@ -3633,10 +3650,10 @@ app.get('/api/category/:categoryId/products', async (req, res) => {
       // Fallback to file-based filtering
       const allProducts = readDataFile('products.json') || [];
       const filtered = allProducts.filter(p => p.category_id === categoryId && p.is_active !== false);
-      
+
       const skip = (page - 1) * limit;
       const paginated = filtered.slice(skip, skip + limit);
-      
+
       res.json({
         ok: true,
         products: paginated,
@@ -3655,22 +3672,22 @@ app.get('/api/category/:categoryId/products', async (req, res) => {
 // Admin: Validation endpoint to find mismatched products
 app.get('/api/admin/validate-products', async (req, res) => {
   if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
-  
+
   try {
     const ProductModel = getProductModel();
     const { PAKISTAN_CATEGORIES } = require('./data/pakistanCategories');
-    
+
     if (ProductModel && mongoose && mongoose.connection.readyState === 1) {
       const allProducts = await ProductModel.find({})
         .select('id Name name title category category_id brand brand_id is_active')
         .lean()
         .limit(1000);
-      
+
       const issues = [];
-      
+
       allProducts.forEach(product => {
         const productName = product.Name || product.name || product.title || 'Unnamed';
-        
+
         // Check 1: Missing category_id
         if (!product.category_id) {
           issues.push({
@@ -3680,7 +3697,7 @@ app.get('/api/admin/validate-products', async (req, res) => {
             details: `Product has category="${product.category}" but no category_id`
           });
         }
-        
+
         // Check 2: Invalid category_id
         if (product.category_id) {
           const validCategory = PAKISTAN_CATEGORIES.find(c => c.id === product.category_id);
@@ -3693,12 +3710,12 @@ app.get('/api/admin/validate-products', async (req, res) => {
             });
           }
         }
-        
+
         // Check 3: Brand doesn't match category
         if (product.category_id && product.brand) {
           const category = PAKISTAN_CATEGORIES.find(c => c.id === product.category_id);
           if (category && category.brands.length > 0) {
-            const brandMatches = category.brands.some(b => 
+            const brandMatches = category.brands.some(b =>
               b.toLowerCase() === product.brand.toLowerCase()
             );
             if (!brandMatches) {
@@ -3711,7 +3728,7 @@ app.get('/api/admin/validate-products', async (req, res) => {
             }
           }
         }
-        
+
         // Check 4: Missing brand
         if (!product.brand || product.brand === '') {
           issues.push({
@@ -3722,7 +3739,7 @@ app.get('/api/admin/validate-products', async (req, res) => {
           });
         }
       });
-      
+
       res.json({
         ok: true,
         total_products: allProducts.length,
@@ -3749,16 +3766,16 @@ app.get('/api/category/:categoryId/brands', async (req, res) => {
   try {
     const categoryId = parseInt(req.params.categoryId);
     const { PAKISTAN_CATEGORIES } = require('./data/pakistanCategories');
-    
+
     const category = PAKISTAN_CATEGORIES.find(c => c.id === categoryId);
-    
+
     if (!category) {
       return res.status(404).json({ ok: false, error: 'Category not found' });
     }
-    
+
     // Get actual brands from products in this category
     const ProductModel = getProductModel();
-    
+
     if (ProductModel && mongoose && mongoose.connection.readyState === 1) {
       const brands = await ProductModel.aggregate([
         { $match: { category_id: categoryId, is_active: { $ne: false } } },
@@ -3766,7 +3783,7 @@ app.get('/api/category/:categoryId/brands', async (req, res) => {
         { $match: { _id: { $ne: null, $ne: '' } } },
         { $sort: { count: -1 } }
       ]);
-      
+
       res.json({
         ok: true,
         category_id: categoryId,
@@ -3827,7 +3844,7 @@ app.put('/api/admin/brands/:id', (req, res) => {
     const brands = readDataFile('brands.json') || [];
     const idx = brands.findIndex(b => String(b._id) === String(req.params.id) || String(b.id) === String(req.params.id));
     if (idx === -1) return res.status(404).json({ ok: false, error: 'Brand not found' });
-    
+
     brands[idx] = { ...brands[idx], ...req.body, updatedAt: new Date() };
     writeDataFile('brands.json', brands);
     res.json({ ok: true, brand: brands[idx] });
@@ -3843,7 +3860,7 @@ app.delete('/api/admin/brands/:id', (req, res) => {
     const brands = readDataFile('brands.json') || [];
     const idx = brands.findIndex(b => String(b._id) === String(req.params.id) || String(b.id) === String(req.params.id));
     if (idx === -1) return res.status(404).json({ ok: false, error: 'Brand not found' });
-    
+
     brands.splice(idx, 1);
     writeDataFile('brands.json', brands);
     res.json({ ok: true, message: 'Brand deleted' });
@@ -3891,7 +3908,7 @@ app.put('/api/admin/deals/:id', (req, res) => {
     const deals = readDataFile('deals.json') || [];
     const idx = deals.findIndex(d => String(d._id) === String(req.params.id) || String(d.id) === String(req.params.id));
     if (idx === -1) return res.status(404).json({ ok: false, error: 'Deal not found' });
-    
+
     deals[idx] = { ...deals[idx], ...req.body, updatedAt: new Date() };
     writeDataFile('deals.json', deals);
     res.json({ ok: true, deal: deals[idx] });
@@ -3907,7 +3924,7 @@ app.delete('/api/admin/deals/:id', (req, res) => {
     const deals = readDataFile('deals.json') || [];
     const idx = deals.findIndex(d => String(d._id) === String(req.params.id) || String(d.id) === String(req.params.id));
     if (idx === -1) return res.status(404).json({ ok: false, error: 'Deal not found' });
-    
+
     deals.splice(idx, 1);
     writeDataFile('deals.json', deals);
     res.json({ ok: true, message: 'Deal deleted' });
@@ -3925,22 +3942,22 @@ app.delete('/api/admin/deals/:id', (req, res) => {
 app.get('/api/proxy-image', async (req, res) => {
   try {
     const imageUrl = req.query.url;
-    
+
     if (!imageUrl) {
       return res.status(400).json({ error: 'Missing url parameter' });
     }
-    
+
     // Validate URL is actually an image URL
     if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
       return res.status(400).json({ error: 'Invalid URL' });
     }
-    
+
     // Use node-fetch or https to fetch the image
     const https = require('https');
     const http = require('http');
-    
+
     const protocol = imageUrl.startsWith('https') ? https : http;
-    
+
     // Set timeout and headers
     const options = {
       timeout: 10000,
@@ -3948,25 +3965,25 @@ app.get('/api/proxy-image', async (req, res) => {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       }
     };
-    
+
     protocol.get(imageUrl, options, (response) => {
       // Check if response is successful
       if (response.statusCode !== 200) {
         return res.status(response.statusCode).json({ error: 'Failed to fetch image' });
       }
-      
+
       // Set appropriate headers
       res.setHeader('Content-Type', response.headers['content-type'] || 'image/jpeg');
       res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
       res.setHeader('Access-Control-Allow-Origin', '*');
-      
+
       // Pipe the image directly to response
       response.pipe(res);
     }).on('error', (err) => {
       console.error('[proxy-image] Error fetching image:', err.message);
       res.status(500).json({ error: 'Failed to fetch image' });
     });
-    
+
   } catch (error) {
     console.error('[proxy-image] Error:', error.message);
     res.status(500).json({ error: 'Server error' });
@@ -3985,7 +4002,7 @@ async function startServer() {
   try {
     // Load environment variables
     require('dotenv').config();
-    
+
     // Log all environment variables (sensitive ones will be masked)
     console.log('[server] Environment variables:');
     Object.keys(process.env).forEach(key => {
@@ -3995,14 +4012,14 @@ async function startServer() {
         console.log(`  ${key}: ${process.env[key]}`);
       }
     });
-    
+
     // Connect to MongoDB Atlas (products are stored there)
     let MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://uni804043_db_user:2124377as@cluster0.0cy1usa.mongodb.net/aalacomputer?retryWrites=true&w=majority';
-    
+
     // Log connection attempt (safely hiding credentials)
     const safeUri = MONGO_URI.replace(/mongodb(\+srv)?:\/\/[^@]+@/, 'mongodb$1://****:****@');
     console.log('[db] Connecting to MongoDB Atlas...', safeUri);
-    
+
     await mongoose.connect(MONGO_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
@@ -4013,24 +4030,24 @@ async function startServer() {
       family: 4
     });
     console.log('[db] ✅ Connected to MongoDB Atlas');
-    
+
     // Configure mongoose
     mongoose.set('bufferCommands', false);
     mongoose.set('strictQuery', false);
-    
+
     // Enhanced connection monitoring
     mongoose.connection.on('connected', () => {
       console.log('[db] Mongoose connection established');
     });
-    
+
     mongoose.connection.on('error', (err) => {
       console.error('[db] Mongoose connection error:', err.message);
     });
-    
+
     mongoose.connection.on('disconnected', () => {
       console.log('[db] Mongoose connection disconnected');
     });
-    
+
     // Verify connection by counting products
     try {
       const mongoose = require('mongoose');
@@ -4042,22 +4059,22 @@ async function startServer() {
           const schema = new mongoose.Schema({}, { strict: false });
           ProductModel = mongoose.model('Product', schema, 'products');
         }
-        
+
         const count = await ProductModel.countDocuments();
         console.log(`[db] ✅ Connection verified - found ${count} products`);
       }
     } catch (err) {
       console.error('[db] Failed to verify connection:', err.message);
     }
-    
+
     // ===== ADMIN STATISTICS ENDPOINT =====
     app.get('/api/admin/statistics', async (req, res) => {
       try {
         if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
-        
+
         const mongoose = require('mongoose');
         const ProductModel = getProductModel();
-        
+
         let statistics = {
           totalProducts: 0,
           totalSales: 0,
@@ -4068,7 +4085,7 @@ async function startServer() {
           recentOrders: [],
           salesByCategory: {}
         };
-        
+
         // Get total products from database
         if (ProductModel && mongoose.connection.readyState === 1) {
           try {
@@ -4081,7 +4098,7 @@ async function startServer() {
           const products = readDataFile('products.json') || [];
           statistics.totalProducts = products.length;
         }
-        
+
         // Load REAL orders from file
         try {
           const ordersData = readDataFile('orders.json') || [];
@@ -4089,7 +4106,7 @@ async function startServer() {
           statistics.totalSales = ordersData.length;
           statistics.totalRevenue = ordersData.reduce((sum, order) => sum + (order.total || 0), 0);
           statistics.avgOrderValue = statistics.totalOrders > 0 ? Math.round(statistics.totalRevenue / statistics.totalOrders) : 0;
-          
+
           // Get REAL top products from orders
           const productSales = {};
           ordersData.forEach(order => {
@@ -4103,12 +4120,12 @@ async function startServer() {
               });
             }
           });
-          
+
           // Sort by revenue and get top 5
           statistics.topProducts = Object.values(productSales)
             .sort((a, b) => b.revenue - a.revenue)
             .slice(0, 5);
-          
+
           // Get REAL recent orders
           statistics.recentOrders = ordersData.slice(-5).reverse().map(order => ({
             id: order.id || Math.random().toString(36).substr(2, 9),
@@ -4117,7 +4134,7 @@ async function startServer() {
             date: order.date || order.createdAt || new Date().toISOString(),
             items: order.items || []
           }));
-          
+
           // Calculate sales by category from orders
           const categorySales = {};
           ordersData.forEach(order => {
@@ -4135,7 +4152,7 @@ async function startServer() {
         } catch (err) {
           console.error('[admin/statistics] Orders file error:', err);
         }
-        
+
         res.json({ ok: true, statistics });
       } catch (err) {
         console.error('[admin/statistics] Error:', err);
@@ -4147,13 +4164,13 @@ async function startServer() {
     app.put('/api/admin/products/:id', async (req, res) => {
       try {
         if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
-        
+
         const productId = req.params.id;
         const updateData = req.body;
-        
+
         const mongoose = require('mongoose');
         const ProductModel = getProductModel();
-        
+
         if (ProductModel && mongoose.connection.readyState === 1) {
           try {
             const updated = await ProductModel.findByIdAndUpdate(
@@ -4161,7 +4178,7 @@ async function startServer() {
               { $set: updateData },
               { new: true }
             );
-            
+
             if (updated) {
               return res.json({ ok: true, product: updated });
             }
@@ -4169,17 +4186,17 @@ async function startServer() {
             console.error('[admin/products/update] DB error:', err);
           }
         }
-        
+
         // Fallback to file-based update
         let products = readDataFile('products.json') || [];
         const index = products.findIndex(p => (p.id || p._id) === productId);
-        
+
         if (index !== -1) {
           products[index] = { ...products[index], ...updateData };
           writeDataFile('products.json', products);
           return res.json({ ok: true, product: products[index] });
         }
-        
+
         res.status(404).json({ ok: false, error: 'Product not found' });
       } catch (err) {
         console.error('[admin/products/update] Error:', err);
@@ -4191,12 +4208,12 @@ async function startServer() {
     app.delete('/api/admin/products/:id', async (req, res) => {
       try {
         if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
-        
+
         const productId = req.params.id;
-        
+
         const mongoose = require('mongoose');
         const ProductModel = getProductModel();
-        
+
         if (ProductModel && mongoose.connection.readyState === 1) {
           try {
             const deleted = await ProductModel.findByIdAndDelete(productId);
@@ -4207,16 +4224,16 @@ async function startServer() {
             console.error('[admin/products/delete] DB error:', err);
           }
         }
-        
+
         // Fallback to file-based delete
         let products = readDataFile('products.json') || [];
         const filtered = products.filter(p => (p.id || p._id) !== productId);
-        
+
         if (filtered.length < products.length) {
           writeDataFile('products.json', filtered);
           return res.json({ ok: true, message: 'Product deleted' });
         }
-        
+
         res.status(404).json({ ok: false, error: 'Product not found' });
       } catch (err) {
         console.error('[admin/products/delete] Error:', err);
@@ -4271,11 +4288,11 @@ async function startServer() {
       }
       next();
     });
-    
+
     // ensure admin exists either in DB or file
     await ensureAdminUser();
 
-    app.listen(PORT,'0.0.0.0', () => console.log(`Backend server listening on port ${PORT}`));
+    app.listen(PORT, '0.0.0.0', () => console.log(`Backend server listening on port ${PORT}`));
   } catch (e) {
     console.error('Failed to start server', e && e.message);
     console.error('Stack trace:', e && e.stack);
@@ -4304,20 +4321,20 @@ app.get('/api/seo/product/:id', async (req, res) => {
     const { id } = req.params;
     const mongoose = require('mongoose');
     const ProductModel = getProductModel();
-    
+
     if (!ProductModel || mongoose.connection.readyState !== 1) {
       return res.status(503).json({ ok: false, error: 'Database not connected' });
     }
-    
+
     const product = await ProductModel.findById(id).lean();
     if (!product) {
       return res.status(404).json({ ok: false, error: 'Product not found' });
     }
-    
+
     // Generate SEO metadata
     const title = `${product.name || product.title} | Aala Computer Pakistan`;
     const description = `${product.name || product.title} - Best price in Pakistan. ${product.description?.substring(0, 100) || 'High-quality PC hardware'}. Free shipping. ✓ Authentic ✓ Warranty`;
-    
+
     res.json({
       ok: true,
       seo: {
@@ -4337,7 +4354,7 @@ app.get('/api/seo/product/:id', async (req, res) => {
 app.get('/api/seo/category/:category', async (req, res) => {
   try {
     const { category } = req.params;
-    
+
     const categoryDescriptions = {
       'Graphics Cards': 'Best Graphics Cards in Pakistan | GPUs, RTX, Radeon | Aala Computer',
       'Processors': 'Best CPUs in Pakistan | Intel, AMD Processors | Aala Computer',
@@ -4350,10 +4367,10 @@ app.get('/api/seo/category/:category', async (req, res) => {
       'Mouse': 'Best Gaming Mouse in Pakistan | High DPI | Aala Computer',
       'Headsets': 'Best Gaming Headsets in Pakistan | 7.1 Surround | Aala Computer'
     };
-    
+
     const title = categoryDescriptions[category] || `${category} | Aala Computer Pakistan`;
     const description = `Shop ${category.toLowerCase()} online in Pakistan. Best prices, authentic products, free delivery. ✓ Warranty ✓ Support`;
-    
+
     res.json({
       ok: true,
       seo: {

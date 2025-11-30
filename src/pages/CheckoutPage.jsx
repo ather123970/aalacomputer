@@ -5,6 +5,7 @@ import emailjs from '@emailjs/browser'
 import Navbar from '../nav'
 import SmartImage from '../components/SmartImage'
 import { API_CONFIG } from '../config/api'
+import '../styles/CheckoutPage.css'
 
 // Initialize EmailJS
 emailjs.init('Y_CyOsWzg0DHn4Spg')
@@ -52,7 +53,7 @@ export default function CheckoutPage() {
   const [orderPlaced, setOrderPlaced] = useState(false)
   const [selectedPayment, setSelectedPayment] = useState('cod')
   const [whatsappNumber, setWhatsappNumber] = useState('+923125066195')
-  
+
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -66,6 +67,7 @@ export default function CheckoutPage() {
   const [formErrors, setFormErrors] = useState({})
   const [showBankDetails, setShowBankDetails] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
+  const [trackingId, setTrackingId] = useState(null)
 
   // Load cart from localStorage
   useEffect(() => {
@@ -116,27 +118,27 @@ export default function CheckoutPage() {
 
   const validateForm = () => {
     const errors = {}
-    
+
     if (!formData.fullName.trim()) {
       errors.fullName = 'Full name is required'
     }
-    
+
     if (!formData.email.trim()) {
       errors.email = 'Email is required'
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       errors.email = 'Invalid email format'
     }
-    
+
     if (!formData.phone.trim()) {
       errors.phone = 'Phone number is required'
     } else if (!/^[\d\s\-\+\(\)]{10,}$/.test(formData.phone.replace(/\s/g, ''))) {
       errors.phone = 'Invalid phone number'
     }
-    
+
     if (!formData.address.trim()) {
       errors.address = 'Address is required'
     }
-    
+
     if (!formData.city.trim()) {
       errors.city = 'City is required'
     }
@@ -182,7 +184,43 @@ export default function CheckoutPage() {
       const tax = calculateTax()
       const total = calculateTotal()
       const paymentMethod = PAYMENT_METHODS[selectedPayment.toUpperCase()] || PAYMENT_METHODS.COD
-      
+
+      // First, create order in database to get tracking ID
+      const base = API_CONFIG.BASE_URL.replace(/\/+$/, '')
+      const orderData = {
+        items: cartItems.map(item => ({
+          productId: item.id || item._id,
+          name: item.name,
+          qty: item.qty || 1,
+          price: item.price,
+          img: item.img || item.image || ''
+        })),
+        total: total,
+        customer: {
+          name: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city
+        },
+        paymentMethod: paymentMethod.id,
+        status: 'order_placed'
+      }
+
+      // Create order in MongoDB
+      const orderResponse = await fetch(`${base}/api/order-tracking/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderData)
+      })
+
+      let createdTrackingId = null
+      if (orderResponse.ok) {
+        const orderResult = await orderResponse.json()
+        createdTrackingId = orderResult.order?.trackingId
+        console.log('Order created with tracking ID:', createdTrackingId)
+      }
+
       // Format items for email
       const orderItemsText = cartItems.map((item, idx) => {
         const itemTotal = item.price * (item.qty || 1)
@@ -206,7 +244,8 @@ export default function CheckoutPage() {
         total_amount: `Rs. ${total.toLocaleString()}`,
         product_image: productImageURL,
         payment_method: paymentMethod.name,
-        payment_image: ''
+        payment_image: '',
+        tracking_id: createdTrackingId || 'N/A'
       }
 
       console.log('Sending email with params:', templateParams)
@@ -221,24 +260,23 @@ export default function CheckoutPage() {
 
       if (response.status === 200 || response.ok) {
         console.log('Email sent successfully:', response)
-        
+
         // Update product stock for each item in order
         try {
-          const base = API_CONFIG.BASE_URL.replace(/\/+$/, '')
           for (const item of cartItems) {
             const productId = item.id || item._id
             const qty = item.qty || 1
-            
+
             // Fetch current product
             const productResponse = await fetch(`${base}/api/product/${productId}`, {
               cache: 'no-store'
             })
-            
+
             if (productResponse.ok) {
               const product = await productResponse.json()
               const currentStock = product.stock || 0
               const newStock = Math.max(0, currentStock - qty)
-              
+
               // Update product stock
               await fetch(`${base}/api/products/${productId}`, {
                 method: 'PUT',
@@ -248,7 +286,7 @@ export default function CheckoutPage() {
                   sold: (product.sold || 0) + qty
                 })
               })
-              
+
               console.log(`Updated stock for ${item.name}: ${currentStock} → ${newStock}`)
             }
           }
@@ -258,14 +296,28 @@ export default function CheckoutPage() {
 
         // Clear cart
         localStorage.removeItem('aala_cart')
-        
+
+        // Save tracking ID for display
+        if (createdTrackingId) {
+          setTrackingId(createdTrackingId)
+
+          // Copy to clipboard
+          navigator.clipboard.writeText(createdTrackingId).then(() => {
+            console.log('Tracking ID copied to clipboard:', createdTrackingId)
+          }).catch(err => {
+            console.error('Failed to copy tracking ID:', err)
+          })
+        }
+
         // Show success message
         setOrderPlaced(true)
-        
-        // Redirect after 3 seconds
-        setTimeout(() => {
-          navigate('/')
-        }, 3000)
+
+        // Auto-redirect to tracking page after 2 seconds
+        if (createdTrackingId) {
+          setTimeout(() => {
+            navigate(`/track-order?id=${createdTrackingId}`)
+          }, 2000)
+        }
       }
     } catch (err) {
       console.error('Error sending email:', err)
@@ -288,50 +340,146 @@ export default function CheckoutPage() {
 
   if (orderPlaced) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-white flex items-center justify-center">
+      <div className="checkout-page">
         <Navbar />
-        <div className="max-w-2xl mx-auto px-4 py-20">
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-500 rounded-2xl p-8 text-center shadow-2xl">
-            {/* Animated checkmark */}
-            <div className="mb-6 flex justify-center">
-              <div className="relative w-24 h-24">
-                <div className="absolute inset-0 bg-green-200 rounded-full animate-ping opacity-75"></div>
-                <div className="relative w-24 h-24 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-16 h-16 text-green-600 animate-bounce" />
+        <div className="checkout-container">
+          <div className="max-w-2xl mx-auto">
+            <div style={{
+              background: 'white',
+              borderRadius: '24px',
+              padding: '3rem 2rem',
+              textAlign: 'center',
+              boxShadow: '0 10px 40px rgba(59, 130, 246, 0.15)',
+              border: '2px solid rgba(59, 130, 246, 0.2)'
+            }}>
+              {/* Animated checkmark */}
+              <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'center' }}>
+                <div style={{ position: 'relative', width: '100px', height: '100px' }}>
+                  <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                    borderRadius: '50%',
+                    animation: 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite',
+                    opacity: 0.3
+                  }}></div>
+                  <div style={{
+                    position: 'relative',
+                    width: '100px',
+                    height: '100px',
+                    background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justificationContent: 'center'
+                  }}>
+                    <CheckCircle style={{ width: '60px', height: '60px', color: 'white' }} />
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            {/* Main heading with animation */}
-            <h1 className="text-4xl md:text-5xl font-bold text-green-700 mb-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
-              Order Placed Successfully! ✅
-            </h1>
-            
-            {/* Subheading */}
-            <p className="text-xl text-gray-700 mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
-              Thank you for your purchase!
-            </p>
-            
-            {/* Order confirmation details */}
-            <div className="bg-white/60 backdrop-blur-sm rounded-xl p-6 mb-8 border border-green-200 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
-              <p className="text-gray-700 font-semibold mb-2">Order Confirmation</p>
-              <p className="text-sm text-gray-600">
-                Your order has been successfully placed and saved. You will receive an email confirmation shortly.
+
+              {/* Main heading */}
+              <h1 style={{
+                fontSize: 'clamp(1.75rem, 4vw, 2.5rem)',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                marginBottom: '1rem'
+              }}>
+                Order Placed Successfully! 🎉
+              </h1>
+
+              {/* Subheading */}
+              <p style={{ fontSize: '1.1rem', color: '#64748b', marginBottom: '2rem' }}>
+                Thank you for your purchase!
               </p>
+
+              {/* Tracking ID Display */}
+              {trackingId && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #eff6ff, #f0f9ff)',
+                  borderRadius: '16px',
+                  padding: '2rem',
+                  marginBottom: '1.5rem',
+                  border: '2px solid #bfdbfe'
+                }}>
+                  <p style={{ color: '#475569', fontWeight: 600, marginBottom: '1rem' }}>
+                    Your Order Tracking ID
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <code style={{
+                      fontSize: 'clamp(1.25rem, 3vw, 1.75rem)',
+                      fontWeight: 700,
+                      color: '#3b82f6',
+                      background: 'white',
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '12px',
+                      border: '2px solid #3b82f6',
+                      fontFamily: 'monospace'
+                    }}>
+                      {trackingId}
+                    </code>
+                    <Check style={{ width: '24px', height: '24px', color: '#22c55e' }} />
+                  </div>
+                  <p style={{ fontSize: '0.9rem', color: '#22c55e', marginTop: '1rem', fontWeight: 600 }}>
+                    ✓ Copied to clipboard!
+                  </p>
+                </div>
+              )}
+
+              {/* Redirect message */}
+              <div style={{
+                background: 'rgba(59, 130, 246, 0.05)',
+                borderRadius: '12px',
+                padding: '1.5rem',
+                marginBottom: '1.5rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <Loader style={{ width: '20px', height: '20px', color: '#3b82f6' }} className="spinner" />
+                  <p style={{ fontSize: '1rem', color: '#1e293b', fontWeight: 600 }}>
+                    Redirecting to tracking page...
+                  </p>
+                </div>
+                <p style={{ fontSize: '0.875rem', color: '#64748b' }}>
+                  You'll be redirected in 2 seconds
+                </p>
+              </div>
+
+              {/* Manual track button */}
+              {trackingId && (
+                <button
+                  onClick={() => navigate(`/track-order?id=${trackingId}`)}
+                  style={{
+                    width: '100%',
+                    padding: '1rem 2rem',
+                    background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '1.05rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(59, 130, 246, 0.3)'
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                >
+                  <Package size={20} />
+                  Track Your Order Now
+                </button>
+              )}
             </div>
-            
-            {/* Redirect message */}
-            <p className="text-lg text-gray-600 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
-              Redirecting to home page in 3 seconds...
-            </p>
-            
-            {/* Button */}
-            <button
-              onClick={() => navigate('/')}
-              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-3 px-8 rounded-lg transition-all shadow-md hover:shadow-lg transform hover:scale-105 active:scale-95 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-400"
-            >
-              Back to Home
-            </button>
           </div>
         </div>
       </div>
@@ -364,7 +512,7 @@ export default function CheckoutPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-white">
       <Navbar />
-      
+
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -401,9 +549,8 @@ export default function CheckoutPage() {
                     value={formData.fullName}
                     onChange={handleInputChange}
                     placeholder="Enter your full name"
-                    className={`w-full px-4 py-3 bg-white border-2 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${
-                      formErrors.fullName ? 'border-red-500 focus:ring-red-500' : 'border-blue-200 focus:ring-blue-500'
-                    }`}
+                    className={`w-full px-4 py-3 bg-white border-2 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${formErrors.fullName ? 'border-red-500 focus:ring-red-500' : 'border-blue-200 focus:ring-blue-500'
+                      }`}
                   />
                   {formErrors.fullName && (
                     <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
@@ -423,9 +570,8 @@ export default function CheckoutPage() {
                     value={formData.email}
                     onChange={handleInputChange}
                     placeholder="your@email.com"
-                    className={`w-full px-4 py-3 bg-white border-2 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${
-                      formErrors.email ? 'border-red-500 focus:ring-red-500' : 'border-blue-200 focus:ring-blue-500'
-                    }`}
+                    className={`w-full px-4 py-3 bg-white border-2 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${formErrors.email ? 'border-red-500 focus:ring-red-500' : 'border-blue-200 focus:ring-blue-500'
+                      }`}
                   />
                   {formErrors.email && (
                     <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
@@ -445,9 +591,8 @@ export default function CheckoutPage() {
                     value={formData.phone}
                     onChange={handleInputChange}
                     placeholder="+92 300 1234567"
-                    className={`w-full px-4 py-3 bg-white border-2 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${
-                      formErrors.phone ? 'border-red-500 focus:ring-red-500' : 'border-blue-200 focus:ring-blue-500'
-                    }`}
+                    className={`w-full px-4 py-3 bg-white border-2 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${formErrors.phone ? 'border-red-500 focus:ring-red-500' : 'border-blue-200 focus:ring-blue-500'
+                      }`}
                   />
                   {formErrors.phone && (
                     <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
@@ -467,9 +612,8 @@ export default function CheckoutPage() {
                     value={formData.city}
                     onChange={handleInputChange}
                     placeholder="e.g., Karachi"
-                    className={`w-full px-4 py-3 bg-white border-2 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${
-                      formErrors.city ? 'border-red-500 focus:ring-red-500' : 'border-blue-200 focus:ring-blue-500'
-                    }`}
+                    className={`w-full px-4 py-3 bg-white border-2 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${formErrors.city ? 'border-red-500 focus:ring-red-500' : 'border-blue-200 focus:ring-blue-500'
+                      }`}
                   />
                   {formErrors.city && (
                     <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
@@ -489,9 +633,8 @@ export default function CheckoutPage() {
                     value={formData.address}
                     onChange={handleInputChange}
                     placeholder="Enter your complete address"
-                    className={`w-full px-4 py-3 bg-white border-2 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${
-                      formErrors.address ? 'border-red-500 focus:ring-red-500' : 'border-blue-200 focus:ring-blue-500'
-                    }`}
+                    className={`w-full px-4 py-3 bg-white border-2 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${formErrors.address ? 'border-red-500 focus:ring-red-500' : 'border-blue-200 focus:ring-blue-500'
+                      }`}
                   />
                   {formErrors.address && (
                     <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
@@ -514,19 +657,16 @@ export default function CheckoutPage() {
                   <button
                     key={key}
                     onClick={() => setSelectedPayment(method.id)}
-                    className={`p-6 rounded-xl border-2 transition-all text-left ${
-                      selectedPayment === method.id
-                        ? 'border-blue-600 bg-blue-50 shadow-md'
-                        : 'border-blue-200 bg-white hover:border-blue-400'
-                    }`}
+                    className={`p-6 rounded-xl border-2 transition-all text-left ${selectedPayment === method.id
+                      ? 'border-blue-600 bg-blue-50 shadow-md'
+                      : 'border-blue-200 bg-white hover:border-blue-400'
+                      }`}
                   >
                     <div className="text-4xl mb-3">{method.icon}</div>
-                    <h3 className={`font-bold mb-1 text-lg ${
-                      selectedPayment === method.id ? 'text-blue-900' : 'text-gray-900'
-                    }`}>{method.name}</h3>
-                    <p className={`text-sm ${
-                      selectedPayment === method.id ? 'text-blue-700' : 'text-gray-600'
-                    }`}>{method.desc}</p>
+                    <h3 className={`font-bold mb-1 text-lg ${selectedPayment === method.id ? 'text-blue-900' : 'text-gray-900'
+                      }`}>{method.name}</h3>
+                    <p className={`text-sm ${selectedPayment === method.id ? 'text-blue-700' : 'text-gray-600'
+                      }`}>{method.desc}</p>
                   </button>
                 ))}
               </div>
@@ -539,7 +679,7 @@ export default function CheckoutPage() {
                       <Building2 className="w-5 h-5 text-white" />
                       Send your payment to these bank accounts:
                     </p>
-                    
+
                     {BANK_DETAILS.map((bank, idx) => (
                       <div key={idx} className="mb-4 pb-4 border-b border-gray-200 last:border-b-0 last:mb-0 last:pb-0">
                         <h4 className="font-bold text-white mb-3 text-base">{bank.bank}</h4>
@@ -632,11 +772,10 @@ export default function CheckoutPage() {
               <button
                 onClick={sendOrderEmail}
                 disabled={submitting}
-                className={`w-full py-4 rounded-lg font-bold text-white flex items-center justify-center gap-2 transition-all ${
-                  submitting
-                    ? 'bg-white/30 cursor-not-allowed'
-                    : 'bg-white text-blue-600 hover:bg-blue-50 active:scale-95 shadow-md'
-                }`}
+                className={`w-full py-4 rounded-lg font-bold text-white flex items-center justify-center gap-2 transition-all ${submitting
+                  ? 'bg-white/30 cursor-not-allowed'
+                  : 'bg-white text-blue-600 hover:bg-blue-50 active:scale-95 shadow-md'
+                  }`}
               >
                 {submitting ? (
                   <>

@@ -91,13 +91,13 @@ export default function Navbar() {
 
     // Listen for storage changes
     window.addEventListener('storage', handleStorageChange);
-    
+
     // Listen for custom cart update event
     window.addEventListener('cartUpdated', handleStorageChange);
-    
+
     // Initial check
     handleStorageChange();
-    
+
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('cartUpdated', handleStorageChange);
@@ -116,7 +116,7 @@ export default function Navbar() {
           const { items, timestamp } = JSON.parse(cartData);
           const now = Date.now();
           const oneDayMs = 24 * 60 * 60 * 1000;
-          
+
           // If cart is older than 24 hours, clear it
           if (now - timestamp > oneDayMs) {
             localStorage.removeItem('aala_cart');
@@ -157,7 +157,7 @@ export default function Navbar() {
         if (!alive) return;
         if (u) {
           setUser(u);
-          try { localStorage.setItem('user', JSON.stringify(u)); } catch (e) {}
+          try { localStorage.setItem('user', JSON.stringify(u)); } catch (e) { }
           return;
         }
         try {
@@ -202,25 +202,25 @@ export default function Navbar() {
 
   // ---- header content (regular React element) ----
   const header = (
-  <FM.header
+    <FM.header
       initial={{ y: 60, opacity: 1 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.28, ease: 'easeInOut' }}
-  className="bg-panel text-primary fixed top-0 left-0 w-full shadow-sm [&_svg]:text-white [&_svg]:!text-white [&_svg]:stroke-white"
-    // ensure header sits above most floating widgets but below UI debug overlays
-  style={{ transform: 'none', pointerEvents: 'auto', zIndex: 200000 }}
+      className="bg-panel text-primary fixed top-0 left-0 w-full shadow-sm [&_svg]:text-white [&_svg]:!text-white [&_svg]:stroke-white"
+      // ensure header sits above most floating widgets but below UI debug overlays
+      style={{ transform: 'none', pointerEvents: 'auto', zIndex: 200000 }}
       role="navigation"
       aria-label="Main navigation"
       tabIndex={0}
     >
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex items-center justify-between gap-4 pointer-events-auto">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex items-center justify-between gap-4 pointer-events-auto">
         {/* ✅ Brand Name Only */}
         <Link to="/" onClick={closeAll} className="text-lg font-bold text-blue-400 hover:text-blue-300 transition">
           Aala Computer
         </Link>
 
         {/* Desktop nav */}
-  <nav className="hidden md:flex items-center gap-6 flex-1 justify-center">
+        <nav className="hidden md:flex items-center gap-6 flex-1 justify-center">
           <Link to="/" onClick={closeAll} className="hover:text-blue-400 transition">Home</Link>
           <Link to="/products" onClick={closeAll} className="hover:text-blue-400 transition">Products</Link>
 
@@ -258,10 +258,12 @@ export default function Navbar() {
           </div>
 
           <Link to="/contact" onClick={closeAll} className="hover:text-blue-400 transition">Contact</Link>
+          <Link to="/track-order" onClick={closeAll} className="hover:text-blue-400 transition">Track Order</Link>
+
         </nav>
 
         {/* Right area desktop */}
-          <div className="hidden md:flex items-center gap-4 ml-auto">
+        <div className="hidden md:flex items-center gap-4 ml-auto">
           <button onClick={() => navigate('/cart')} className="relative hover:opacity-80 transition" aria-label="Open cart">
             <div className="w-11 h-11 bg-white rounded-lg flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow">
               <ShoppingCart size={22} style={{ color: '#000000', stroke: '#000000' }} strokeWidth={2.5} />
@@ -276,7 +278,7 @@ export default function Navbar() {
           </button>
 
           {user ? (
-              <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3">
               <button onClick={() => navigate('/profile')} className="p-2 rounded bg-white hover:bg-gray-100 flex items-center justify-center" aria-label="Profile">
                 <User size={20} style={{ color: '#000000', stroke: '#000000' }} strokeWidth={2.5} />
               </button>
@@ -290,7 +292,7 @@ export default function Navbar() {
         </div>
 
         {/* Mobile icons */}
-  <div className="md:hidden flex items-center gap-2 ml-auto pointer-events-auto">
+        <div className="md:hidden flex items-center gap-2 ml-auto pointer-events-auto">
           <button onClick={() => navigate('/cart')} className="relative hover:opacity-80 transition" aria-label="Open cart">
             <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg">
               <ShoppingCart size={20} style={{ color: '#000000', stroke: '#000000' }} strokeWidth={2.5} />
@@ -317,7 +319,7 @@ export default function Navbar() {
       {/* mobile menu (rendered inside header DOM to keep structure) */}
       <AnimatePresence>
         {isOpen && (
-            <FM.div
+          <FM.div
             key="mobile-menu"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -326,7 +328,7 @@ export default function Navbar() {
             className="md:hidden bg-card/95 border-t border-gray-800 shadow-inner"
             style={{ transform: 'none' }}
           >
-              <ul className="flex flex-col px-4 py-3 gap-1">
+            <ul className="flex flex-col px-4 py-3 gap-1">
               <li><Link to="/" onClick={closeAll} className="block px-3 py-2 hover:text-blue-400 transition">Home</Link></li>
               <li><Link to="/products" onClick={closeAll} className="block px-3 py-2 hover:text-blue-400 transition">Products</Link></li>
 
@@ -352,6 +354,12 @@ export default function Navbar() {
               <li className="pt-1 border-t border-gray-800">
                 <Link to="/contact" onClick={closeAll} className="block px-3 py-2 hover:text-blue-400 transition">Contact</Link>
               </li>
+              <li>
+                <Link to="/track-order" onClick={closeAll} className="block px-3 py-2 hover:text-blue-400 transition">Track Order</Link>
+              </li>
+              <li>
+
+              </li>
               <li className="pt-2 border-t border-gray-800">
                 <div className="flex gap-2">
                   <button onClick={() => { setIsOpen(false); navigate('/cart'); }} className="flex-1 px-3 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold">Cart ({cartCount})</button>
@@ -371,8 +379,8 @@ export default function Navbar() {
       {/* render header into body when mounted so it's outside transforms/stacking contexts */}
       {mounted && createPortal(header, document.body)}
 
-  {/* spacer so page content doesn't hide under header (responsive) */}
-  <div className="h-[72px] md:h-[72px] w-full" />
+      {/* spacer so page content doesn't hide under header (responsive) */}
+      <div className="h-[72px] md:h-[72px] w-full" />
 
       {/* Floating buttons removed from global header — moved to a dedicated page */}
     </>
