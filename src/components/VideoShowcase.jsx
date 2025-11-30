@@ -11,21 +11,21 @@ export default function VideoShowcase() {
     {
       id: 1,
       title: "110k PC that runs GTA 5 like a butter 🔥",
-      src: "/heroimg/midvideotoshow.mp4",
+      src: "/heroimg/ssstik.io_@aalacomputers_1764488159826.mp4",
       views: "1.25M",
       likes: "125.4K"
     },
     {
       id: 2,
       title: "Budget Gaming PC Build - 50K PKR 💻",
-      src: "/heroimg/2ndvideo (1).mp4",
+      src: "/heroimg/ssstik.io_@aalacomputers_1764488186318.mp4",
       views: "850K",
       likes: "89.2K"
     },
     {
       id: 3,
       title: "High-End Gaming Rig - RTX 4070 Beast 🚀",
-      src: "/heroimg/3rdimg.mp4",
+      src: "/heroimg/ssstik.io_@aalacomputers_1764488206401.mp4",
       views: "1.5M",
       likes: "156.8K"
     }
@@ -48,7 +48,7 @@ export default function VideoShowcase() {
     if (video) {
       // Always unmuted - audio always on
       video.muted = false;
-      
+
       // Force autoplay with multiple attempts
       const attemptPlay = async () => {
         try {
@@ -70,7 +70,7 @@ export default function VideoShowcase() {
     const scrollLeft = container.scrollLeft;
     const cardWidth = 400; // Approximate card width
     const newIndex = Math.round(scrollLeft / cardWidth);
-    
+
     if (newIndex !== currentIndex && newIndex < videos.length) {
       setCurrentIndex(newIndex);
       playCurrentVideo(newIndex);
@@ -83,7 +83,7 @@ export default function VideoShowcase() {
     const timer = setTimeout(() => {
       playCurrentVideo(currentIndex);
     }, 500);
-    
+
     return () => clearTimeout(timer);
   }, [currentIndex]);
 
@@ -92,7 +92,7 @@ export default function VideoShowcase() {
     const forcePlayOnMount = () => {
       // Try multiple times to ensure video plays
       const attempts = [500, 1000, 2000, 3000]; // Delays in ms
-      
+
       attempts.forEach((delay, index) => {
         setTimeout(() => {
           const video = videoRefs.current[currentIndex];
@@ -132,7 +132,7 @@ export default function VideoShowcase() {
           }
         });
       },
-      { 
+      {
         threshold: 0.3, // Play when 30% of video is visible
         rootMargin: '0px'
       }
@@ -275,11 +275,10 @@ export default function VideoShowcase() {
             {videos.map((_, index) => (
               <button
                 key={index}
-                className={`transition-all ${
-                  index === currentIndex
+                className={`transition-all ${index === currentIndex
                     ? 'w-8 h-3 bg-blue-600'
                     : 'w-3 h-3 bg-slate-300 hover:bg-slate-400'
-                } rounded-full`}
+                  } rounded-full`}
                 aria-label={`Video ${index + 1}`}
               />
             ))}
