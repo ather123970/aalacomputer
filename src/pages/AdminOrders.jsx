@@ -3,7 +3,7 @@ import { Package, Truck, CheckCircle, XCircle, Clock, Search, Filter, ChevronDow
 import { motion, AnimatePresence } from 'framer-motion';
 import '../styles/AdminOrders.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:10000';
 
 const AdminOrders = () => {
     const [orders, setOrders] = useState([]);

@@ -886,6 +886,15 @@ app.get('/api/proxy-image', async (req, res) => {
   }
 });
 
+// ✅ ORDER TRACKING ROUTES
+try {
+  const orderTrackingRouter = require(path.join(__dirname, 'orderTracking.js'));
+  app.use('/api/order-tracking', orderTrackingRouter);
+  console.log('[server] Order tracking routes mounted at /api/order-tracking');
+} catch (e) {
+  console.warn('[server] Could not load order tracking routes:', e.message);
+}
+
 // Simple buffer-based image fetcher
 app.get('/api/fetch-image', async (req, res) => {
   const imageUrl = req.query.url;
@@ -1008,14 +1017,23 @@ app.get('/api/v1/products', async (req, res) => {
 
       // Search filter
       if (search) {
-        query.$or = [
-          { Name: { $regex: search, $options: 'i' } },
-          { name: { $regex: search, $options: 'i' } },
-          { title: { $regex: search, $options: 'i' } },
-          { category: { $regex: search, $options: 'i' } },
-          { brand: { $regex: search, $options: 'i' } },
-          { Spec: { $regex: search, $options: 'i' } }
-        ];
+        const searchTerms = search.split(/\s+/).filter(term => term.length > 0);
+
+        if (searchTerms.length > 0) {
+          // Create an AND condition for all search terms
+          query.$and = searchTerms.map(term => ({
+            $or: [
+              { Name: { $regex: term, $options: 'i' } },
+              { name: { $regex: term, $options: 'i' } },
+              { title: { $regex: term, $options: 'i' } },
+              { category: { $regex: term, $options: 'i' } },
+              { brand: { $regex: term, $options: 'i' } },
+              { Spec: { $regex: term, $options: 'i' } },
+              { description: { $regex: term, $options: 'i' } },
+              { tags: { $regex: term, $options: 'i' } }
+            ]
+          }));
+        }
       }
 
       // Count total documents for pagination
@@ -1065,11 +1083,19 @@ app.get('/api/v1/products', async (req, res) => {
   }
 
   if (search) {
-    const searchLower = search.toLowerCase();
+    const searchTerms = search.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+
     prods = prods.filter(p => {
       const productName = (p.Name || p.name || '').toLowerCase();
       const productCategory = (p.category || '').toLowerCase();
-      return productName.includes(searchLower) || productCategory.includes(searchLower);
+      const productDesc = (p.description || '').toLowerCase();
+
+      // Check if ALL search terms are present in any of the fields
+      return searchTerms.every(term =>
+        productName.includes(term) ||
+        productCategory.includes(term) ||
+        productDesc.includes(term)
+      );
     });
   }
 

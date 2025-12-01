@@ -10,22 +10,22 @@ export default function VideoShowcase() {
   const videos = [
     {
       id: 1,
-      title: "110k PC that runs GTA 5 like a butter 🔥",
+      title: "Satisfied customer ✅",
       src: "/heroimg/ssstik.io_@aalacomputers_1764488159826.mp4",
       views: "1.25M",
       likes: "125.4K"
     },
     {
       id: 2,
-      title: "Budget Gaming PC Build - 50K PKR 💻",
+      title: "Tiktoker visit aalacomputer 🎵",
       src: "/heroimg/ssstik.io_@aalacomputers_1764488186318.mp4",
       views: "850K",
       likes: "89.2K"
     },
     {
       id: 3,
-      title: "High-End Gaming Rig - RTX 4070 Beast 🚀",
-      src: "/heroimg/ssstik.io_@aalacomputers_1764488206401.mp4",
+      title: "low budget but customer satisfied 💯",
+      src: "/heroimg/ssstik.io_@aalacomputer_1764488206401.mp4",
       views: "1.5M",
       likes: "156.8K"
     }
@@ -276,8 +276,8 @@ export default function VideoShowcase() {
               <button
                 key={index}
                 className={`transition-all ${index === currentIndex
-                    ? 'w-8 h-3 bg-blue-600'
-                    : 'w-3 h-3 bg-slate-300 hover:bg-slate-400'
+                  ? 'w-8 h-3 bg-blue-600'
+                  : 'w-3 h-3 bg-slate-300 hover:bg-slate-400'
                   } rounded-full`}
                 aria-label={`Video ${index + 1}`}
               />

@@ -21,13 +21,13 @@ const AdminDashboardPro = () => {
       navigate('/admin/login');
       return;
     }
-    
+
     // Verify token is still valid (check expiration)
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
       const expiresAt = payload.exp * 1000;
       const now = Date.now();
-      
+
       if (now > expiresAt) {
         // Token expired
         sessionStorage.removeItem('aalacomp_admin_token');
@@ -42,7 +42,7 @@ const AdminDashboardPro = () => {
 
   // Lazy load components only when tab is active
   const renderContent = () => {
-    switch(activeTab) {
+    switch (activeTab) {
       case 'analytics':
         return <AdminAnalytics showMessage={showMessage} />;
       case 'products':
@@ -72,6 +72,7 @@ const AdminDashboardPro = () => {
   const tabs = [
     { id: 'analytics', label: 'Dashboard', icon: BarChart3 },
     { id: 'products', label: 'Products', icon: Package },
+    { id: 'orders', label: 'Orders', icon: Package, isLink: true, path: '/admin/orders' },
     { id: 'create', label: 'Create', icon: Plus },
     { id: 'categories', label: 'Settings', icon: Settings }
   ];
@@ -82,9 +83,8 @@ const AdminDashboardPro = () => {
       <motion.aside
         initial={{ x: -300 }}
         animate={{ x: 0 }}
-        className={`fixed left-0 top-0 h-screen w-64 bg-white border-r border-blue-200 shadow-lg z-40 transition-all duration-300 ${
-          !sidebarOpen ? '-translate-x-full' : ''
-        }`}
+        className={`fixed left-0 top-0 h-screen w-64 bg-white border-r border-blue-200 shadow-lg z-40 transition-all duration-300 ${!sidebarOpen ? '-translate-x-full' : ''
+          }`}
       >
         {/* Sidebar Header */}
         <div className="p-6 border-b border-blue-200">
@@ -108,14 +108,17 @@ const AdminDashboardPro = () => {
                 key={tab.id}
                 whileHover={{ x: 5 }}
                 onClick={() => {
-                  setActiveTab(tab.id);
-                  setSidebarOpen(false);
+                  if (tab.isLink && tab.path) {
+                    navigate(tab.path);
+                  } else {
+                    setActiveTab(tab.id);
+                    setSidebarOpen(false);
+                  }
                 }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition font-medium ${
-                  activeTab === tab.id
-                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md'
-                    : 'text-gray-700 hover:bg-blue-50'
-                }`}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition font-medium ${activeTab === tab.id
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md'
+                  : 'text-gray-700 hover:bg-blue-50'
+                  }`}
               >
                 {Icon ? <Icon size={20} /> : <span className="text-xl">{tab.icon}</span>}
                 <span>{tab.label}</span>
@@ -176,11 +179,10 @@ const AdminDashboardPro = () => {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className={`fixed top-24 right-6 px-6 py-3 rounded-lg z-40 shadow-xl font-medium ${
-              message.type === 'success' 
-                ? 'bg-gradient-to-r from-green-500 to-green-600 text-white' 
-                : 'bg-gradient-to-r from-red-500 to-red-600 text-white'
-            }`}
+            className={`fixed top-24 right-6 px-6 py-3 rounded-lg z-40 shadow-xl font-medium ${message.type === 'success'
+              ? 'bg-gradient-to-r from-green-500 to-green-600 text-white'
+              : 'bg-gradient-to-r from-red-500 to-red-600 text-white'
+              }`}
           >
             {message.text}
           </motion.div>
