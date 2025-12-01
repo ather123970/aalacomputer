@@ -25,6 +25,7 @@ const App = () => {
   const [hasMore, setHasMore] = useState(true);
   const [allProductsLoaded, setAllProductsLoaded] = useState(false);
   const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [categoryImages, setCategoryImages] = useState({});
 
   const { ref: sectionRef, inView } = useInView({
     triggerOnce: false,
@@ -148,6 +149,27 @@ const App = () => {
       });
 
       setFeaturedProducts(featured);
+
+      // Extract category images for the carousel
+      const categoriesWithImages = [
+        'Processors', 'Graphics Cards', 'RAM', 'Motherboards',
+        'Storage', 'Monitors', 'Keyboards', 'Mouse',
+        'Headsets', 'PC Cases', 'Laptops'
+      ];
+
+      const images = {};
+      categoriesWithImages.forEach(cat => {
+        const product = prebuilds.find(p =>
+          (p.category || '').toLowerCase().includes(cat.toLowerCase()) ||
+          (cat === 'Graphics Cards' && (p.category || '').toLowerCase().includes('graphics')) ||
+          (cat === 'PC Cases' && (p.category || '').toLowerCase().includes('case'))
+        );
+        if (product && product.imageUrl) {
+          images[cat] = product.imageUrl;
+        }
+      });
+
+      setCategoryImages(images);
     }
   }, [prebuilds]);
 
@@ -355,9 +377,22 @@ const App = () => {
                         onClick={() => navigate(`/category/${category.slug}`)}
                         className="group flex flex-col items-center gap-4 flex-shrink-0 transition-all duration-300 transform hover:scale-110 hover:-translate-y-2"
                       >
-                        {/* Large Circle */}
-                        <div className={`w-32 h-32 ${category.color} rounded-full flex items-center justify-center text-5xl shadow-xl group-hover:shadow-2xl transition-all duration-300 border-4 border-white ring-4 ring-blue-100 group-hover:ring-blue-300`}>
-                          {category.icon}
+                        {/* Large Circle with Product Image or Emoji Fallback */}
+                        <div className={`w-32 h-32 ${categoryImages[category.name] ? 'bg-white' : category.color} rounded-full flex items-center justify-center overflow-hidden shadow-xl group-hover:shadow-2xl transition-all duration-300 border-4 border-white ring-4 ring-blue-100 group-hover:ring-blue-300`}>
+                          {categoryImages[category.name] ? (
+                            <img
+                              src={categoryImages[category.name]}
+                              alt={category.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextElementSibling.style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <div className={`${categoryImages[category.name] ? 'hidden' : 'flex'} w-full h-full items-center justify-center text-5xl`}>
+                            {category.icon}
+                          </div>
                         </div>
                         {/* Category Name */}
                         <h3 className="text-base font-bold text-gray-800 group-hover:text-blue-600 transition-colors max-w-[128px] text-center">
