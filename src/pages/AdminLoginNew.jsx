@@ -5,7 +5,7 @@ import { Lock, Mail, Eye, EyeOff, Package } from 'lucide-react';
 
 const AdminLoginNew = () => {
   const navigate = useNavigate();
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('admin@aalacomputer.com');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -19,16 +19,16 @@ const AdminLoginNew = () => {
     try {
       // Use import.meta.env for Vite (not process.env)
       const base = import.meta.env.VITE_API_URL || 'http://localhost:10000';
-      
+
       console.log('[AdminLogin] Attempting login with API base:', base);
       console.log('[AdminLogin] Username: admin, Password length:', password.length);
-      
+
       // Send login request to backend
-      const response = await fetch(`${base}/api/admin/login`, {
+      const response = await fetch(`${base}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: 'admin',
+          email: email,
           password: password
         })
       });
@@ -40,9 +40,9 @@ const AdminLoginNew = () => {
         const data = await response.json();
         console.log('[AdminLogin] Login successful, token received');
         // Store JWT token in sessionStorage (expires when browser closes)
-        sessionStorage.setItem('aalacomp_admin_token', data.token);
+        sessionStorage.setItem('aalacomp_admin_token', data.accessToken);
         console.log('[AdminLogin] Token stored in sessionStorage - will expire on browser close');
-        
+
         // Redirect to dashboard
         setTimeout(() => {
           navigate('/admin/dashboard');
@@ -59,7 +59,7 @@ const AdminLoginNew = () => {
       console.error('Login error - Stack:', error?.stack);
       console.error('Login error - Type:', typeof error);
       console.error('Login error - Constructor:', error?.constructor?.name);
-      
+
       // Provide more specific error messages
       let errorMsg = 'Connection error. Please try again.';
       if (error?.message?.includes('Failed to fetch')) {
@@ -67,7 +67,7 @@ const AdminLoginNew = () => {
       } else if (error?.message) {
         errorMsg = error.message;
       }
-      
+
       setError(errorMsg);
       setLoading(false);
     }
@@ -118,22 +118,24 @@ const AdminLoginNew = () => {
 
           {/* Login Form */}
           <form onSubmit={handleLogin} className="space-y-6" autoComplete="off">
-            {/* Username Field - Always "admin" */}
+            {/* Email Field */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3 }}
             >
               <label className="block text-sm font-semibold text-gray-900 mb-2">
-                Username
+                Email
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 text-blue-500" size={20} />
                 <input
-                  type="text"
-                  value="admin"
-                  disabled
-                  className="w-full pl-10 pr-4 py-3 border-2 border-blue-200 rounded-lg bg-gray-100 text-gray-900 font-semibold cursor-not-allowed"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter admin email"
+                  autoComplete="email"
+                  className="w-full pl-10 pr-4 py-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-500 transition bg-blue-50 text-gray-900 placeholder-gray-500"
                 />
               </div>
             </motion.div>

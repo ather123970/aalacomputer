@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Truck, CheckCircle, XCircle, Clock, Search, Filter, ChevronDown, AlertCircle, Loader } from 'lucide-react';
+import { Package, Truck, CheckCircle, XCircle, Clock, Search, Filter, ChevronDown, AlertCircle, Loader, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import '../styles/AdminOrders.css';
+import '../styles/AdminOrdersExtras.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:10000';
 
 const AdminOrders = () => {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [copiedId, setCopiedId] = useState(null);
     const [updating, setUpdating] = useState(null);
     const [filter, setFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
@@ -29,7 +31,7 @@ const AdminOrders = () => {
         setError('');
 
         try {
-            const token = localStorage.getItem('accessToken');
+            const token = sessionStorage.getItem('aalacomp_admin_token');
             const response = await fetch(`${API_URL}/api/order-tracking/admin/orders?status=${filter}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -57,7 +59,7 @@ const AdminOrders = () => {
         setUpdating(orderId);
 
         try {
-            const token = localStorage.getItem('accessToken');
+            const token = sessionStorage.getItem('aalacomp_admin_token');
             const response = await fetch(`${API_URL}/api/order-tracking/admin/orders/${orderId}/status`, {
                 method: 'PATCH',
                 headers: {
@@ -87,6 +89,16 @@ const AdminOrders = () => {
             alert('Failed to update order status. Please try again.');
         } finally {
             setUpdating(null);
+        }
+    };
+
+    const copyToClipboard = async (trackingId) => {
+        try {
+            await navigator.clipboard.writeText(trackingId);
+            setCopiedId(trackingId);
+            setTimeout(() => setCopiedId(null), 2000);
+        } catch (err) {
+            console.error('Failed to copy:', err);
         }
     };
 
@@ -207,7 +219,20 @@ const AdminOrders = () => {
                                                 className="order-row"
                                             >
                                                 <td>
-                                                    <span className="tracking-id">{order.trackingId}</span>
+                                                    <div className="tracking-id-cell">
+                                                        <span className="tracking-id">{order.trackingId}</span>
+                                                        <button
+                                                            onClick={() => copyToClipboard(order.trackingId)}
+                                                            className="copy-btn"
+                                                            title="Copy tracking ID"
+                                                        >
+                                                            {copiedId === order.trackingId ? (
+                                                                <Check size={16} className="icon-success" />
+                                                            ) : (
+                                                                <Copy size={16} />
+                                                            )}
+                                                        </button>
+                                                    </div>
                                                 </td>
                                                 <td>
                                                     <div className="customer-info">
@@ -216,7 +241,21 @@ const AdminOrders = () => {
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    <span className="items-count">{order.items?.length || 0} items</span>
+                                                    <div className="items-cell">
+                                                        <div className="items-count">{order.items?.length || 0} items</div>
+                                                        {order.items && order.items.length > 0 && (
+                                                            <div className="product-names">
+                                                                {order.items.slice(0, 2).map((item, idx) => (
+                                                                    <div key={idx} className="product-name" title={item.name}>
+                                                                        • {item.name}
+                                                                    </div>
+                                                                ))}
+                                                                {order.items.length > 2 && (
+                                                                    <div className="more-items">+{order.items.length - 2} more</div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td>
                                                     <span className="order-total">Rs. {order.total?.toLocaleString()}</span>

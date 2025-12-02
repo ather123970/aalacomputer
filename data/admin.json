@@ -1,5 +1,6 @@
 {
   "username": "admin",
-  "passwordHash": "$2b$10$Y08qnLjtlCKWZbf/kcXvhOBpGIwrbXDrxVfZcubOLtrjjUuazPc3i",
+  "email": "admin@aalacomputer.com",
+  "passwordHash": "$2b$10$9NGFGbOkuiUwC0nh62yEMOmSjV6ZRE/LE5weBqnQGdgjsumyZG2X6",
   "name": "Site Admin"
 }

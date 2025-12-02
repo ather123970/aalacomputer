@@ -25,7 +25,7 @@ export default function VideoShowcase() {
     {
       id: 3,
       title: "low budget but customer satisfied 💯",
-      src: "/heroimg/ssstik.io_@aalacomputer_1764488206401.mp4",
+      src: "/heroimg/ssstik.io_@aalacomputers_1764488206401.mp4",
       views: "1.5M",
       likes: "156.8K"
     }

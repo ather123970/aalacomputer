@@ -36,9 +36,9 @@ const AdminProductsTableV2 = ({ showMessage }) => {
       });
       const data = await response.json();
       const allProds = Array.isArray(data) ? data : data.products || [];
-      
+
       setAllProducts(allProds);
-      
+
       // Load first page
       loadPage(1, allProds);
     } catch (error) {
@@ -59,28 +59,28 @@ const AdminProductsTableV2 = ({ showMessage }) => {
     setLoading(true);
     try {
       const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
-      const token = localStorage.getItem('adminToken');
-      
+      const token = sessionStorage.getItem('aalacomp_admin_token');
+
       // Search directly from database using ADMIN API
       const response = await fetch(
         `${base}/api/admin/products?search=${encodeURIComponent(query)}&limit=5000`,
-        { 
+        {
           cache: 'no-store',
           headers: {
             'Authorization': `Bearer ${token}`
           }
         }
       );
-      
+
       if (!response.ok) {
         throw new Error(`API returned ${response.status}`);
       }
-      
+
       const data = await response.json();
       const searchResults = data.products || [];
-      
+
       console.log(`[AdminProductsTableV2] Search "${query}" returned ${searchResults.length} results`);
-      
+
       setAllProducts(searchResults);
       loadPage(1, searchResults);
     } catch (error) {
@@ -105,7 +105,7 @@ const AdminProductsTableV2 = ({ showMessage }) => {
   // Debounced search
   const handleSearch = (value) => {
     setSearchTerm(value);
-    
+
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
@@ -212,16 +212,16 @@ const AdminProductsTableV2 = ({ showMessage }) => {
     try {
       const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
       const productId = editingProduct._id || editingProduct.id;
-      
+
       // Get admin token from sessionStorage
       const adminToken = sessionStorage.getItem('aalacomp_admin_token');
-      
+
       // Use admin-protected endpoint for product updates
       const endpoint = `${base}/api/admin/products/${productId}`;
-      
+
       const response = await fetch(endpoint, {
         method: 'PUT',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           ...(adminToken && { 'Authorization': `Bearer ${adminToken}` })
         },
@@ -231,17 +231,17 @@ const AdminProductsTableV2 = ({ showMessage }) => {
 
       if (response.ok) {
         // Update local state
-        setProducts(products.map(p => 
-          (p._id || p.id) === productId 
+        setProducts(products.map(p =>
+          (p._id || p.id) === productId
             ? { ...p, ...editData }
             : p
         ));
-        setAllProducts(allProducts.map(p => 
-          (p._id || p.id) === productId 
+        setAllProducts(allProducts.map(p =>
+          (p._id || p.id) === productId
             ? { ...p, ...editData }
             : p
         ));
-        
+
         closeEditModal();
         showMessage('Product updated successfully!', 'success');
       } else {
@@ -263,7 +263,7 @@ const AdminProductsTableV2 = ({ showMessage }) => {
     try {
       const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
       const adminToken = sessionStorage.getItem('aalacomp_admin_token');
-      
+
       const response = await fetch(`${base}/api/admin/products/${id}`, {
         method: 'DELETE',
         headers: {
@@ -292,11 +292,11 @@ Price: ${product.price}
 Category: ${product.category}
 Brand: ${product.brand || 'N/A'}
 Stock: ${product.stock || 0}`;
-      
+
       await navigator.clipboard.writeText(productText);
       setCopiedProductId(product._id || product.id);
       showMessage('Product copied to clipboard!', 'success');
-      
+
       // Reset after 2 seconds
       setTimeout(() => setCopiedProductId(null), 2000);
     } catch (error) {
@@ -363,8 +363,8 @@ Stock: ${product.stock || 0}`;
                 >
                   <td className="px-4 py-3">
                     <div className="w-12 h-12 bg-gray-200 rounded overflow-hidden">
-                      <img 
-                        src={product.img || product.imageUrl || product.image || '/placeholder.svg'} 
+                      <img
+                        src={product.img || product.imageUrl || product.image || '/placeholder.svg'}
                         alt={product.name}
                         className="w-full h-full object-cover"
                         onError={(e) => {
@@ -383,11 +383,10 @@ Stock: ${product.stock || 0}`;
                     PKR {typeof product.price === 'number' ? product.price.toLocaleString() : product.price}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700">
-                    <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                      (product.stock || 0) > 0 
-                        ? 'bg-green-100 text-green-800' 
+                    <span className={`px-2 py-1 rounded text-xs font-semibold ${(product.stock || 0) > 0
+                        ? 'bg-green-100 text-green-800'
                         : 'bg-red-100 text-red-800'
-                    }`}>
+                      }`}>
                       {product.stock || 0}
                     </span>
                   </td>
@@ -408,11 +407,10 @@ Stock: ${product.stock || 0}`;
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => copyProductToClipboard(product)}
-                      className={`p-2 rounded transition text-white ${
-                        copiedProductId === (product._id || product.id)
+                      className={`p-2 rounded transition text-white ${copiedProductId === (product._id || product.id)
                           ? 'bg-green-500'
                           : 'bg-purple-500 hover:bg-purple-600'
-                      }`}
+                        }`}
                       title="Copy product to clipboard"
                     >
                       {copiedProductId === (product._id || product.id) ? (
@@ -510,13 +508,13 @@ Stock: ${product.stock || 0}`;
                 {/* Image Upload Section */}
                 <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <h3 className="font-semibold text-gray-900">Product Image</h3>
-                  
+
                   {/* Image Preview - Small Box */}
                   {imagePreview && (
                     <div className="relative w-32 h-32 bg-gray-200 rounded-lg overflow-hidden mx-auto">
-                      <img 
-                        src={imagePreview} 
-                        alt="Preview" 
+                      <img
+                        src={imagePreview}
+                        alt="Preview"
                         className="w-full h-full object-contain"
                         onError={(e) => {
                           e.target.src = '/placeholder.svg';
