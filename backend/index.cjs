@@ -97,7 +97,9 @@ const allowedOrigins = [
   'https://www.aalacomputer.com',
   'https://aalacomputerkarachi.vercel.app',
   'https://aalacomputer.onrender.com',
-  'https://aalacomputer-0uuf.onrender.com'
+  'https://aalacomputer-0uuf.onrender.com',
+  // ✅ Allow ALL Render.com domains (for any Render deployment)
+  /^https:\/\/.*\.onrender\.com$/
 ];
 
 app.use(cors({

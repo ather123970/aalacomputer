@@ -17,16 +17,29 @@ const AdminLoginNew = () => {
     setLoading(true);
 
     try {
-      // Use import.meta.env for Vite (not process.env)
-      const base = import.meta.env.VITE_API_URL || 'http://localhost:10000';
+      // Dynamic API URL - works in both dev and production
+      let base;
+      if (import.meta.env.DEV) {
+        // Development: use localhost
+        base = import.meta.env.VITE_API_URL || 'http://localhost:10000';
+      } else {
+        // Production: use same origin (Render serves both frontend and backend)
+        const protocol = window.location.protocol;
+        const hostname = window.location.hostname;
+        const port = window.location.port;
+        base = port && port !== '80' && port !== '443'
+          ? `${protocol}//${hostname}:${port}`
+          : `${protocol}//${hostname}`;
+      }
 
       console.log('[AdminLogin] Attempting login with API base:', base);
-      console.log('[AdminLogin] Username: admin, Password length:', password.length);
+      console.log('[AdminLogin] Password length:', password.length);
 
       // Send login request to backend
       const response = await fetch(`${base}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // Important for cookies
         body: JSON.stringify({
           email: email,
           password: password
