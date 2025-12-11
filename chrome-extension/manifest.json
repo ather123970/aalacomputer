@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Aala Computer Image Extractor",
+  "version": "1.0",
+  "description": "Auto-extract image URLs from Google Images",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "https://www.google.com/*",
+    "http://localhost:5173/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.google.com/search*"],
+      "js": ["content.js"]
+    }
+  ],
+  "action": {
+    "default_title": "Aala Image Extractor"
+  }
+}

@@ -1,0 +1,50 @@
+[
+  {
+    "productId": "690dce25593ec6a82cb7d2a8",
+    "title": "Amaze A692 Ultra Bass with Magnetic Buds Wired type C Handsfree",
+    "field": "brand",
+    "oldValue": "N/A",
+    "newValue": "MSI",
+    "reason": "Auto-detected from title"
+  },
+  {
+    "productId": "690dce25593ec6a82cb7d2b5",
+    "title": "Amaze A245 Maglite Wireless 10000Mah Power Bank 20W",
+    "field": "brand",
+    "oldValue": "N/A",
+    "newValue": "MSI",
+    "reason": "Auto-detected from title"
+  },
+  {
+    "productId": "690dce25593ec6a82cb7d3a5",
+    "title": "XP-PEN Magic Drawing Pad Standalone Tablet",
+    "field": "brand",
+    "oldValue": "N/A",
+    "newValue": "MSI",
+    "reason": "Auto-detected from title"
+  },
+  {
+    "productId": "690dce25593ec6a82cb7d649",
+    "title": "WIWU WiR001 15W Magsafe Charging",
+    "field": "brand",
+    "oldValue": "N/A",
+    "newValue": "MSI",
+    "reason": "Auto-detected from title"
+  },
+  {
+    "productId": "690dce27593ec6a82cb7dcd9",
+    "title": "WIWU PENCIL ONE 2 IN 1 PASSIVE STYLUS WITH MAGNETIC COVER",
+    "field": "brand",
+    "oldValue": "N/A",
+    "newValue": "MSI",
+    "reason": "Auto-detected from title"
+  },
+  {
+    "productId": "690dce27593ec6a82cb7dd18",
+    "title": "WIWU 5 in 1 513HVP Multifunctional Magic High Speed Data Transfer Usb C Adapter Type C Hub",
+    "field": "brand",
+    "oldValue": "N/A",
+    "newValue": "MSI",
+    "reason": "Auto-detected from title"
+  }
+]

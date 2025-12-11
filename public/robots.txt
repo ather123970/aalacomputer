@@ -1,0 +1,71 @@
+# Aala Computer - robots.txt
+# SEO Optimization for Google, Bing, and other search engines
+
+User-agent: *
+Allow: /
+Allow: /products
+Allow: /category
+Allow: /guides
+Allow: /blog
+Allow: /deals
+Allow: /about
+Allow: /contact
+
+# Disallow admin and internal pages
+Disallow: /admin
+Disallow: /admin/
+Disallow: /api
+Disallow: /api/
+Disallow: /backend
+Disallow: /backend/
+Disallow: /data
+Disallow: /data/
+Disallow: /cart
+Disallow: /checkout
+Disallow: /user
+Disallow: /user/
+Disallow: /profile
+Disallow: /profile/
+Disallow: /auth
+Disallow: /auth/
+Disallow: /login
+Disallow: /register
+Disallow: /search
+Disallow: /search?
+Disallow: /*.json
+Disallow: /*.xml
+Disallow: /node_modules
+Disallow: /dist
+Disallow: /build
+
+# Allow search engines to crawl CSS and JS
+Allow: /*.css$
+Allow: /*.js$
+Allow: /images/
+Allow: /assets/
+
+# Specific rules for Googlebot
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 0
+
+# Specific rules for Bingbot
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
+
+# Disallow bad bots
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
+
+# Sitemap location
+Sitemap: https://aalacomputer.com/sitemap.xml
+Sitemap: https://aalacomputer.com/sitemap-products.xml
+Sitemap: https://aalacomputer.com/sitemap-categories.xml
+Sitemap: https://aalacomputer.com/sitemap-guides.xml

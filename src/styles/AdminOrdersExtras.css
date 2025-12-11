@@ -1,0 +1,68 @@
+/* Copy Button and Product Names Styles */
+.tracking-id-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.copy-btn {
+    background: transparent;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 6px;
+    padding: 0.375rem;
+    cursor: pointer;
+    color: #3b82f6;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.copy-btn:hover {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: #3b82f6;
+}
+
+.copy-btn:active {
+    transform: scale(0.95);
+}
+
+.icon-success {
+    color: #10b981;
+}
+
+/* Items Cell with Product Names */
+.items-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.items-count {
+    font-weight: 600;
+    color: #1e293b;
+    font-size: 0.875rem;
+}
+
+.product-names {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+}
+
+.product-name {
+    font-size: 0.75rem;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+.more-items {
+    font-size: 0.75rem;
+    color: #3b82f6;
+    font-weight: 500;
+    font-style: italic;
+}

@@ -1,0 +1,83 @@
+/* Prevent text selection across the page except for product names */
+
+/* Disable selection globally */
+* {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Allow selection only for product names */
+.product-name,
+.product-title,
+.product-card h3,
+.product-card .name,
+.ProductCard h3,
+.PremiumUI h3,
+[data-selectable="product-name"],
+.product-name-text {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  user-select: text !important;
+}
+
+/* Allow selection in input fields and text areas */
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  user-select: text !important;
+}
+
+/* Drag selection is handled via JavaScript events in selectionControl.js */
+
+/* Disable text selection cursor globally */
+* {
+  cursor: default;
+}
+
+/* Show text cursor only for selectable elements */
+.product-name,
+.product-title,
+.product-card h3,
+.product-card .name,
+.ProductCard h3,
+.PremiumUI h3,
+[data-selectable="product-name"],
+.product-name-text,
+input,
+textarea,
+select,
+button,
+a {
+  cursor: auto;
+}
+
+/* Show pointer cursor for interactive elements */
+button,
+a,
+[role="button"],
+[onclick] {
+  cursor: pointer;
+}
+
+/* Prevent selection of prices, ratings, etc */
+.price,
+.rating,
+.brand,
+.category,
+.description,
+.specs,
+.product-meta,
+.product-info,
+.product-details {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+}
